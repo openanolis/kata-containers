@@ -130,8 +130,7 @@ impl Container {
                 &config.container_id,
                 spec.linux
                     .as_ref()
-                    .map(|linux| linux.resources.as_ref())
-                    .flatten(),
+                    .and_then(|linux| linux.resources.as_ref()),
             )
             .await?;
 
@@ -332,7 +331,7 @@ impl Container {
         let logger = logger_with_process(process);
         let inner = self.inner.read().await;
         if inner.init_process.status != ProcessStatus::Running {
-            warn!(logger, "container is running no need to resume");
+            warn!(logger, "container is not running");
             return Ok(());
         }
         self.agent
