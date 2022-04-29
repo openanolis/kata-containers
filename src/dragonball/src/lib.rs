@@ -6,6 +6,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 
-//! Dragonball is a sandbox as Virtual Machine Monitor that leverages the 
-//! Linux Kernel-based Virtual Machine (KVM), and other virtualization 
+//! Dragonball is a sandbox as Virtual Machine Monitor that leverages the
+//! Linux Kernel-based Virtual Machine (KVM), and other virtualization
 //! features to run a single lightweight micro-virtual machine (microVM).
+
+/// Resource manager for virtual machines.
+pub mod resource_manager;
