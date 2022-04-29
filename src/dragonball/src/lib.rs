@@ -10,5 +10,9 @@
 //! Linux Kernel-based Virtual Machine (KVM), and other virtualization
 //! features to run a single lightweight micro-virtual machine (microVM).
 
+/// Address space manager for virtual machines.
+pub mod address_space_manager;
 /// Resource manager for virtual machines.
 pub mod resource_manager;
+/// Virtual machine manager for virtual machines.
+pub mod vm;
