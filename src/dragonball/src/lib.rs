@@ -20,3 +20,5 @@ pub mod resource_manager;
 pub mod vm;
 /// Device manager for virtual machines.
 pub mod device_manager;
+
+mod config_manager;
