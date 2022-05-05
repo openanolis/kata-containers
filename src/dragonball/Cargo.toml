@@ -37,3 +37,4 @@ vm-memory = { version = "0.7.0", features = ["backend-mmap"] }
 
 [features]
 atomic-guest-memory = []
+virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]
