@@ -20,5 +20,7 @@ pub mod resource_manager;
 pub mod vm;
 /// Device manager for virtual machines.
 pub mod device_manager;
+/// Errors related to Virtual machine manager.
+pub mod error;
 
 mod config_manager;
