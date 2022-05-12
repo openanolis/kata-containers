@@ -12,6 +12,9 @@
 
 #![warn(missing_docs)]
 
+//TODO: Remoe this, after the rest of dragonball has been committed.
+#![allow(dead_code)]
+
 /// Address space manager for virtual machines.
 pub mod address_space_manager;
 /// Resource manager for virtual machines.
