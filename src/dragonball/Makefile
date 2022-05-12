@@ -1,0 +1,29 @@
+# Copyright (c) 2019-2022 Alibaba Cloud
+# Copyright (c) 2019-2022 Ant Group
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+default: build
+
+build:
+	cargo build --all-features
+
+check: clippy format
+
+clippy:
+	@echo "INFO: cargo clippy..."
+	cargo clippy --all-targets --all-features \
+		-- \
+		-D warnings
+
+format:
+	@echo "INFO: cargo fmt..."
+	cargo fmt -- --check
+
+clean:
+	cargo clean
+
+test:
+	@echo "INFO: testing dragonball for development build"
+	cargo test --all-features -- --nocapture
