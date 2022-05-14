@@ -31,6 +31,8 @@ pub mod signal_handler;
 pub mod metric;
 /// KVM operation context for virtual machines.
 pub mod kvm_context;
+/// Virtual CPU manager for virtual machines.
+pub mod vcpu;
 
 mod io_manager;
 pub(crate) use self::io_manager::IoManagerImpl;
