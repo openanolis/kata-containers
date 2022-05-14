@@ -33,6 +33,8 @@ pub mod metric;
 pub mod kvm_context;
 /// Virtual CPU manager for virtual machines.
 pub mod vcpu;
+/// API to handle vmm requests.
+pub mod api;
 
 mod io_manager;
 pub(crate) use self::io_manager::IoManagerImpl;
