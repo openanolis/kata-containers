@@ -18,6 +18,11 @@ use dbs_device::resources::{Resource, ResourceConstraint};
 use dbs_device::DeviceIo;
 use dbs_interrupt::KvmIrqManager;
 use dbs_legacy_devices::ConsoleHandler;
+#[cfg(feature = "hotplug")]
+use dbs_upcall::{
+    AddMmioDevRequest, DevMgrRequest, DevMgrService, UpcallClient, UpcallClientError,
+    UpcallClientRequest,
+};
 use dbs_utils::epoll_manager::EpollManager;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::{
@@ -88,6 +93,11 @@ pub enum DeviceMgrError {
     /// Error from Virtio subsystem.
     #[error(transparent)]
     Virtio(virtio::Error),
+
+    #[cfg(feature = "hotplug")]
+    /// Failed to hotplug the device.
+    #[error("failed to hotplug virtual device")]
+    HotplugDevice(#[source] UpcallClientError),
 }
 
 /// Specialized version of `std::result::Result` for device manager operations.
@@ -196,6 +206,8 @@ pub struct DeviceOpContext {
     logger: slog::Logger,
     is_hotplug: bool,
 
+    #[cfg(feature = "hotplug")]
+    upcall_client: Option<Arc<UpcallClient<DevMgrService>>>,
     #[cfg(feature = "dbs-virtio-devices")]
     virtio_devices: Vec<Arc<DbsMmioV2Device>>,
 }
@@ -228,6 +240,8 @@ impl DeviceOpContext {
             address_space,
             logger,
             is_hotplug,
+            #[cfg(feature = "hotplug")]
+            upcall_client: None,
             #[cfg(feature = "dbs-virtio-devices")]
             virtio_devices: Vec::new(),
         }
@@ -266,6 +280,47 @@ impl DeviceOpContext {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(not(feature = "hotplug"))]
+impl DeviceOpContext {
+    pub(crate) fn insert_hotplug_device(&self, dev: Arc<dyn DeviceIo>) -> Result<()> {
+        Err(DeviceMgrError::InvalidOperation)
+    }
+}
+
+#[cfg(feature = "hotplug")]
+impl DeviceOpContext {
+    pub(crate) fn insert_hotplug_device(&self, dev: Arc<DbsMmioV2Device>) -> Result<()> {
+        if !self.is_hotplug {
+            return Err(DeviceMgrError::InvalidOperation);
+        }
+
+        if let Some(upcall_client) = self.upcall_client.as_ref() {
+            let (mmio_base, mmio_size, mmio_irq) = DeviceManager::get_virtio_device_info(&dev)?;
+            let req = DevMgrRequest::AddMmioDev(AddMmioDevRequest {
+                mmio_base,
+                mmio_size,
+                mmio_irq,
+            });
+            // Do not expect poisoned lock here.
+            upcall_client
+                .send_request_without_result(UpcallClientRequest::DevMgr(req))
+                .map_err(DeviceMgrError::HotplugDevice)?;
+            Ok(())
+
+        // TODO(sicun): how to deal with reply?
+        // match reply {
+        //     SystemReply::Ok => Ok(()),
+        //     SystemReply::Failed => Err(DeviceMgrError::CreateDevice(io::Error::new(
+        //         io::ErrorKind::Other,
+        //         "failed to hot-add device to guest by system_upcall".to_owned(),
+        //     ))),
+        // }
+        } else {
+            Err(DeviceMgrError::InvalidOperation)
+        }
     }
 }
 
