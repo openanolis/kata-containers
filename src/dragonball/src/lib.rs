@@ -26,4 +26,7 @@ pub mod device_manager;
 /// Errors related to Virtual machine manager.
 pub mod error;
 
+mod io_manager;
+pub(crate) use self::io_manager::IoManagerImpl;
+
 mod config_manager;
