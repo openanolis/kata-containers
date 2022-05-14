@@ -29,6 +29,8 @@ pub mod error;
 pub mod signal_handler;
 /// Metrics system.
 pub mod metric;
+/// KVM operation context for virtual machines.
+pub mod kvm_context;
 
 mod io_manager;
 pub(crate) use self::io_manager::IoManagerImpl;
