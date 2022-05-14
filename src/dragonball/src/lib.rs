@@ -25,6 +25,8 @@ pub mod vm;
 pub mod device_manager;
 /// Errors related to Virtual machine manager.
 pub mod error;
+/// Signal handler for virtual machines.
+pub mod signal_handler;
 /// Metrics system.
 pub mod metric;
 
@@ -32,3 +34,22 @@ mod io_manager;
 pub(crate) use self::io_manager::IoManagerImpl;
 
 mod config_manager;
+
+/// Success exit code.
+pub const EXIT_CODE_OK: u8 = 0;
+/// Generic error exit code.
+pub const EXIT_CODE_GENERIC_ERROR: u8 = 1;
+/// Generic exit code for an error considered not possible to occur if the program logic is sound.
+pub const EXIT_CODE_UNEXPECTED_ERROR: u8 = 2;
+/// Dragonball was shut down after intercepting a restricted system call.
+pub const EXIT_CODE_BAD_SYSCALL: u8 = 148;
+/// Dragonball was shut down after intercepting `SIGBUS`.
+pub const EXIT_CODE_SIGBUS: u8 = 149;
+/// Dragonball was shut down after intercepting `SIGSEGV`.
+pub const EXIT_CODE_SIGSEGV: u8 = 150;
+/// Invalid json passed to the Dragonball process for configuring microvm.
+pub const EXIT_CODE_INVALID_JSON: u8 = 151;
+/// Bad configuration for microvm's resources, when using a single json.
+pub const EXIT_CODE_BAD_CONFIGURATION: u8 = 152;
+/// Command line arguments parsing error.
+pub const EXIT_CODE_ARG_PARSING: u8 = 153;
