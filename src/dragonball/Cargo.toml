@@ -57,3 +57,5 @@ dbs-legacy-devices = { git = "https://github.com/openanolis/dragonball-sandbox.g
 dbs-upcall = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
 dbs-utils = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
 dbs-virtio-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
+dbs-arch = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
+dbs-boot = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
