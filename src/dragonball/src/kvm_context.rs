@@ -57,8 +57,7 @@ impl KvmContext {
         Self::check_cap(&kvm, Cap::UserMemory)?;
 
         #[cfg(target_arch = "x86_64")]
-        let supported_msrs =
-            dbs_arch::msr::supported_guest_msrs(&kvm).map_err(Error::GuestMSRs)?;
+        let supported_msrs = dbs_arch::msr::supported_guest_msrs(&kvm).map_err(Error::GuestMSRs)?;
         let max_memslots = kvm.get_nr_memslots();
 
         Ok(KvmContext {

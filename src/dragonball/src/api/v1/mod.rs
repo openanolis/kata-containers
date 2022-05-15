@@ -6,4 +6,3 @@
 /// Wrapper over the microVM general information.
 mod instance_info;
 pub use self::instance_info::{InstanceInfo, InstanceState};
-

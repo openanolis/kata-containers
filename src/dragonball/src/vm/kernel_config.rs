@@ -20,7 +20,6 @@ pub struct KernelConfigInfo {
     pub cmdline: linux_loader::cmdline::Cmdline,
     /// Share guest kernel text/ro sections.
     share_ro_sections: String,
-
 }
 
 impl KernelConfigInfo {

@@ -11,30 +11,29 @@
 //! features to run a single lightweight micro-virtual machine (microVM).
 
 #![warn(missing_docs)]
-
 //TODO: Remoe this, after the rest of dragonball has been committed.
 #![allow(dead_code)]
 
 /// Address space manager for virtual machines.
 pub mod address_space_manager;
-/// Resource manager for virtual machines.
-pub mod resource_manager;
-/// Virtual machine manager for virtual machines.
-pub mod vm;
+/// API to handle vmm requests.
+pub mod api;
 /// Device manager for virtual machines.
 pub mod device_manager;
 /// Errors related to Virtual machine manager.
 pub mod error;
-/// Signal handler for virtual machines.
-pub mod signal_handler;
-/// Metrics system.
-pub mod metric;
 /// KVM operation context for virtual machines.
 pub mod kvm_context;
+/// Metrics system.
+pub mod metric;
+/// Resource manager for virtual machines.
+pub mod resource_manager;
+/// Signal handler for virtual machines.
+pub mod signal_handler;
 /// Virtual CPU manager for virtual machines.
 pub mod vcpu;
-/// API to handle vmm requests.
-pub mod api;
+/// Virtual machine manager for virtual machines.
+pub mod vm;
 
 mod io_manager;
 pub(crate) use self::io_manager::IoManagerImpl;
