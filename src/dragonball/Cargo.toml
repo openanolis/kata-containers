@@ -49,6 +49,7 @@ acpi = []
 atomic-guest-memory = []
 hotplug = ["virtio-vsock"]
 virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]
+virtio-blk = ["dbs-virtio-devices/virtio-blk", "virtio-queue"]
 
 [patch.'crates-io']
 dbs-device = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "127621db934af5ffba558e44b77afa00cdf62af6" }
