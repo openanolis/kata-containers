@@ -50,11 +50,11 @@ hotplug = ["dbs-upcall", "virtio-vsock"]
 virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]
 
 [patch.'crates-io']
-dbs-device = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
-dbs-interrupt = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
-dbs-legacy-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
-dbs-upcall = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
-dbs-utils = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
-dbs-virtio-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "84eee5737cc7d85f9921c94a93e6b9dc4ae24a39" }
+dbs-device = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
+dbs-interrupt = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
+dbs-legacy-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
+dbs-upcall = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
+dbs-utils = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
+dbs-virtio-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
 dbs-arch = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }
 dbs-boot = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "9df36a160b671427ae288692bef748f4d04e0570" }

@@ -239,7 +239,10 @@ impl VcpuManager {
                 "vcpu_manager: specified vcpu count {} is greater than max allowed count {} by kvm",
                 max_vcpu_count, kvm_max_vcpu_count
             );
-            return Err(VcpuManagerError::MaxVcpuLimitation(max_vcpu_count, kvm_max_vcpu_count));
+            return Err(VcpuManagerError::MaxVcpuLimitation(
+                max_vcpu_count,
+                kvm_max_vcpu_count,
+            ));
         }
 
         let mut vcpu_infos = Vec::with_capacity(max_vcpu_count.into());
@@ -837,7 +840,7 @@ mod hotplug {
                 e
             })?;
 
-            let mut cpu_ids_array = [0u8; (u8::MAX as usize)];
+            let mut cpu_ids_array = [0u8; (u8::MAX as usize) + 1];
             cpu_ids_array[..cpu_ids.len()].copy_from_slice(&cpu_ids[..cpu_ids.len()]);
             let req = DevMgrRequest::AddVcpu(CpuDevRequest {
                 count: cpu_ids.len() as u8,
