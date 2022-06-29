@@ -167,7 +167,6 @@ impl DragonballInner {
         let vm_config = VmConfigInfo {
             serial_path: Some(serial_path),
             mem_size_mib: self.config.memory_info.default_memory as usize,
-            ht_enabled: false,
             vcpu_count: self.config.cpu_info.default_vcpus as u8,
             ..Default::default()
         };
@@ -213,7 +212,7 @@ impl DragonballInner {
         );
 
         let mut boot_cfg = BootSourceConfig {
-            kernel_image_path: self
+            kernel_path: self
                 .get_resource(kernel_path, DRAGONBALL_KERNEL)
                 .context("jail resource")?,
             ..Default::default()

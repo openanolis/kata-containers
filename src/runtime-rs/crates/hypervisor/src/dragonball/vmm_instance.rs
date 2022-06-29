@@ -102,8 +102,7 @@ impl VmmInstance {
 
         self.set_instance_id(id);
 
-        let api_event_fd1 = self.to_vmm_fd.try_clone().expect("Failed to dup eventfd");
-        let vmm_service = VmmService::new(api_event_fd1, from_runtime, to_runtime);
+        let vmm_service = VmmService::new(from_runtime, to_runtime);
 
         self.to_vmm = Some(to_vmm);
         self.from_vmm = Some(from_vmm);

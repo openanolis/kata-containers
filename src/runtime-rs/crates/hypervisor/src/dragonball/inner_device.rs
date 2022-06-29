@@ -158,7 +158,7 @@ impl DragonballInner {
 
         fs_cfg.mode = String::from("virtio");
         fs_cfg.cache_policy = self.config.shared_fs.virtio_fs_cache.clone();
-        fs_cfg.killpriv_v2 = true;
+        fs_cfg.fuse_killpriv_v2 = true;
 
         // Crate `go_flag` is used to keep compatible with go/flag package.
         println!("args: {:?}", &self.config.shared_fs.virtio_fs_extra_args);
