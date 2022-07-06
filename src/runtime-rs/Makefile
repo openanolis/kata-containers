@@ -122,6 +122,7 @@ MONITOR_OUTPUT = $(CURDIR)/$(MONITOR)
 MONITOR_DIR = $(CLI_DIR)/kata-monitor
 SOURCES := $(shell find . 2>&1 | grep -E '.*\.(c|h|go)$$')
 VERSION := ${shell cat ./VERSION}
+
 # List of configuration files to build and install
 CONFIGS =
 CONFIG_PATHS =
@@ -330,7 +331,9 @@ endef
 .DEFAULT_GOAL := default
 
 ##TARGET default: build code
-default: $(TARGET) show-header
+default: runtime show-header
+
+runtime: $(TARGET)
 
 $(TARGET): $(GENERATED_CODE) $(TARGET_PATH)
 
@@ -417,6 +420,11 @@ codecov: check_tarpaulin
 ##TARGET codecov-html: Generate code coverage html report
 codecov-html: check_tarpaulin
 	cargo tarpaulin $(TARPAULIN_ARGS) -o Html
+
+install: install-runtime install-configs
+
+install-runtime: runtime
+	install -D $(TARGET_PATH) $(BINDIR)
 
 install-configs: $(CONFIGS)
 	$(foreach f,$(CONFIGS),$(call INSTALL_CONFIG,$f,$(dir $(CONFIG_PATH)))) \
