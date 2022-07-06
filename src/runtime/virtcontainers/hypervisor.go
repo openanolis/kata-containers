@@ -47,6 +47,9 @@ const (
 	// ClhHypervisor is the ICH hypervisor.
 	ClhHypervisor HypervisorType = "clh"
 
+	// DragonballHypervisor is the Dragonball hypervisor.
+	DragonballHypervisor HypervisorType = "dragonball"
+
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 
@@ -170,6 +173,9 @@ func (hType *HypervisorType) Set(value string) error {
 		return nil
 	case "clh":
 		*hType = ClhHypervisor
+		return nil
+	case "dragonball":
+		*hType = DragonballHypervisor
 		return nil
 	case "mock":
 		*hType = MockHypervisor
