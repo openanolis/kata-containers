@@ -12,6 +12,7 @@ use hypervisor::Hypervisor;
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
+use persist::sandbox::ResourceState;
 use tokio::sync::RwLock;
 
 use crate::{manager_inner::ResourceManagerInner, rootfs::Rootfs, volume::Volume, ResourceConfig};
@@ -88,5 +89,10 @@ impl ResourceManager {
     pub async fn delete_cgroups(&self) -> Result<()> {
         let inner = self.inner.read().await;
         inner.delete_cgroups().await
+    }
+
+    pub async fn save(&self) -> Option<ResourceState> {
+        let inner = self.inner.read().await;
+        inner.save().await
     }
 }

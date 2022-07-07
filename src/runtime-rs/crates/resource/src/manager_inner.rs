@@ -12,6 +12,7 @@ use hypervisor::Hypervisor;
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
+use persist::sandbox::ResourceState;
 
 use crate::{
     cgroups::CgroupsResource,
@@ -189,5 +190,16 @@ impl ResourceManagerInner {
     pub async fn dump(&self) {
         self.rootfs_resource.dump().await;
         self.volume_resource.dump().await;
+    }
+
+    pub async fn save(&self) -> Option<ResourceState> {
+        if let Some(network) = &self.network {
+            if let Some(endpoint_state) = network.save().await {
+                return Some(ResourceState {
+                    endpoint: endpoint_state,
+                });
+            }
+        }
+        None
     }
 }

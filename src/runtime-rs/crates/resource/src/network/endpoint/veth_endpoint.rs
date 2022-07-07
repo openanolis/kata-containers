@@ -9,6 +9,7 @@ use std::io::{self, Error};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hypervisor::{device::NetworkConfig, Device, Hypervisor};
+use persist::network::EndpointState;
 
 use super::Endpoint;
 use crate::network::{utils, NetworkPair};
@@ -80,5 +81,8 @@ impl Endpoint for VethEndpoint {
             .await
             .context("remove device")?;
         Ok(())
+    }
+    async fn save(&self) -> Option<EndpointState> {
+        todo!()
     }
 }

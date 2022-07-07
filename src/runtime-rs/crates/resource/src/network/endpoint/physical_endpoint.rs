@@ -12,7 +12,7 @@ use hypervisor::{device, Hypervisor};
 
 use super::Endpoint;
 use crate::network::utils::{self, link};
-
+use persist::network::{EndpointState, PhysicalEndpointState};
 pub const SYS_PCI_DEVICES_PATH: &str = "/sys/bus/pci/devices";
 
 #[derive(Debug)]
@@ -140,5 +140,18 @@ impl Endpoint for PhysicalEndpoint {
             )
         })?;
         Ok(())
+    }
+
+    async fn save(&self) -> Option<EndpointState> {
+        Some(EndpointState {
+            physical_endpoint: Some(PhysicalEndpointState {
+                bdf: self.bdf.clone(),
+                driver: self.driver.clone(),
+                vendor_id: self.vendor_device_id.vendor_id.clone(),
+                device_id: self.vendor_device_id.device_id.clone(),
+                hard_addr: self.hard_addr.clone(),
+            }),
+            ..Default::default()
+        })
     }
 }

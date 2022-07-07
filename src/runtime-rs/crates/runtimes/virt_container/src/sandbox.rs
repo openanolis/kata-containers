@@ -23,6 +23,7 @@ use resource::{
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 
 use crate::health_check::HealthCheck;
+use persist::{self, Persist};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum SandboxState {
@@ -202,6 +203,8 @@ impl Sandbox for VirtSandbox {
             }
         });
         self.monitor.start(id, self.agent.clone());
+        let state = self.save().await.context("save state")?;
+        persist::to_disk(&state, id)?;
         Ok(())
     }
 
@@ -237,5 +240,26 @@ impl Sandbox for VirtSandbox {
     async fn cleanup(&self, _id: &str) -> Result<()> {
         // TODO: cleanup
         Ok(())
+    }
+}
+
+#[async_trait]
+impl Persist for VirtSandbox {
+    type State = persist::sandbox::SandboxState;
+    type ConstructorArgs = ();
+
+    /// Returns the current state of the component.
+    async fn save(&self) -> Result<Self::State> {
+        let resource_state = self.resource_manager.save().await;
+        Ok(persist::sandbox::SandboxState {
+            resource: resource_state,
+        })
+    }
+
+    async fn restore(
+        _constructor_args: Self::ConstructorArgs,
+        _state: &Self::State,
+    ) -> Result<Self> {
+        todo!()
     }
 }

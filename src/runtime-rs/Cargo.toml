@@ -1,6 +1,11 @@
 [workspace]
 members = [
     "crates/shim",
+    # TODO: current only for check, delete after use the agent crate
+    "crates/agent",
+    # TODO: current only for check, delete after use the resource crate
+    "crates/resource",
+    "crates/persist",
 ]
 
 [patch.'crates-io']

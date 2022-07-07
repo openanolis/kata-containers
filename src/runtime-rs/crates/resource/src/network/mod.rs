@@ -23,7 +23,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hypervisor::Hypervisor;
-
+use persist::network;
 #[derive(Debug)]
 pub enum NetworkConfig {
     NetworkResourceWithNetNs(NetworkWithNetNsConfig),
@@ -35,6 +35,7 @@ pub trait Network: Send + Sync {
     async fn interfaces(&self) -> Result<Vec<agent::Interface>>;
     async fn routes(&self) -> Result<Vec<agent::Route>>;
     async fn neighs(&self) -> Result<Vec<agent::ARPNeighbor>>;
+    async fn save(&self) -> Option<Vec<network::EndpointState>>;
 }
 
 pub async fn new(config: &NetworkConfig) -> Result<Arc<dyn Network>> {

@@ -13,6 +13,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use hypervisor::Hypervisor;
+use persist::network;
 use scopeguard::defer;
 use tokio::sync::RwLock;
 
@@ -105,6 +106,17 @@ impl Network for NetworkWithNetns {
             neighs.append(&mut list);
         }
         Ok(neighs)
+    }
+
+    async fn save(&self) -> Option<Vec<network::EndpointState>> {
+        let inner = self.inner.read().await;
+        let mut endpoint = vec![];
+        for e in &inner.entity_list {
+            if let Some(state) = e.endpoint.save().await {
+                endpoint.push(state);
+            }
+        }
+        Some(endpoint)
     }
 }
 

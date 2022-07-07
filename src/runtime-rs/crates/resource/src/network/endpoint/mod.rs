@@ -12,6 +12,7 @@ pub use veth_endpoint::VethEndpoint;
 use anyhow::Result;
 use async_trait::async_trait;
 use hypervisor::Hypervisor;
+use persist::network::EndpointState;
 
 #[async_trait]
 pub trait Endpoint: std::fmt::Debug + Send + Sync {
@@ -19,4 +20,5 @@ pub trait Endpoint: std::fmt::Debug + Send + Sync {
     async fn hardware_addr(&self) -> String;
     async fn attach(&self, hypervisor: &dyn Hypervisor) -> Result<()>;
     async fn detach(&self, hypervisor: &dyn Hypervisor) -> Result<()>;
+    async fn save(&self) -> Option<EndpointState>;
 }
