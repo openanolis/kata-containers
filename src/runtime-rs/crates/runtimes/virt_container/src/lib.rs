@@ -24,6 +24,8 @@ use kata_types::config::{hypervisor::register_hypervisor_plugin, DragonballConfi
 use resource::ResourceManager;
 use tokio::sync::mpsc::Sender;
 
+const HYPERVISOR_DRAGONBALL: &str = "dragonball";
+
 unsafe impl Send for VirtContainer {}
 unsafe impl Sync for VirtContainer {}
 pub struct VirtContainer {}
@@ -107,9 +109,15 @@ async fn new_hypervisor(toml_config: &TomlConfig) -> Result<Arc<dyn Hypervisor>>
         .ok_or_else(|| anyhow!("failed to get hypervisor for {}", &hypervisor_name))
         .context("get hypervisor")?;
 
-    let mut hypervisor = Dragonball::new();
-    hypervisor
-        .set_hypervisor_config(hypervisor_config.clone())
-        .await;
-    Ok(Arc::new(hypervisor))
+    // TODO: support other hypervisor
+    match hypervisor_name.as_str() {
+        HYPERVISOR_DRAGONBALL => {
+            let mut hypervisor = Dragonball::new();
+            hypervisor
+                .set_hypervisor_config(hypervisor_config.clone())
+                .await;
+            Ok(Arc::new(hypervisor))
+        }
+        _ => Err(anyhow!("Unsupported hypervisor {}", &hypervisor_name)),
+    }
 }
