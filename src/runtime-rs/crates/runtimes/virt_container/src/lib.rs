@@ -110,6 +110,7 @@ async fn new_hypervisor(toml_config: &TomlConfig) -> Result<Arc<dyn Hypervisor>>
         .context("get hypervisor")?;
 
     // TODO: support other hypervisor
+    // issue: https://github.com/kata-containers/kata-containers/issues/4634
     match hypervisor_name.as_str() {
         HYPERVISOR_DRAGONBALL => {
             let mut hypervisor = Dragonball::new();

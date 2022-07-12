@@ -88,8 +88,12 @@ impl VirtSandbox {
                 NetworkWithNetNsConfig {
                     network_model: config.runtime.internetworking_model.clone(),
                     netns_path,
-                    // TODO: get queues from config
-                    queues: 1,
+                    queues: self
+                        .hypervisor
+                        .hypervisor_config()
+                        .await
+                        .network_info
+                        .network_queues as usize,
                 },
             ));
             resource_configs.push(network_config);

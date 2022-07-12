@@ -22,8 +22,7 @@ use super::{
 };
 
 lazy_static! {
-    pub(crate) static ref SHARED_DIR_VIRTIO_FS_OPTIONS: Vec::<String> =
-        vec![String::from("nodev"),];
+    pub(crate) static ref SHARED_DIR_VIRTIO_FS_OPTIONS: Vec::<String> = vec![String::from("nodev")];
 }
 
 #[derive(Debug, Clone)]

@@ -58,12 +58,6 @@ impl RootFsResource {
                 // Safe as single_layer_rootfs must have one layer
                 let layer = &mounts_vec[0];
 
-                // not support at this stage
-                /*let rootfs = if let Some(_dev_id) = get_block_device(&layer.source) {
-                    // block rootfs
-                    unimplemented!()
-                } else
-                */
                 let rootfs = if let Some(share_fs) = share_fs {
                     // share fs rootfs
                     let share_fs_mount = share_fs.get_share_fs_mount();

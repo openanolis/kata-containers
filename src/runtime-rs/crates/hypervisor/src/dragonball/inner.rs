@@ -26,7 +26,7 @@ pub struct DragonballInner {
     /// sandbox id
     pub(crate) id: String,
 
-    /// Unique ID per pod. Normally maps to the sandbox id
+    /// vm path
     pub(crate) vm_path: String,
 
     /// jailed flag
@@ -91,8 +91,13 @@ impl DragonballInner {
 
         // set boot source
         let kernel_path = self.config.boot_info.kernel.clone();
-        self.set_boot_source(&kernel_path, &kernel_params.to_string())
-            .context("set_boot_source")?;
+        self.set_boot_source(
+            &kernel_path,
+            &kernel_params
+                .to_string()
+                .context("kernel params to string")?,
+        )
+        .context("set_boot_source")?;
 
         // get vm rootfs
         let image = {
@@ -192,7 +197,7 @@ impl DragonballInner {
     }
 
     fn jail_resource(&self, src: &str, dst: &str) -> Result<String> {
-        info!(sl!(), "src {} dst {}", src, dst);
+        info!(sl!(), "jail resource: src {} dst {}", src, dst);
         if src.is_empty() || dst.is_empty() {
             return Err(anyhow!("invalid param src {} dst {}", src, dst));
         }
@@ -214,7 +219,7 @@ impl DragonballInner {
         let mut boot_cfg = BootSourceConfig {
             kernel_path: self
                 .get_resource(kernel_path, DRAGONBALL_KERNEL)
-                .context("jail resource")?,
+                .context("get resource")?,
             ..Default::default()
         };
 
@@ -228,7 +233,7 @@ impl DragonballInner {
     }
 
     fn set_vm_rootfs(&mut self, path: &str, driver: &str) -> Result<()> {
-        info!(sl!(), "==== set vm rootfs {} {}", path, driver);
+        info!(sl!(), "set vm rootfs {} {}", path, driver);
         let jail_drive = self
             .get_resource(path, DRAGONBALL_ROOT_FS)
             .context("get resource")?;
@@ -250,7 +255,11 @@ impl DragonballInner {
                 .insert_block_device(blk_cfg)
                 .context("inert block device")
         } else {
-            Err(anyhow!("Unknown vm_rootfs driver: {}", driver))
+            Err(anyhow!(
+                "Unknown vm_rootfs driver {} path {:?}",
+                driver,
+                path
+            ))
         }
     }
 
@@ -263,7 +272,7 @@ impl DragonballInner {
         Ok(())
     }
 
-    // wait_vmm will wait for timeout seconds for the VMM to be up and running.
+    // wait_vmm_ready will wait for timeout seconds for the VMM to be up and running.
     // This does not mean that the VM is up and running. It only indicates that the VMM is up and
     // running and able to handle commands to setup and launch a VM
     fn wait_vmm_ready(&mut self, timeout: i32) -> Result<()> {
@@ -279,7 +288,7 @@ impl DragonballInner {
                     let time_now = std::time::Instant::now();
                     if time_now.duration_since(time_start).as_millis() > timeout as u128 {
                         return Err(anyhow!(
-                            "Describe instance timeout {} err : {:?}",
+                            "waiting vmm ready timeout {} err: {:?}",
                             timeout,
                             err
                         ));

@@ -54,7 +54,8 @@ impl VmmInstance {
             DRAGONBALL_VERSION.to_string(),
         )));
 
-        let to_vmm_fd = EventFd::new(libc::EFD_NONBLOCK).expect("Failed to create eventfd for vmm");
+        let to_vmm_fd = EventFd::new(libc::EFD_NONBLOCK)
+            .unwrap_or_else(|_| panic!("Failed to create eventfd for vmm {}", id));
 
         VmmInstance {
             vmm_shared_info,
@@ -82,20 +83,7 @@ impl VmmInstance {
     }
 
     pub fn run_vmm_server(&mut self, id: &str, netns: Option<String>) -> Result<()> {
-        let kvm = || -> Result<std::fs::File> {
-            let kvm_list = vec!["/dev/kvm", "/dev/kvm0", "/dev/kvm1"];
-            for k in &kvm_list {
-                match OpenOptions::new().read(true).write(true).open(k) {
-                    Ok(kvm) => {
-                        info!(sl!(), "open kvm: {}", k);
-                        return Ok(kvm);
-                    }
-                    Err(err) => warn!(sl!(), "failed to open kvm: {} error {:?}", k, err),
-                }
-            }
-            return Err(anyhow!("failed to open kvm in list {:?}", kvm_list));
-        }()
-        .context("open kvm")?;
+        let kvm = OpenOptions::new().read(true).write(true).open("/dev/kvm")?;
 
         let (to_vmm, from_runtime) = channel();
         let (to_runtime, from_vmm) = channel();
@@ -252,10 +240,6 @@ impl VmmInstance {
         todo!()
     }
 
-    #[allow(dead_code)]
-    fn flush_metrics(&self) -> Result<()> {
-        todo!()
-    }
     pub fn pid(&self) -> u32 {
         std::process::id()
     }
@@ -292,12 +276,12 @@ impl VmmInstance {
 
         //notify vmm action
         if let Err(e) = self.to_vmm_fd.write(1) {
-            return Err(anyhow!("failed to notify vmm. {}", e));
+            return Err(anyhow!("failed to notify vmm: {}", e));
         }
 
         if let Some(from_vmm) = self.from_vmm.as_ref() {
             match from_vmm.recv() {
-                Err(e) => Err(anyhow!("vmm recv err. {}", e)),
+                Err(e) => Err(anyhow!("vmm recv err: {}", e)),
                 Ok(vmm_outcome) => Ok(vmm_outcome),
             }
         } else {

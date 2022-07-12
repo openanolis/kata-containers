@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::fmt;
+use anyhow::{anyhow, Result};
 
 use crate::{VM_ROOTFS_DRIVER_BLK, VM_ROOTFS_DRIVER_PMEM};
 
@@ -39,41 +39,16 @@ impl KernelParams {
     pub(crate) fn new(debug: bool) -> Self {
         // default kernel params
         let mut params = vec![
-            Param {
-                key: "reboot".to_string(),
-                value: "k".to_string(),
-            },
-            Param {
-                key: "earlyprintk".to_string(),
-                value: "ttyS0".to_string(),
-            },
-            Param {
-                key: "initcall_debug".to_string(),
-                value: "".to_string(),
-            },
-            Param {
-                key: "panic".to_string(),
-                value: "1".to_string(),
-            },
-            Param {
-                key: String::from("systemd.unit"),
-                value: String::from("kata-containers.target"),
-            },
-            Param {
-                key: String::from("systemd.mask"),
-                value: String::from("systemd-networkd.service"),
-            },
-            Param {
-                key: String::from("systemd.mask"),
-                value: String::from("systemd-networkd.socket"),
-            },
+            Param::new("reboot", "k"),
+            Param::new("earlyprintk", "ttyS0"),
+            Param::new("initcall_debug", ""),
+            Param::new("panic", "1"),
+            Param::new("systemd.unit", "kata-containers.target"),
+            Param::new("systemd.mask", "systemd-networkd.service"),
         ];
 
         if debug {
-            params.push(Param {
-                key: "agent.log_vport".to_string(),
-                value: VSOCK_LOGS_PORT.to_string(),
-            });
+            params.push(Param::new("agent.log_vport", VSOCK_LOGS_PORT));
         }
 
         Self { params }
@@ -149,17 +124,15 @@ impl KernelParams {
 
         Self { params }
     }
-}
 
-impl fmt::Display for KernelParams {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    pub(crate) fn to_string(&self) -> Result<String> {
         let mut parameters: Vec<String> = Vec::new();
 
         for param in &self.params {
             if param.key.is_empty() && param.value.is_empty() {
-                continue;
+                return Err(anyhow!("Empty key and value"));
             } else if param.key.is_empty() {
-                parameters.push(param.value.to_string());
+                return Err(anyhow!("Empty key"));
             } else if param.value.is_empty() {
                 parameters.push(param.key.to_string());
             } else {
@@ -170,32 +143,24 @@ impl fmt::Display for KernelParams {
             }
         }
 
-        let data = parameters.join(KERNEL_PARAM_DELIMITER);
-        write!(f, "{}", data)
+        Ok(parameters.join(KERNEL_PARAM_DELIMITER))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Result;
+
     use super::*;
 
     #[test]
-    fn test_kernel_params() {
+    fn test_kernel_params() -> Result<()> {
         let expect_params_string = "k1=v1 k2=v2 k3=v3".to_string();
         let expect_params = KernelParams {
             params: vec![
-                Param {
-                    key: "k1".to_string(),
-                    value: "v1".to_string(),
-                },
-                Param {
-                    key: "k2".to_string(),
-                    value: "v2".to_string(),
-                },
-                Param {
-                    key: "k3".to_string(),
-                    value: "v3".to_string(),
-                },
+                Param::new("k1", "v1"),
+                Param::new("k2", "v2"),
+                Param::new("k3", "v3"),
             ],
         };
 
@@ -204,7 +169,9 @@ mod tests {
         assert_eq!(kernel_params, expect_params);
 
         // check kernel params to string
-        let kernel_params_string = expect_params.to_string();
+        let kernel_params_string = expect_params.to_string()?;
         assert_eq!(kernel_params_string, expect_params_string);
+
+        Ok(())
     }
 }

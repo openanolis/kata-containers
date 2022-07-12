@@ -160,8 +160,10 @@ impl DragonballInner {
         fs_cfg.cache_policy = self.config.shared_fs.virtio_fs_cache.clone();
         fs_cfg.fuse_killpriv_v2 = true;
 
-        // Crate `go_flag` is used to keep compatible with go/flag package.
-        println!("args: {:?}", &self.config.shared_fs.virtio_fs_extra_args);
+        info!(
+            sl!(),
+            "args: {:?}", &self.config.shared_fs.virtio_fs_extra_args
+        );
         let args = &self.config.shared_fs.virtio_fs_extra_args;
         let _ = go_flag::parse_args_with_warnings::<String, _, _>(args, None, |flags| {
             flags.add_flag("d", &mut debug);

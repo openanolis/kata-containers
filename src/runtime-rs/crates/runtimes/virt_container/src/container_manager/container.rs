@@ -298,7 +298,7 @@ impl Container {
 
     pub async fn pause(&self) -> Result<()> {
         let inner = self.inner.read().await;
-        if inner.init_process.status == ProcessStatus::Paused {
+        if inner.init_process.get_status().await == ProcessStatus::Paused {
             warn!(self.logger, "container is paused no need to pause");
             return Ok(());
         }
@@ -311,7 +311,7 @@ impl Container {
 
     pub async fn resume(&self) -> Result<()> {
         let inner = self.inner.read().await;
-        if inner.init_process.status == ProcessStatus::Running {
+        if inner.init_process.get_status().await == ProcessStatus::Running {
             warn!(self.logger, "container is running no need to resume");
             return Ok(());
         }
@@ -330,7 +330,7 @@ impl Container {
     ) -> Result<()> {
         let logger = logger_with_process(process);
         let inner = self.inner.read().await;
-        if inner.init_process.status != ProcessStatus::Running {
+        if inner.init_process.get_status().await != ProcessStatus::Running {
             warn!(logger, "container is not running");
             return Ok(());
         }
