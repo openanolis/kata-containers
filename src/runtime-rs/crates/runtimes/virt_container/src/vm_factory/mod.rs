@@ -12,8 +12,16 @@ pub mod vm;
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use hypervisor::dragonball::Dragonball;
+use hypervisor::Hypervisor;
+use kata_types::config::TomlConfig;
+
+use self::direct::Direct;
+use self::vm::VMConfig;
+
+const HYPERVISOR_DRAGONBALL: &str = "dragonball";
 
 // FactoryBase trait requires implementations of factory-specific interfaces
 // There is a upper level trait called *Factory* that requires this trait, the
@@ -22,9 +30,9 @@ use async_trait::async_trait;
 // that in another trait.
 #[async_trait]
 pub trait FactoryBase: std::fmt::Debug + Sync + Send {
-    pub fn config(&self) -> Arc<vm::VMConfig>;
-    pub async fn get_base_vm(&self, config: &vm::VMConfig) -> Result<vm::BareVM>;
-    pub async fn close_factory(&self) -> Result<()>;
+    fn config(&self) -> Arc<vm::VMConfig>;
+    async fn get_base_vm(&self, config: Arc<vm::VMConfig>) -> Result<vm::BareVM>;
+    async fn close_factory(&self) -> Result<()>;
     // TODO: async fn get_vm_status(&self) -> Result<>; returns a grpc status
 }
 
@@ -36,5 +44,49 @@ pub trait FactoryBase: std::fmt::Debug + Sync + Send {
 // all factory implementations need.
 #[async_trait]
 pub trait Factory: FactoryBase {
-    pub async fn get_vm(&self, config: &vm::VMConfig) -> Result<vm::BareVM>;
+    async fn get_vm(&self, config: &vm::VMConfig) -> Result<vm::BareVM>;
+}
+
+// return an instance of FactoryBase according to the configuration file.
+pub fn get_factory_base(config: Arc<TomlConfig>) -> Result<Arc<dyn FactoryBase>> {
+    let vm_config = Arc::new(VMConfig::new(config.clone()));
+    info!(
+        sl!(),
+        "getting factory type {:?}",
+        config.runtime.factory_type.clone()
+    );
+    match config.runtime.factory_type.as_str() {
+        "template" => {
+            warn!(sl!(), "template factory not supported yet");
+        }
+
+        "cache" => {
+            warn!(sl!(), "template factory not supported yet");
+        }
+
+        _ => {
+            return Ok(Arc::new(Direct::new(vm_config)));
+        }
+    }
+    Ok(Arc::new(Direct::new(vm_config)))
+}
+
+async fn new_hypervisor(config: Arc<VMConfig>) -> Result<Arc<dyn Hypervisor>> {
+    let hypervisor_name = config.hypervisor_name();
+    let hypervisor_config = config
+        .hypervisor_config()
+        .context("get hypervisor config")?;
+
+    // TODO: support other hypervisor
+    // issue: https://github.com/kata-containers/kata-containers/issues/4634
+    match hypervisor_name.as_str() {
+        HYPERVISOR_DRAGONBALL => {
+            let mut hypervisor = Dragonball::new();
+            hypervisor
+                .set_hypervisor_config(hypervisor_config.clone())
+                .await;
+            Ok(Arc::new(hypervisor))
+        }
+        _ => Err(anyhow!("Unsupported hypervisor {}", &hypervisor_name)),
+    }
 }

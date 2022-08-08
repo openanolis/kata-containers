@@ -10,11 +10,13 @@ use agent::Agent;
 use hypervisor::Hypervisor;
 use kata_types::config::{Agent as AgentConfig, Hypervisor as HypervisorConfig, TomlConfig};
 
+use anyhow::{anyhow, Result};
+
 // VMConfig contains all info that a new blackbox VM needs.
-// Acutally we need hypervisor_name, hypervisor config and agent config
-// all of these can be extracted if we offer appropriate methods
+// Acutally we need hypervisor_name, hypervisor config and agent config all of
+// these can be extracted without exposing other info if we offer appropriate methods
 #[derive(Debug)]
-pub(crate) struct VMConfig {
+pub struct VMConfig {
     config: Arc<TomlConfig>,
 }
 
@@ -31,41 +33,66 @@ impl VMConfig {
         self.config.runtime.agent_name.clone()
     }
 
-    pub fn hypervisor_config(&self) -> Result<HypervisorConfig> {
-        let hypervisor_name = self.hypervisor_name().as_ref();
+    pub fn hypervisor_config(&self) -> Result<&HypervisorConfig> {
+        let hypervisor_name = self.hypervisor_name();
         let hypervisor_config = self
             .config
             .hypervisor
-            .get(hypervisor_name)
-            .ok_or_else(|| anyhow!("failed to get hypervisor for {}", &hypervisor_name))
-            .context("get hypervisor")?;
-        hypervisor_config
+            .get(&hypervisor_name)
+            .ok_or_else(|| anyhow!("failed to get hypervisor for {}", &hypervisor_name))?;
+        Ok(hypervisor_config)
     }
 
-    pub fn agent_config(&self) -> Result<AgentConfig> {
-        let agent_name = self.agent_name().as_ref();
+    pub fn agent_config(&self) -> Result<&AgentConfig> {
+        let agent_name = self.agent_name();
         let agent_config = self
             .config
             .agent
-            .get(agent_name)
-            .ok_or_else(|| anyhow!("failed to get agent for {}", &agent_name))
-            .context("get agent")?;
-        agent_config
+            .get(&agent_name)
+            .ok_or_else(|| anyhow!("failed to get agent for {}", &agent_name))?;
+        Ok(agent_config)
     }
 }
 
 // BareVM abstracts a Virtual Machine with no sandbox/container specific information.
+// We mainly expose the *hypervisor and agent* on sandbox/VM launching
+//
 // The VirtSandbox actually contains all the information we need to do so, but it contains
-// too much info, If we use VirtSandbox to abstract the bare vm, the redundant info may
-// be harmful for further development.
-#[derive(Debug)]
-pub(crate) struct BareVM {
-    id: String,
+// too much info, If we use VirtSandbox to abstract the bare vm, there are too much redundant info
+// making us hard to maintain this
+pub struct BareVM {
     hypervisor: Arc<dyn Hypervisor>,
     agent: Arc<dyn Agent>,
-    cpu: u32,
-    memory: u32,
-    cpu_delta: u32,
 }
 
-impl BareVM {}
+impl BareVM {
+    pub fn new(hypervisor: Arc<dyn Hypervisor>, agent: Arc<dyn Agent>) -> Self {
+        Self { hypervisor, agent }
+    }
+
+    pub fn get_hypervisor(&self) -> Arc<dyn Hypervisor> {
+        self.hypervisor.clone()
+    }
+
+    pub fn get_agent(&self) -> Arc<dyn Agent> {
+        self.agent.clone()
+    }
+
+    // returns the number of cpus
+    pub async fn ncpus(&self) -> i32 {
+        self.hypervisor
+            .hypervisor_config()
+            .await
+            .cpu_info
+            .default_vcpus
+    }
+
+    // returns the size of memory
+    pub async fn mem_size(&self) -> u32 {
+        self.hypervisor
+            .hypervisor_config()
+            .await
+            .memory_info
+            .default_memory
+    }
+}

@@ -4,17 +4,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use kata_types::config::TomlConfig;
+use std::sync::Arc;
 
 use super::{
     vm::{BareVM, VMConfig},
     FactoryBase,
 };
 
+use anyhow::Result;
+use async_trait::async_trait;
+
 #[derive(Debug)]
-struct Template {
+#[allow(dead_code)]
+pub struct Template {
     template_path: String,
-    config: VMConfig,
+    config: Arc<VMConfig>,
 }
 
 // Template is a vm factory creates VM from a *pre-created and saved* template vm.
@@ -22,7 +26,8 @@ struct Template {
 // shares a portion of initial memory (kernel, initramfs and agent). CPU and memory are
 // hot plugged when necessary.
 impl Template {
-    pub fn new(template_path: String, config: Arc<TomlConfig>) -> Self {
+    #[allow(dead_code)]
+    pub fn new(template_path: String, config: Arc<VMConfig>) -> Self {
         Self {
             template_path,
             config,
@@ -30,12 +35,13 @@ impl Template {
     }
 }
 
+#[async_trait]
 impl FactoryBase for Template {
     fn config(&self) -> Arc<VMConfig> {
-        Arc::new(self.config)
+        self.config.clone()
     }
 
-    async fn get_base_vm(&self, config: &VMConfig) -> Result<BareVM> {
+    async fn get_base_vm(&self, _config: Arc<VMConfig>) -> Result<BareVM> {
         todo!();
     }
 

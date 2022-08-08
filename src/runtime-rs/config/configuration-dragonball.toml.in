@@ -247,3 +247,7 @@ experimental=@DEFAULTEXPFEATURES@
 # If enabled, user can run pprof tools with shim v2 process through kata-monitor.
 # (default: false)
 # enable_pprof = true
+
+# VM Factory type configuration: direct | template(to be supported) | cache(to be supported)
+# if not assigned, default to be direct
+factory_type="@DEFVMFACTORY@"
