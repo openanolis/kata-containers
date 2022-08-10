@@ -104,7 +104,7 @@ impl Default for CpuTopology {
 }
 
 /// Configuration information for virtual machine instance.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VmConfigInfo {
     /// Number of vcpu to start.
     pub vcpu_count: u8,
