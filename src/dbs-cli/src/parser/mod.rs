@@ -28,52 +28,59 @@ use crate::utils::{CLIResult, CLIError, KernelErrorKind, RootfsErrorKind};
 
 use dragonball::{api::v1::InstanceInfo, Vmm, event_manager::EventManager};
 use dragonball::api::v1::VmmData;
+use dragonball::vm::VmConfigInfo;
 
 
-// pub fn run_with_cli(args: &DBSArgs) -> CLIResult<()> {
-//     let kernel_path = & args.boot_args.kernel_path;
-//     let rootfs_path = & args.boot_args.rootfs_args.rootfs;
-//
-//     // check the existence of kernel
-//     let kernel_file = std::path::Path::new(kernel_path);
-//     if !kernel_file.exists() || !kernel_file.is_file() {
-//         return Err(CLIError::KernelError(KernelErrorKind::KernelNotFound))
-//     }
-//
-//     // check the existence of rootfs
-//     let rootfs_file = std::path::Path::new(rootfs_path);
-//     if !rootfs_file.exists() || !rootfs_file.is_file() {
-//         return Err(CLIError::RootfsError(RootfsErrorKind::RootfsNotFound))
-//     }
-//
-//     // retrieve empty seccomp filters
-//     let vmm_seccomp_filters = BpfProgram::default();
-//     let vcpu_seccomp_filters = BpfProgram::default();
-//
-//     // Create a VMM instance
-//     let shared_info = std::sync::Arc::new(RwLock::new(InstanceInfo::default()));
-//     let event_fd = EventFd::new(EFD_NONBLOCK)?;
-//     let kvm_fd = Kvm::open_with_cloexec(true)?;
-//     let mut vmm = Vmm::new(
-//         shared_info,
-//         event_fd,
-//         vmm_seccomp_filters,
-//         vcpu_seccomp_filters,
-//         kvmfd,
-//     ).unwrap();
-//
-//     // event manager
-//     let mut epoll_mgr = EpollManager::default();
-//     let mut event_mgr = EventManager::new(& Arc::new(Mutex::new(vmm)), epoll_mgr).unwrap();
-//
-//     // TODO: add Error type
-//     let vm = vmm.get_vm_mut().ok_or(std::io::Error)?;
-//     if vm.is_vm_initialized() {
-//         // TODO: add Error type
-//         // return Err(StartMicroVm(MicroVMAlreadyRunning));
-//     }
-//
-//     vm.start_microvm(&mut event_mgr, vmm.vmm_seccomp_filter(), vmm.vcpu_seccomp_filter())?
-//
-//     return Ok(())
-// }
+pub fn run_with_cli(args: &DBSArgs) -> CLIResult<()> {
+    let kernel_path = & args.boot_args.kernel_path;
+    let rootfs_path = & args.boot_args.rootfs_args.rootfs;
+
+    // check the existence of kernel
+    let kernel_file = std::path::Path::new(kernel_path);
+    if !kernel_file.exists() || !kernel_file.is_file() {
+        return Err(CLIError::KernelError(KernelErrorKind::KernelNotFound))
+    }
+
+    // check the existence of rootfs
+    let rootfs_file = std::path::Path::new(rootfs_path);
+    if !rootfs_file.exists() || !rootfs_file.is_file() {
+        return Err(CLIError::RootfsError(RootfsErrorKind::RootfsNotFound))
+    }
+
+    // retrieve empty seccomp filters
+    let vmm_seccomp_filters = BpfProgram::default();
+    let vcpu_seccomp_filters = BpfProgram::default();
+
+    // Create a VMM instance
+    let shared_info = std::sync::Arc::new(RwLock::new(InstanceInfo::default()));
+    let event_fd = EventFd::new(EFD_NONBLOCK)?;
+    let kvm_fd = Kvm::open_with_cloexec(true)?;
+    let mut vmm = Vmm::new(
+        shared_info,
+        event_fd,
+        vmm_seccomp_filters,
+        vcpu_seccomp_filters,
+        kvmfd,
+    ).unwrap();
+    let mut config = VmConfigInfo {
+        vcpu_count: args.create_args.vcpu,
+        max_vcpu_count: args.create_args.max_vcpu,
+        cpu_pm: args.create_args.
+    }
+
+
+    // event manager
+    let mut epoll_mgr = EpollManager::default();
+    let mut event_mgr = EventManager::new(& Arc::new(Mutex::new(vmm)), epoll_mgr).unwrap();
+
+    // TODO: add Error type
+    let vm = vmm.get_vm_mut().ok_or(std::io::Error)?;
+    if vm.is_vm_initialized() {
+        // TODO: add Error type
+        // return Err(StartMicroVm(MicroVMAlreadyRunning));
+    }
+
+    vm.start_microvm(&mut event_mgr, vmm.vmm_seccomp_filter(), vmm.vcpu_seccomp_filter())?
+
+    return Ok(())
+}
