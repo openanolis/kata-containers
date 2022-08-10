@@ -46,12 +46,6 @@ pub struct RootfsArgs {
     pub is_read_only: bool,
 }
 
-/// Bind a socket
-#[derive(Args, Debug)]
-pub struct BindArgs {
-
-}
-
 /// Configurations used for creating a VM.
 #[derive(Args, Debug, Deserialize, Serialize)]
 pub struct CreateArgs {
