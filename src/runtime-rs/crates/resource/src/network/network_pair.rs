@@ -4,13 +4,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{convert::TryFrom, sync::Arc, usize};
-
 use anyhow::{anyhow, Context, Result};
 use futures::stream::TryStreamExt;
+use std::{convert::TryFrom, sync::Arc, usize};
 
 use super::{
-    network_model,
+    network_model::{self, NetworkModelType},
     utils::{self, address::Address, link},
 };
 
@@ -51,13 +50,26 @@ impl NetworkPair {
         let model = network_model::new(model).context("new network model")?;
         let tap_iface_name = format!("tap{}{}", idx, TAP_SUFFIX);
         let virt_iface_name = format!("eth{}", idx);
-        let tap_link = create_link(handle, &tap_iface_name, queues)
-            .await
-            .context("create link")?;
-
         let virt_link = get_link_by_name(handle, virt_iface_name.clone().as_str())
             .await
             .context("get link by name")?;
+        let tap_link = match model.model_type() {
+            NetworkModelType::TcFilter => create_link(handle, &tap_iface_name, queues)
+                .await
+                .context("create link"),
+            NetworkModelType::Macvtap => {
+                handle
+                    .link()
+                    .add()
+                    .macvtap(tap_iface_name.clone(), virt_link.attrs().index, 4u32)
+                    .execute()
+                    .await?;
+                get_link_by_name(handle, tap_iface_name.as_str())
+                    .await
+                    .context("get link by name")
+            }
+            _ => Err(anyhow!("Unsupported hypervisor")),
+        }?;
 
         let mut virt_addr_msg_list = handle
             .address()
@@ -93,13 +105,15 @@ impl NetworkPair {
             .await
             .context("set link mtu")?;
 
-        handle
-            .link()
-            .set(tap_link.attrs().index)
-            .up()
-            .execute()
-            .await
-            .context("set link up")?;
+        if model.model_type() == NetworkModelType::TcFilter {
+            handle
+                .link()
+                .set(tap_link.attrs().index)
+                .up()
+                .execute()
+                .await
+                .context("set link up")?;
+        }
 
         let mut net_pair = NetworkPair {
             tap: TapInterface {

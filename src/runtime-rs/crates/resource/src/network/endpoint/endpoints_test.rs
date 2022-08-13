@@ -15,9 +15,8 @@ mod tests {
     use crate::network::{
         endpoint::{IPVlanEndpoint, MacVlanEndpoint, VlanEndpoint},
         network_model::{
-            self,
-            tc_filter_model::{fetch_index, TcFilterModel},
-            NetworkModelType, TC_FILTER_NET_MODEL_STR,
+            self, fetch_index, tc_filter_model::TcFilterModel, NetworkModelType,
+            TC_FILTER_NET_MODEL_STR,
         },
         network_pair::{NetworkInterface, NetworkPair, TapInterface},
     };

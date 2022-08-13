@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests {
     use crate::network::{
-        network_model::{tc_filter_model::fetch_index, TC_FILTER_NET_MODEL_STR},
+        network_model::{fetch_index, TC_FILTER_NET_MODEL_STR},
         network_pair::NetworkPair,
     };
     use anyhow::Context;

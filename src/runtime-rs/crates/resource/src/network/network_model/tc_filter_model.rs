@@ -6,11 +6,10 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use rtnetlink::Handle;
 use scopeguard::defer;
 
 use super::{NetworkModel, NetworkModelType};
-use crate::network::NetworkPair;
+use crate::network::{network_model::fetch_index, NetworkPair};
 
 #[derive(Debug)]
 pub(crate) struct TcFilterModel {}
@@ -93,12 +92,4 @@ impl NetworkModel for TcFilterModel {
         handle.qdisc().del(virt_index as i32).execute().await?;
         Ok(())
     }
-}
-
-pub async fn fetch_index(handle: &Handle, name: &str) -> Result<u32> {
-    let link = crate::network::network_pair::get_link_by_name(handle, name)
-        .await
-        .context("get link by name")?;
-    let base = link.attrs();
-    Ok(base.index)
 }
