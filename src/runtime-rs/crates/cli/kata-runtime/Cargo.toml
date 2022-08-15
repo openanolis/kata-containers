@@ -1,0 +1,13 @@
+[package]
+name = "kata-runtime"
+version = "0.1.0"
+authors = ["The Kata Containers community <kata-dev@lists.katacontainers.io>"]
+edition = "2018"
+
+[[bin]]
+name = "kata-runtime"
+path = "src/bin/main.rs"
+
+[dependencies]
+anyhow = "^1.0"
+clap = "3.2.16"

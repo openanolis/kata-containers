@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/shim",
+    "crates/cli/kata-runtime"
 ]
 
 [patch.'crates-io']
