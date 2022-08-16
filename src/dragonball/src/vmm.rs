@@ -185,6 +185,12 @@ impl Vmm {
 
         exit_code
     }
+
+    /// get private field: epoll_manager
+    pub fn epoll_manager(&self) -> EpollManager {
+        self.epoll_manager.clone()
+    }
+
 }
 
 #[cfg(test)]
