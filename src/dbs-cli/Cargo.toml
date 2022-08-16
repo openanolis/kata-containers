@@ -26,4 +26,6 @@ thiserror = "1"
 nix = "0.24.1"
 anyhow = "1.0.61"
 vmm-sys-util = "0.9.0"
-env_logger = "0.9.0"
+
+slog-envlogger = "2.2.0"
+slog-stdlog = "4.1.1"

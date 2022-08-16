@@ -8,17 +8,19 @@ use parser::DBSArgs;
 use parser::run_with_cli;
 use anyhow::{anyhow, Context, Result};
 
-use log::{debug, error, log_enabled, info, Level};
-use env_logger;
 
+extern crate slog_stdlog;
+extern crate slog_envlogger;
 
+#[macro_use]
+extern crate log;
 
 fn main() -> Result<()>{
     // RUST_LOG=debug ./dbs-cli <args>
-    env_logger::init();
+    let _guard = slog_envlogger::init().unwrap();
 
     let args: DBSArgs = DBSArgs::parse();
 
-    run_with_cli(&args)?;
+    run_with_cli(args)?;
     Ok(())
 }

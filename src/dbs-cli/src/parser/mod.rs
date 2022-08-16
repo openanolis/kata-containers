@@ -11,10 +11,7 @@
 
 pub mod args;
 
-use std::sync::{RwLock, Arc, Mutex};
 use std::collections::HashMap;
-use std::fs::File;
-use std::path::{Path, PathBuf};
 use clap::Parser;
 use kvm_ioctls::Kvm;
 use seccompiler::{BpfProgram};
@@ -26,14 +23,69 @@ use vm_memory::{Bytes, GuestAddress, GuestMemoryMmap};
 use hypervisor::dragonball::vmm_instance::VmmInstance;
 use anyhow::Result;
 use vmm_sys_util::terminal::Terminal;
+use dragonball::{
+    api::v1::{
+        BlockDeviceConfigInfo, BootSourceConfig,
+        InstanceInfo, InstanceState, VmmAction, VmmActionError, VmmData,
+        VmmRequest, VmmResponse, VmmService, BootSourceConfigError, DEFAULT_KERNEL_CMDLINE,
+    },
+    vm::{VmConfigInfo, CpuTopology, KernelConfigInfo},
+    Vmm,
+    event_manager::EventManager,
+};
+use std::{
+    fs::{File, OpenOptions},
+    os::unix::{io::IntoRawFd, prelude::AsRawFd},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex, RwLock,
+    },
+    thread,
+    path::{Path, PathBuf}
+};
+use std::ops::Deref;
+
+const KVM_DEVICE: &str = "/dev/kvm";
+
 
 pub use args::DBSArgs;
 
 use crate::cli_instance::CliInstance;
 
-pub fn run_with_cli(args: &DBSArgs) -> Result<()> {
+pub fn run_with_cli(args: DBSArgs) -> Result<()> {
     let mut cli_instance = CliInstance::new("dbs-cli");
-    cli_instance.run_vmm_server("dbs-cli", args);
+
+    let kvm = OpenOptions::new().read(true).write(true).open(KVM_DEVICE)?;
+
+    let (to_vmm, from_runtime) = channel();
+    let (to_runtime, from_vmm) = channel();
+
+    let vmm_service = VmmService::new(from_runtime, to_runtime);
+
+    cli_instance.to_vmm = Some(to_vmm);
+    cli_instance.from_vmm = Some(from_vmm);
+
+    let api_event_fd2 = cli_instance.to_vmm_fd.try_clone().expect("Failed to dup eventfd");
+    let vmm = Vmm::new(
+        cli_instance.vmm_shared_info.clone(),
+        api_event_fd2,
+        cli_instance.seccomp.clone(),
+        cli_instance.seccomp.clone(),
+        Some(kvm.into_raw_fd()),
+    ).expect("Failed to start vmm");
+
+    // let cli_instance_copy = Arc::new(RwLock::new(cli_instance)).clone();
+    thread::Builder::new().name("set configuration".to_owned())
+        .spawn(move || {
+            cli_instance.run_vmm_server("dbs-cli", args);
+
+        });
+
+    println!("Begin event handling.");
+    let exit_code =
+        Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service);
+    println!("run vmm thread exited: {}", exit_code);
+
     return Ok(());
 }
 

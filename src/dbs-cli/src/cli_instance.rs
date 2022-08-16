@@ -35,25 +35,21 @@ use hypervisor::ShareFsOperation;
 
 use crate::parser::DBSArgs;
 
+const DRAGONBALL_VERSION: &str = env!("CARGO_PKG_VERSION");
 const SERIAL_PATH: &str = "/tmp/dbs-cli";
-
+const REQUEST_RETRY: u32 = 500;
 
 pub enum Request {
     Sync(VmmAction),
 }
 
-const DRAGONBALL_VERSION: &str = env!("CARGO_PKG_VERSION");
-const REQUEST_RETRY: u32 = 500;
-const KVM_DEVICE: &str = "/dev/kvm";
-
 pub struct CliInstance {
     /// VMM instance info directly accessible from runtime
-    vmm_shared_info: Arc<RwLock<InstanceInfo>>,
-    to_vmm: Option<Sender<VmmRequest>>,
-    from_vmm: Option<Receiver<VmmResponse>>,
-    to_vmm_fd: EventFd,
-    seccomp: BpfProgram,
-    vmm_thread: Option<thread::JoinHandle<Result<i32>>>,
+    pub vmm_shared_info: Arc<RwLock<InstanceInfo>>,
+    pub to_vmm: Option<Sender<VmmRequest>>,
+    pub from_vmm: Option<Receiver<VmmResponse>>,
+    pub to_vmm_fd: EventFd,
+    pub seccomp: BpfProgram,
 }
 
 impl CliInstance {
@@ -74,7 +70,6 @@ impl CliInstance {
             from_vmm: None,
             to_vmm_fd,
             seccomp: vec![],
-            vmm_thread: None,
         }
     }
 
@@ -82,33 +77,12 @@ impl CliInstance {
         self.vmm_shared_info.clone()
     }
 
-    fn set_instance_id(&mut self, id: &str) {
+    pub fn set_instance_id(&mut self, id: &str) {
         let share_info_lock = self.vmm_shared_info.clone();
         share_info_lock.write().unwrap().id = String::from(id);
     }
 
-    pub fn run_vmm_server(&mut self, id: &str, args: &DBSArgs) -> Result<()> {
-        let kvm = OpenOptions::new().read(true).write(true).open(KVM_DEVICE)?;
-
-        let (to_vmm, from_runtime) = channel();
-        let (to_runtime, from_vmm) = channel();
-
-        self.set_instance_id(id);
-
-        let vmm_service = VmmService::new(from_runtime, to_runtime);
-
-        self.to_vmm = Some(to_vmm);
-        self.from_vmm = Some(from_vmm);
-
-        let api_event_fd2 = self.to_vmm_fd.try_clone().expect("Failed to dup eventfd");
-        let vmm = Vmm::new(
-            self.vmm_shared_info.clone(),
-            api_event_fd2,
-            self.seccomp.clone(),
-            self.seccomp.clone(),
-            Some(kvm.into_raw_fd()),
-        )
-            .expect("Failed to start vmm");
+    pub fn run_vmm_server(&mut self, id: &str, args: DBSArgs) -> Result<()> {
 
         // configuration
         let mut vm_config = VmConfigInfo {
@@ -137,7 +111,7 @@ impl CliInstance {
         let boot_source_config = BootSourceConfig {
             kernel_path: args.boot_args.kernel_path.clone(),
             initrd_path: args.boot_args.initrd_path.clone(),
-            boot_args: args.boot_args.boot_args.clone(),
+            boot_args: Some(args.boot_args.boot_args.clone()),
         };
 
         // rootfs
@@ -149,18 +123,6 @@ impl CliInstance {
             is_read_only: args.boot_args.rootfs_args.is_read_only,
             ..block_device_config_info
         };
-
-        /// put configuration to service
-        let vmm_thread = thread::Builder::new()
-            .name("CLI".to_owned())
-            .spawn(move || {
-                println!("Begin event handling.");
-                let exit_code =
-                    Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service);
-                println!("run vmm thread exited: {}", exit_code);
-                Ok(exit_code)
-            }).expect("failed to start vmm thread");
-        self.vmm_thread = Some(vmm_thread);
 
         /// put configuration to service
         println!("Begin configuring");
@@ -177,9 +139,6 @@ impl CliInstance {
         self.instance_start().expect("failed to start micro-vm");
 
         println!("Configuration Complete.");
-
-        self.vmm_thread.take().unwrap().join();
-
         Ok(())
     }
 
