@@ -39,10 +39,10 @@ pub struct RootfsArgs {
     #[clap(short, long, value_parser, help = "The path of rootfs file", display_order = 4)]
     pub rootfs: String,
 
-    #[clap(long, value_parser, action, help = "Decide the device to be the root boot device or not [default: true]", display_order = 5)]
+    #[clap(long, value_parser, default_value_t = true, help = "Decide the device to be the root boot device or not [default: true]", display_order = 5)]
     pub is_root: bool,
 
-    #[clap(long, value_parser, action, help = "The driver opened in read-only or not [default: false]", display_order = 6)]
+    #[clap(long, value_parser, default_value_t = false, help = "The driver opened in read-only or not [default: false]", display_order = 6)]
     pub is_read_only: bool,
 }
 

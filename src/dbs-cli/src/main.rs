@@ -1,17 +1,16 @@
 #![allow(unused)]
 
 mod parser;
-mod utils;
-
+mod cli_instance;
 
 use clap::Parser;
 use parser::DBSArgs;
-// use parser::run_with_cli;
-use utils::{CLIError, CLIResult, KernelErrorKind, RootfsErrorKind};
+use parser::run_with_cli;
+use anyhow::{anyhow, Context, Result};
 
-fn main() -> CLIResult<()>{
+fn main() -> Result<()>{
     let args: DBSArgs = DBSArgs::parse();
 
-    // run_with_cli(&args)?;
+    run_with_cli(&args)?;
     Ok(())
 }

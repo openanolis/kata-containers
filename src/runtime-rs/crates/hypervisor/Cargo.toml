@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 anyhow = "^1.0"
 async-trait = "0.1.48"
-dbs-utils = "0.1.0"
+dbs-utils = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "7a8e832b53d66994d6a16f0513d69f540583dcd0" }
 go-flag = "0.1.0"
 libc = ">=0.2.39"
 nix = "0.24.1"
