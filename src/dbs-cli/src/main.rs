@@ -14,6 +14,7 @@ use env_logger;
 
 
 fn main() -> Result<()>{
+    // RUST_LOG=debug ./dbs-cli <args>
     env_logger::init();
 
     let args: DBSArgs = DBSArgs::parse();
