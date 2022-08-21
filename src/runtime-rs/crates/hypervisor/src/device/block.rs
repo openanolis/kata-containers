@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct BlockConfig {
     /// Unique identifier of the drive.
     pub id: String,
@@ -21,4 +21,13 @@ pub struct BlockConfig {
 
     /// device index
     pub index: u64,
+
+    pub io_limits: Option<IoLimits>,
+}
+#[derive(Debug, Clone, Default)]
+pub struct IoLimits {
+    pub read_iops: Option<u64>,
+    pub write_iops: Option<u64>,
+    pub read_bps: Option<u64>,
+    pub write_bps: Option<u64>,
 }

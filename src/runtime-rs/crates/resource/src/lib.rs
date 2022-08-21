@@ -22,6 +22,7 @@ pub mod rootfs;
 pub mod share_fs;
 pub mod volume;
 pub use manager::ResourceManager;
+pub mod device;
 
 use kata_types::config::hypervisor::SharedFsInfo;
 

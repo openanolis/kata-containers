@@ -5,7 +5,7 @@
 //
 
 mod block;
-pub use block::BlockConfig;
+pub use block::{BlockConfig, IoLimits};
 mod network;
 pub use network::{Address, NetworkConfig};
 mod share_fs_device;
@@ -15,9 +15,8 @@ pub use vfio::{bind_device_to_host, bind_device_to_vfio, VfioBusMode, VfioConfig
 mod share_fs_mount;
 pub use share_fs_mount::{ShareFsMountConfig, ShareFsMountType, ShareFsOperation};
 mod vsock;
-pub use vsock::VsockConfig;
-
 use std::fmt;
+pub use vsock::VsockConfig;
 
 #[derive(Debug)]
 pub enum Device {
