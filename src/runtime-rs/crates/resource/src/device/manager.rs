@@ -12,6 +12,8 @@ const SYS_DEV_PREFIX: &str = "/sys/dev";
 pub const VIRTIO_MMIO: &str = "virtio-mmio";
 pub const VIRTIO_BLOCK: &str = "virtio-blk";
 pub const VFIO: &str = "vfio";
+pub const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
+pub const KATA_BLK_DEV_TYPE: &str = "blk";
 type ArcBoxDevice = Arc<Mutex<Box<dyn Device>>>;
 
 pub struct DeviceManager {
