@@ -99,7 +99,7 @@ impl CliInstance {
             mem_type: args.create_args.mem_type.clone(),
             mem_file_path: args.create_args.mem_file_path.clone(),
             mem_size_mib: args.create_args.mem_size,
-            serial_path: Some(String::from(SERIAL_PATH)),
+            serial_path: Some(SERIAL_PATH.to_owned())
         };
         // check the existence of the serial path (rm it if exist)
         let serial_file = Path::new(SERIAL_PATH);
