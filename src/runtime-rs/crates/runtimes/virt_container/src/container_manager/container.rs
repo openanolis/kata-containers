@@ -124,7 +124,18 @@ impl Container {
         spec.mounts = oci_mounts;
 
         // TODO: handler device
+        let linux = match spec.linux.as_ref() {
+            None => {
+                return Err(anyhow!("spec miss linux field"));
+            }
+            Some(l) => l,
+        };
 
+        let mut devices_agent = vec![];
+
+        self.resource_manager
+            .handler_device(&config.container_id, linux, &mut devices_agent)
+            .await?;
         // update cgroups
         self.resource_manager
             .update_cgroups(
@@ -139,7 +150,7 @@ impl Container {
         let r = agent::CreateContainerRequest {
             process_id: agent::ContainerProcessID::new(&config.container_id, ""),
             string_user: None,
-            devices: vec![],
+            devices: devices_agent,
             storages,
             oci: Some(spec),
             guest_hooks: None,

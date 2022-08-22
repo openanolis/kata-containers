@@ -7,16 +7,16 @@
 use std::sync::Arc;
 
 use crate::{
-    device::manager::{DeviceManager, VIRTIO_BLOCK},
+    device::manager::{new_device_info, DeviceManager, VIRTIO_BLOCK},
     resource_persist::ResourceState,
 };
-use agent::{Agent, Storage};
+use agent::{types::Device, Agent, Storage};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hypervisor::Hypervisor;
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
-use oci::LinuxResources;
+use oci::{Linux, LinuxResources};
 use persist::sandbox_persist::Persist;
 use tokio::sync::Mutex;
 
@@ -203,6 +203,29 @@ impl ResourceManagerInner {
             .await
     }
 
+    pub async fn handler_device(
+        &self,
+        _cid: &str,
+        linux: &Linux,
+        devices_agent: &mut Vec<Device>,
+    ) -> Result<()> {
+        for d in linux.devices.iter() {
+            let mut device_info = new_device_info(d, None, None)?;
+            self.device
+                .lock()
+                .await
+                .new_device(&mut device_info, self.hypervisor.as_ref())
+                .await?;
+            let device = self
+                .device
+                .lock()
+                .await
+                .generate_agent_device(device_info)
+                .await?;
+            devices_agent.push(device);
+        }
+        return Ok(());
+    }
     pub async fn update_cgroups(
         &self,
         cid: &str,

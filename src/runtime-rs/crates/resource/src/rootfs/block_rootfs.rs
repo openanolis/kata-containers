@@ -65,6 +65,7 @@ impl BlockRootfs {
                     bdf: None,
                     driver_options: HashMap::new(),
                     io_limits: None,
+                    ..Default::default()
                 },
                 h,
             )

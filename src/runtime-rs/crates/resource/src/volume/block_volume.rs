@@ -57,6 +57,7 @@ impl BlockVolume {
                     bdf: None,
                     driver_options: options,
                     io_limits: None,
+                    ..Default::default()
                 },
                 h,
             )

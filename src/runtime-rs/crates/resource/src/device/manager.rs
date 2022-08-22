@@ -1,7 +1,8 @@
 use super::driver::{block::BlockDevice, GenericDevice};
 use crate::device::device::{Device, DeviceInfo};
+use agent::types::Device as AgentDevice;
 use anyhow::{anyhow, Result};
-use hypervisor::Hypervisor;
+use hypervisor::{Hypervisor, IoLimits};
 use ini::Ini;
 use kata_sys_util::{rand, HexSlice};
 use std::{collections::HashMap, sync::Arc};
@@ -45,6 +46,38 @@ impl DeviceManager {
         self.devices.insert(id.clone(), Arc::clone(&dev));
         self.attach_device(&id, h).await?;
         Ok(id)
+    }
+
+    pub(crate) async fn generate_agent_device(
+        &self,
+        device_info: DeviceInfo,
+    ) -> Result<AgentDevice> {
+        // Safe because we just attached the device
+        let dev = self.get_device_by_id(&device_info.id);
+        let base_info = dev.unwrap().lock().await.get_device_info().await?;
+        let mut device = AgentDevice {
+            container_path: device_info.container_path.clone(),
+            ..Default::default()
+        };
+
+        match self.get_block_driver().await {
+            VIRTIO_MMIO => {
+                if let Some(path) = base_info.virt_path {
+                    device.id = path.clone();
+                    device.field_type = KATA_MMIO_BLK_DEV_TYPE.to_string();
+                    device.vm_path = path.clone();
+                }
+            }
+            VIRTIO_BLOCK => {
+                if let Some(path) = base_info.pci_addr {
+                    device.id = path.clone();
+                    device.field_type = KATA_BLK_DEV_TYPE.to_string();
+                    device.vm_path = path.clone();
+                }
+            }
+            _ => (),
+        }
+        Ok(device)
     }
 
     pub async fn get_block_driver(&self) -> &str {
@@ -168,6 +201,10 @@ impl DeviceManager {
         }
         Err(anyhow!("ID are exhausted"))
     }
+
+    fn get_device_by_id(&self, id: &str) -> Option<ArcBoxDevice> {
+        self.devices.get(id).map(Arc::clone)
+    }
 }
 
 fn is_block(dev_info: &DeviceInfo) -> bool {
@@ -209,4 +246,51 @@ pub fn get_host_path(dev_info: &DeviceInfo) -> Result<String> {
         .get("DEVNAME")
         .ok_or_else(|| anyhow!("has no DEVNAME"))?;
     Ok(format!("/dev/{}", dev_name))
+}
+
+pub fn new_device_info(
+    device: &oci::LinuxDevice,
+    bdf: Option<String>,
+    io_limits: Option<IoLimits>,
+) -> Result<DeviceInfo> {
+    let allow_device_type: Vec<&str> = vec!["c", "b", "u", "p"];
+
+    info!(sl!(), "device type:{:?}", device.r#type);
+    if !allow_device_type.contains(&device.r#type.as_str()) {
+        return Err(anyhow!("runtime not support device type {}", device.r#type));
+    }
+
+    if device.path.is_empty() {
+        return Err(anyhow!("container path can not be empty"));
+    }
+
+    let mut file_mode: u32 = 0;
+    let mut uid: u32 = 0;
+    let mut gid: u32 = 0;
+    if device.file_mode.is_some() {
+        file_mode = device.file_mode.unwrap();
+    }
+    if device.uid.is_some() {
+        uid = device.uid.unwrap();
+    }
+    if device.gid.is_some() {
+        gid = device.gid.unwrap();
+    }
+
+    let dev_info = DeviceInfo {
+        host_path: String::new(),
+        container_path: device.path.clone(),
+        dev_type: device.r#type.clone(),
+        major: device.major,
+        minor: device.minor,
+        file_mode: file_mode as u32,
+        uid,
+        gid,
+        id: "".to_string(),
+        bdf,
+        driver_options: HashMap::new(),
+        io_limits,
+        ..Default::default()
+    };
+    Ok(dev_info)
 }

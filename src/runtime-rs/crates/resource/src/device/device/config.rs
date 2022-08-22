@@ -39,4 +39,10 @@ pub struct DeviceInfo {
     pub driver_options: HashMap<String, String>,
 
     pub io_limits: Option<IoLimits>,
+
+    // PCIAddr is the PCI address used to identify the slot at which the drive is attached.
+    pub pci_addr: Option<String>,
+
+    // VirtPath at which the device appears inside the VM, outside of the container mount namespace
+    pub virt_path: Option<String>,
 }
