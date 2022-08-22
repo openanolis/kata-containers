@@ -10,6 +10,7 @@ use share_virtio_fs_inline::ShareVirtioFsInline;
 mod share_virtio_fs_standalone;
 use share_virtio_fs_standalone::ShareVirtioFsStandalone;
 mod utils;
+pub use utils::{do_get_guest_path, do_get_host_path};
 mod virtio_fs_share_mount;
 use virtio_fs_share_mount::VirtiofsShareMount;
 

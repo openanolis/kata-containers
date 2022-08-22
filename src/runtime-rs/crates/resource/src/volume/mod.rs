@@ -12,9 +12,10 @@ mod shm_volume;
 use std::{sync::Arc, vec::Vec};
 
 use anyhow::{Context, Result};
-use tokio::sync::RwLock;
+use hypervisor::Hypervisor;
+use tokio::sync::{Mutex, RwLock};
 
-use crate::share_fs::ShareFs;
+use crate::{device::manager::DeviceManager, share_fs::ShareFs};
 
 pub trait Volume: Send + Sync {
     fn get_volume_mount(&self) -> Result<Vec<oci::Mount>>;
@@ -40,11 +41,20 @@ impl VolumeResource {
     pub async fn handler_volumes(
         &self,
         share_fs: &Option<Arc<dyn ShareFs>>,
+        device_manager: Arc<Mutex<DeviceManager>>,
+        hypervisor: &dyn Hypervisor,
         cid: &str,
         oci_mounts: &[oci::Mount],
     ) -> Result<Vec<Arc<dyn Volume>>> {
         let mut volumes: Vec<Arc<dyn Volume>> = vec![];
         for m in oci_mounts {
+            let mut read_only = false;
+            for o in &m.options {
+                if o == "ro" {
+                    read_only = true;
+                    break;
+                }
+            }
             let volume: Arc<dyn Volume> = if shm_volume::is_shim_volume(m) {
                 let shm_size = shm_volume::DEFAULT_SHM_SIZE;
                 Arc::new(
@@ -59,8 +69,15 @@ impl VolumeResource {
                 )
             } else if block_volume::is_block_volume(m) {
                 Arc::new(
-                    block_volume::BlockVolume::new(m)
-                        .with_context(|| format!("new block volume {:?}", m))?,
+                    block_volume::BlockVolume::new(
+                        device_manager.clone(),
+                        hypervisor,
+                        m,
+                        read_only,
+                        cid,
+                    )
+                    .await
+                    .with_context(|| format!("new block volume {:?}", m))?,
                 )
             } else if is_skip_volume(m) {
                 info!(sl!(), "skip volume {:?}", m);

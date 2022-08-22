@@ -66,11 +66,11 @@ fn do_get_guest_any_path(target: &str, cid: &str, is_volume: bool, is_virtiofs: 
     path.to_str().unwrap().to_string()
 }
 
-fn do_get_guest_path(target: &str, cid: &str, is_volume: bool) -> String {
+pub fn do_get_guest_path(target: &str, cid: &str, is_volume: bool) -> String {
     do_get_guest_any_path(target, cid, is_volume, false)
 }
 
-fn do_get_host_path(
+pub fn do_get_host_path(
     target: &str,
     sid: &str,
     cid: &str,

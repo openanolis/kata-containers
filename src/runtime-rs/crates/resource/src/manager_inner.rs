@@ -6,7 +6,10 @@
 
 use std::sync::Arc;
 
-use crate::resource_persist::ResourceState;
+use crate::{
+    device::manager::{DeviceManager, VIRTIO_BLOCK},
+    resource_persist::ResourceState,
+};
 use agent::{Agent, Storage};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -15,6 +18,7 @@ use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
 use persist::sandbox_persist::Persist;
+use tokio::sync::Mutex;
 
 use crate::{
     cgroups::{CgroupArgs, CgroupsResource},
@@ -33,6 +37,7 @@ pub(crate) struct ResourceManagerInner {
     hypervisor: Arc<dyn Hypervisor>,
     network: Option<Arc<dyn Network>>,
     share_fs: Option<Arc<dyn ShareFs>>,
+    device: Arc<Mutex<DeviceManager>>,
 
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
@@ -54,6 +59,7 @@ impl ResourceManagerInner {
             hypervisor,
             network: None,
             share_fs: None,
+            device: Arc::new(Mutex::new(DeviceManager::new(VIRTIO_BLOCK))),
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
             cgroups_resource,
@@ -179,7 +185,13 @@ impl ResourceManagerInner {
         oci_mounts: &[oci::Mount],
     ) -> Result<Vec<Arc<dyn Volume>>> {
         self.volume_resource
-            .handler_volumes(&self.share_fs, cid, oci_mounts)
+            .handler_volumes(
+                &self.share_fs,
+                self.device.clone(),
+                self.hypervisor.as_ref(),
+                cid,
+                oci_mounts,
+            )
             .await
     }
 
@@ -238,6 +250,7 @@ impl Persist for ResourceManagerInner {
             hypervisor: resource_args.hypervisor,
             network: None,
             share_fs: None,
+            device: Arc::new(Mutex::new(DeviceManager::new(VIRTIO_BLOCK))),
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
             cgroups_resource: CgroupsResource::restore(
