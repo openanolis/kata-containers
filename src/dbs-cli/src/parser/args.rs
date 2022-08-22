@@ -85,7 +85,7 @@ pub struct BootArgs {
     pub initrd_path: Option<String>,
 
     // for kata_rootfs: 'root=/dev/vda1'
-    #[clap(short, long, value_parser,  default_value = "console=ttyS1 reboot=k panic=1 pci=off root=/dev/vda virtio_mmio.device=4K@0xd0000000:5", help = "The boot arguments passed to the kernel (Optional)", display_order = 3)]
+    #[clap(short, long, value_parser,  default_value = "console=ttyS1 reboot=k panic=1 pci=off root=/dev/vda", help = "The boot arguments passed to the kernel (Optional)", display_order = 3)]
     pub boot_args: String,
 
     /// rootfs

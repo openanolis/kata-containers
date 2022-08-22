@@ -579,7 +579,7 @@ impl DeviceManager {
         Ok(())
     }
 
-    /// Init legacy devices with logger stream in associted virtual machine
+    /// Init legacy devices with logger stream in associated virtual machine
     pub fn init_legacy_devices(
         &mut self,
         dmesg_fifo: Option<Box<dyn io::Write + Send>>,
@@ -591,14 +591,15 @@ impl DeviceManager {
             .map_err(|_| StartMicroVmError::EventFd)?;
 
         info!(self.logger, "init console path: {:?}", com1_sock_path);
-        if let Some(path) = com1_sock_path {
-            if let Some(legacy_manager) = self.legacy_manager.as_ref() {
-                let com1 = legacy_manager.get_com1_serial();
-                self.con_manager
-                    .create_socket_console(com1, path)
-                    .map_err(StartMicroVmError::DeviceManager)?;
-            }
-        } else if let Some(legacy_manager) = self.legacy_manager.as_ref() {
+        // if let Some(path) = com1_sock_path {
+        //     if let Some(legacy_manager) = self.legacy_manager.as_ref() {
+        //         let com1 = legacy_manager.get_com1_serial();
+        //         self.con_manager
+        //             .create_socket_console(com1, path)
+        //             .map_err(StartMicroVmError::DeviceManager)?;
+        //     }
+        // } else
+        if let Some(legacy_manager) = self.legacy_manager.as_ref() {
             let com1 = legacy_manager.get_com1_serial();
             self.con_manager
                 .create_stdio_console(com1)
