@@ -257,6 +257,7 @@ impl VmmService {
                 self.update_fs_rate_limiters(vmm, fs_update_cfg)
             }
         };
+        println!("{response:?}");
 
         debug!("send vmm response: {:?}", response);
         self.send_response(response)

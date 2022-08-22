@@ -110,7 +110,7 @@ impl VmmInstance {
             thread::Builder::new()
                 .name("vmm_master".to_owned())
                 .spawn(move || {
-                    || -> Result<i32> {
+                    (|| -> Result<i32> {
                         debug!(sl!(), "run vmm thread start");
                         if let Some(netns_path) = netns {
                             info!(sl!(), "set netns for vmm master {}", &netns_path);
@@ -121,9 +121,10 @@ impl VmmInstance {
                         }
                         let exit_code =
                             Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service);
+                        println!("run vmm thread exited: {}", exit_code);
                         debug!(sl!(), "run vmm thread exited: {}", exit_code);
                         Ok(exit_code)
-                    }()
+                    })()
                     .map_err(|e| {
                         error!(sl!(), "run vmm thread err. {:?}", e);
                         e
