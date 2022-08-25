@@ -110,6 +110,16 @@ block_device_driver = "@DEFBLOCKSTORAGEDRIVER_DB@"
 # Default false
 #disable_vhost_net = true
 
+# Use rx Rate Limiter to control network I/O inbound bandwidth(size in bits/sec for SB/VM).
+# the rate limits both the rate of *bandwidth (Bps)* and the rate of *operation (op/s)*
+# Default 0-sized value means unlimited rate.
+#rx_rate_limiter_max_rate = 0
+# Use tx Rate Limiter to control network I/O outbound bandwidth(size in bits/sec for SB/VM).
+# the rate limits both the rate of *bandwidth (Bps)* and the rate of *operation (op/s)*
+# Default 0-sized value means unlimited rate.
+#tx_rate_limiter_max_rate = 0
+
+
 # Path to OCI hook binaries in the *guest rootfs*.
 # This does not affect host-side hooks which must instead be added to
 # the OCI spec passed to the runtime.

@@ -8,9 +8,12 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use dbs_utils::net::MacAddr;
-use dragonball::api::v1::{
-    BlockDeviceConfigInfo, FsDeviceConfigInfo, FsMountConfigInfo, VirtioNetDeviceConfigInfo,
-    VsockDeviceConfigInfo,
+use dragonball::{
+    api::v1::{
+        BlockDeviceConfigInfo, FsDeviceConfigInfo, FsMountConfigInfo, VirtioNetDeviceConfigInfo,
+        VsockDeviceConfigInfo,
+    },
+    config_manager::{RateLimiterConfigInfo, TokenBucketConfigInfo},
 };
 
 use super::DragonballInner;
@@ -119,6 +122,34 @@ impl DragonballInner {
     }
 
     fn add_net_device(&mut self, config: &NetworkConfig) -> Result<()> {
+        let tx_limit_info = match config.tx_limited_rate {
+            Some(rate) => {
+                let bucket_info = TokenBucketConfigInfo {
+                    size: rate,
+                    one_time_burst: rate,
+                    refill_time: 1000, // 1000ms to refill to *rate*
+                };
+                Some(RateLimiterConfigInfo {
+                    bandwidth: bucket_info.clone(),
+                    ops: bucket_info,
+                })
+            }
+            None => None,
+        };
+        let rx_limit_info = match config.rx_limited_rate {
+            Some(rate) => {
+                let bucket_info = TokenBucketConfigInfo {
+                    size: rate,
+                    one_time_burst: rate,
+                    refill_time: 1000, // 1000ms to refill to *rate*
+                };
+                Some(RateLimiterConfigInfo {
+                    bandwidth: bucket_info.clone(),
+                    ops: bucket_info,
+                })
+            }
+            None => None,
+        };
         let iface_cfg = VirtioNetDeviceConfigInfo {
             iface_id: config.id.clone(),
             host_dev_name: config.host_dev_name.clone(),
@@ -126,6 +157,8 @@ impl DragonballInner {
                 Some(mac) => MacAddr::from_bytes(&mac.0).ok(),
                 None => None,
             },
+            tx_rate_limiter: tx_limit_info,
+            rx_rate_limiter: rx_limit_info,
             ..Default::default()
         };
 

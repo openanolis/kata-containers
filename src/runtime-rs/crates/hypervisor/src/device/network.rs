@@ -29,4 +29,10 @@ pub struct NetworkConfig {
 
     /// Guest MAC address.
     pub guest_mac: Option<Address>,
+
+    /// tx limited rate for packets
+    pub tx_limited_rate: Option<u64>,
+
+    /// rx limited rate for packets
+    pub rx_limited_rate: Option<u64>,
 }

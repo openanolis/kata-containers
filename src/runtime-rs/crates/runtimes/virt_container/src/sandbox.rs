@@ -25,6 +25,7 @@ use tokio::sync::{mpsc::Sender, Mutex, RwLock};
 
 use crate::{health_check::HealthCheck, sandbox_persist::SandboxTYPE};
 use persist::{self, sandbox_persist::Persist};
+
 pub struct SandboxRestoreArgs {
     pub sid: String,
     pub toml_config: TomlConfig,
@@ -90,17 +91,15 @@ impl VirtSandbox {
         let mut resource_configs = vec![];
 
         let config = self.resource_manager.config().await;
+        let hv_config = self.hypervisor.hypervisor_config().await;
         if let Some(netns_path) = netns {
             let network_config = ResourceConfig::Network(NetworkConfig::NetworkResourceWithNetNs(
                 NetworkWithNetNsConfig {
                     network_model: config.runtime.internetworking_model.clone(),
                     netns_path,
-                    queues: self
-                        .hypervisor
-                        .hypervisor_config()
-                        .await
-                        .network_info
-                        .network_queues as usize,
+                    queues: hv_config.network_info.network_queues as usize,
+                    tx_rate_limited: hv_config.network_info.tx_rate_limiter_max_rate,
+                    rx_rate_limited: hv_config.network_info.rx_rate_limiter_max_rate,
                 },
             ));
             resource_configs.push(network_config);

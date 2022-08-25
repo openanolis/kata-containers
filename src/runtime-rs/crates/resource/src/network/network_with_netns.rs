@@ -33,6 +33,8 @@ pub struct NetworkWithNetNsConfig {
     pub network_model: String,
     pub netns_path: String,
     pub queues: usize,
+    pub tx_rate_limited: u64,
+    pub rx_rate_limited: u64,
 }
 
 struct NetworkWithNetnsInner {
@@ -172,6 +174,9 @@ async fn create_endpoint(
         .unwrap();
     let attrs = link.attrs();
     let link_type = link.r#type();
+    let tx_rate = config.tx_rate_limited;
+    let rx_rate = config.rx_rate_limited;
+
     let endpoint: Arc<dyn Endpoint> = if is_physical_iface(&attrs.name)? {
         info!(
             sl!(),
@@ -189,7 +194,7 @@ async fn create_endpoint(
         );
         match link_type {
             "veth" => {
-                let ret = VethEndpoint::new(
+                let mut ret = VethEndpoint::new(
                     handle,
                     &attrs.name,
                     idx,
@@ -198,22 +203,28 @@ async fn create_endpoint(
                 )
                 .await
                 .context("veth endpoint")?;
+                ret.set_rx_rate_limited(rx_rate);
+                ret.set_tx_rate_limited(tx_rate);
                 Arc::new(ret)
             }
             "vlan" => {
-                let ret = VlanEndpoint::new(handle, &attrs.name, idx, config.queues)
+                let mut ret = VlanEndpoint::new(handle, &attrs.name, idx, config.queues)
                     .await
                     .context("vlan endpoint")?;
+                ret.set_rx_rate_limited(rx_rate);
+                ret.set_tx_rate_limited(tx_rate);
                 Arc::new(ret)
             }
             "ipvlan" => {
-                let ret = IPVlanEndpoint::new(handle, &attrs.name, idx, config.queues)
+                let mut ret = IPVlanEndpoint::new(handle, &attrs.name, idx, config.queues)
                     .await
                     .context("ipvlan endpoint")?;
+                ret.set_rx_rate_limited(rx_rate);
+                ret.set_tx_rate_limited(tx_rate);
                 Arc::new(ret)
             }
             "macvlan" => {
-                let ret = MacVlanEndpoint::new(
+                let mut ret = MacVlanEndpoint::new(
                     handle,
                     &attrs.name,
                     idx,
@@ -222,6 +233,8 @@ async fn create_endpoint(
                 )
                 .await
                 .context("macvlan endpoint")?;
+                ret.set_rx_rate_limited(rx_rate);
+                ret.set_tx_rate_limited(tx_rate);
                 Arc::new(ret)
             }
             _ => return Err(anyhow!("unsupported link type: {}", link_type)),

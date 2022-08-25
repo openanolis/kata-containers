@@ -142,6 +142,19 @@ impl Endpoint for PhysicalEndpoint {
         Ok(())
     }
 
+    // since physical endpoint is passthru, it does not support any rate limiting
+    fn get_rx_rate_limited(&self) -> Option<u64> {
+        None
+    }
+
+    fn set_rx_rate_limited(&mut self, _rate: u64) {}
+
+    fn get_tx_rate_limited(&self) -> Option<u64> {
+        None
+    }
+
+    fn set_tx_rate_limited(&mut self, _rate: u64) {}
+
     async fn save(&self) -> Option<EndpointState> {
         Some(EndpointState {
             physical_endpoint: Some(PhysicalEndpointState {

@@ -19,6 +19,8 @@ use hypervisor::{device::NetworkConfig, Device, Hypervisor};
 #[derive(Debug)]
 pub struct IPVlanEndpoint {
     pub(crate) net_pair: NetworkPair,
+    pub rx_rate_limited: Option<u64>,
+    pub tx_rate_limited: Option<u64>,
 }
 
 impl IPVlanEndpoint {
@@ -32,7 +34,11 @@ impl IPVlanEndpoint {
         let net_pair = NetworkPair::new(handle, idx, name, TC_FILTER_NET_MODEL_STR, queues)
             .await
             .context("error creating new NetworkPair")?;
-        Ok(IPVlanEndpoint { net_pair })
+        Ok(IPVlanEndpoint {
+            net_pair,
+            rx_rate_limited: None,
+            tx_rate_limited: None,
+        })
     }
 
     fn get_network_config(&self) -> Result<NetworkConfig> {
@@ -47,6 +53,8 @@ impl IPVlanEndpoint {
             id: self.net_pair.virt_iface.name.clone(),
             host_dev_name: iface.name.clone(),
             guest_mac: Some(guest_mac),
+            tx_limited_rate: self.get_tx_rate_limited(),
+            rx_limited_rate: self.get_rx_rate_limited(),
         })
     }
 }
@@ -87,6 +95,22 @@ impl Endpoint for IPVlanEndpoint {
             .context("error removing device by hypervisor")?;
 
         Ok(())
+    }
+
+    fn get_rx_rate_limited(&self) -> Option<u64> {
+        self.rx_rate_limited
+    }
+
+    fn set_rx_rate_limited(&mut self, rate: u64) {
+        self.rx_rate_limited = Some(rate);
+    }
+
+    fn get_tx_rate_limited(&self) -> Option<u64> {
+        self.tx_rate_limited
+    }
+
+    fn set_tx_rate_limited(&mut self, rate: u64) {
+        self.tx_rate_limited = Some(rate);
     }
 
     async fn save(&self) -> Option<EndpointState> {

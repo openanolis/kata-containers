@@ -29,5 +29,13 @@ pub trait Endpoint: std::fmt::Debug + Send + Sync {
     async fn hardware_addr(&self) -> String;
     async fn attach(&self, hypervisor: &dyn Hypervisor) -> Result<()>;
     async fn detach(&self, hypervisor: &dyn Hypervisor) -> Result<()>;
+
+    // if (rx/tx)_rate = 0, it means that it is not limited
+    // passthru network endpoint cannot be limited for now
+    fn get_rx_rate_limited(&self) -> Option<u64>;
+    fn set_rx_rate_limited(&mut self, rate: u64);
+    fn get_tx_rate_limited(&self) -> Option<u64>;
+    fn set_tx_rate_limited(&mut self, rate: u64);
+
     async fn save(&self) -> Option<EndpointState>;
 }
