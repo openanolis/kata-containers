@@ -1,0 +1,30 @@
+[package]
+name = "dbs-cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hypervisor = { path = "../runtime-rs/crates/hypervisor" }
+dragonball = { path = "../dragonball" }
+
+lazy_static = "1.2"
+clap = { version = "3.2.14", features = ["derive"] }
+serde = "1.0.27"
+serde_derive = "1.0.27"
+serde_json = "1.0.9"
+libc = "0.2.39"
+seccompiler = "0.2.0"
+log = "0.4.14"
+kvm-bindings = "0.5.0"
+kvm-ioctls = "0.11.0"
+vm-memory = { version = "0.7.0", features = ["backend-mmap"] }
+linux-loader = "0.4.0"
+thiserror = "1"
+nix = "0.24.1"
+anyhow = "1.0.61"
+vmm-sys-util = "0.9.0"
+
+slog-envlogger = "2.2.0"
+slog-stdlog = "4.1.1"
