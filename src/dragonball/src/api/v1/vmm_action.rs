@@ -35,6 +35,7 @@ pub use crate::device_manager::virtio_net_dev_mgr::{
 #[cfg(feature = "virtio-vsock")]
 pub use crate::device_manager::vsock_dev_mgr::{VsockDeviceConfigInfo, VsockDeviceError};
 
+use super::machine_config::VmResizeInfo;
 use super::*;
 
 /// Wrapper for all errors associated with VMM actions.
@@ -156,6 +157,10 @@ pub enum VmmAction {
     #[cfg(feature = "virtio-fs")]
     /// Update fs rate limiter, after microVM start.
     UpdateFsDevice(FsDeviceConfigUpdateInfo),
+
+    #[cfg(feature = "hotplug")]
+    /// Resize the microVM
+    VmResize(VmResizeInfo),
 }
 
 /// The enum represents the response sent by the VMM in case of success. The response is either
@@ -255,6 +260,10 @@ impl VmmService {
             #[cfg(feature = "virtio-fs")]
             VmmAction::UpdateFsDevice(fs_update_cfg) => {
                 self.update_fs_rate_limiters(vmm, fs_update_cfg)
+            }
+            #[cfg(feature = "hotplug")]
+            VmmAction::VmResize(_vm_resize_cfg) => {
+                todo!("vm resize is not implemented, this is a mocked for dev")
             }
         };
 
