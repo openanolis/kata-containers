@@ -12,7 +12,7 @@ use crate::{
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use dragonball::{
-    api::v1::{BlockDeviceConfigInfo, BootSourceConfig},
+    api::v1::{BlockDeviceConfigInfo, BootSourceConfig, VmResizeInfo},
     vm::VmConfigInfo,
 };
 use kata_sys_util::mount;
@@ -301,6 +301,62 @@ impl DragonballInner {
                 }
             }
         }
+    }
+
+    // check if resizing info is valid
+    // returns Result<(old, new)> if old_vcpus > 0
+    // returns Result<(0, new)> if old_vcpus <= 0
+    // the old_vcpus has an i32 semantic, check the comment in *struct CpuInfo*
+    pub fn do_check_resize_vcpus(&self, new_vcpus: u32) -> Result<(u32, u32)> {
+        let old_vcpus = self.config.cpu_info.current_vcpus;
+        if old_vcpus <= 0 {
+            // if old_vcpus = 0, it is default_vcpus
+            // if old_vcpus < 0, it is the # of physical cores
+            info!(
+                sl!(),
+                "{}",
+                format!("old vcpu value is {}, skip the check", old_vcpus).as_str()
+            );
+            return Ok((0, new_vcpus));
+        }
+        // old_vcpus > 0, safe for conversion
+        let current_vcpus = old_vcpus as u32;
+        // a non-zero positive is required
+        if new_vcpus == 0 {
+            return Err(anyhow!("resize vcpu error: 0 vcpu resizing is invalid"));
+        }
+        // cannot exceed maximum value
+        if new_vcpus > self.config.cpu_info.default_maxvcpus {
+            return Err(anyhow!("resize vcpu error: cannot greater than maxvcpus"));
+        }
+        Ok((current_vcpus, new_vcpus))
+    }
+
+    pub async fn do_resize_vcpus(&mut self, new_vcpus: u32) -> Result<()> {
+        let cpu_resize_info = VmResizeInfo {
+            vcpu_count: Some(new_vcpus as u8),
+        };
+        self.vmm_instance
+            .resize_vm(&cpu_resize_info)
+            .context("failed to do_resize_vcpus")?;
+        Ok(())
+    }
+
+    // do the check before resizing, returns Result<(old, new)>
+    pub async fn resize_vcpu(&mut self, new_vcpus: u32) -> Result<(u32, u32)> {
+        let (old_vcpus, new_vcpus) = self.do_check_resize_vcpus(new_vcpus)?;
+        if old_vcpus == new_vcpus {
+            info!(sl!(), "resize_vcpu: no need to resize vcpus");
+            return Ok((new_vcpus, new_vcpus));
+        }
+
+        self.do_resize_vcpus(new_vcpus)
+            .await
+            .map(|_| {
+                self.config.cpu_info.current_vcpus = new_vcpus as i32;
+                Ok((old_vcpus, new_vcpus))
+            })
+            .context("do_resize_vcpus failed")?
     }
 
     pub fn set_hypervisor_config(&mut self, config: HypervisorConfig) {

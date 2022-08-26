@@ -2,6 +2,8 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+use serde_derive::{Deserialize, Serialize};
+
 /// We only support this number of vcpus for now. Mostly because we have set all vcpu related metrics as u8
 /// and breaking u8 will take extra efforts.
 pub const MAX_SUPPORTED_VCPUS: u8 = 254;
@@ -83,4 +85,14 @@ pub enum VmConfigError {
     /// NUMA region vCPU count is invalid
     #[error("Max id of vCPUs in NUMA regions: {0}, should matches max vcpu count in config")]
     InvalidNumaRegionCpuMaxId(u16),
+}
+
+/// Strongly typed structure that represents the configuration resize of the microvm.
+#[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct VmResizeInfo {
+    /// The desired vcpu count to resize.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vcpu_count: Option<u8>,
 }
