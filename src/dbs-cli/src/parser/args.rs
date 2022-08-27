@@ -4,7 +4,6 @@
 
 use clap::{Parser, Args};
 use serde_derive::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// A simple command-line tool to start DragonBall micro-VM
 #[derive(Parser, Debug)]

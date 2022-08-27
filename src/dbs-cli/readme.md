@@ -36,12 +36,6 @@ For the rootfs build from kata:
 
 > If you want to exit vm, just input `reboot` in vm's console.
 
-## 2. Show more information
-
-```bash
-RUST_LOG=debug ./dbs-cli <args>
-```
-
 # Acknowledgement
 Part of the code is based on the [Cloud Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) project, [`crosvm`](https://github.com/google/crosvm) project and [Firecracker](https://github.com/firecracker-microvm/firecracker) project. They are all rust written virtual machine managers with advantages on safety and security.
 

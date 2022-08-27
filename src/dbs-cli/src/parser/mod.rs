@@ -5,39 +5,20 @@
 
 pub mod args;
 
-use std::collections::HashMap;
-use clap::Parser;
-use kvm_ioctls::Kvm;
-use seccompiler::{BpfProgram};
-use vmm_sys_util::eventfd::{EventFd, EFD_NONBLOCK};
-use vm_memory::{Bytes, GuestAddress, GuestMemoryMmap};
-// use dbs_utils::epoll_manager::{
-//     EpollManager, EventOps, EventSet, Events, MutEventSubscriber, SubscriberId,
-// };
-use hypervisor::dragonball::vmm_instance::VmmInstance;
 use anyhow::Result;
-use vmm_sys_util::terminal::Terminal;
 use dragonball::{
-    api::v1::{
-        BlockDeviceConfigInfo, BootSourceConfig,
-        InstanceInfo, InstanceState, VmmAction, VmmActionError, VmmData,
-        VmmRequest, VmmResponse, VmmService, BootSourceConfigError, DEFAULT_KERNEL_CMDLINE,
-    },
-    vm::{VmConfigInfo, CpuTopology, KernelConfigInfo},
+    api::v1::VmmService,
     Vmm,
-    event_manager::EventManager,
 };
 use std::{
-    fs::{File, OpenOptions},
-    os::unix::{io::IntoRawFd, prelude::AsRawFd},
+    fs::OpenOptions,
+    os::unix::io::IntoRawFd,
     sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex, RwLock,
+        mpsc::channel,
+        Arc, Mutex,
     },
     thread,
-    path::{Path, PathBuf}
 };
-use std::ops::Deref;
 
 const KVM_DEVICE: &str = "/dev/kvm";
 
@@ -46,7 +27,7 @@ pub use args::DBSArgs;
 
 use crate::cli_instance::CliInstance;
 
-pub fn run_with_cli(args: DBSArgs) -> Result<()> {
+pub fn run_with_cli(args: DBSArgs) -> Result<i32> {
     let mut cli_instance = CliInstance::new("dbs-cli");
 
     let kvm = OpenOptions::new().read(true).write(true).open(KVM_DEVICE)?;
@@ -71,13 +52,11 @@ pub fn run_with_cli(args: DBSArgs) -> Result<()> {
     // let cli_instance_copy = Arc::new(RwLock::new(cli_instance)).clone();
     thread::Builder::new().name("set configuration".to_owned())
         .spawn(move || {
-            cli_instance.run_vmm_server("dbs-cli", args);
-
-        });
+            cli_instance.run_vmm_server(args).expect("Failed to run server.");
+        }).unwrap();
 
     let exit_code =
         Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service);
 
-    return Ok(());
+    return Ok(exit_code);
 }
-

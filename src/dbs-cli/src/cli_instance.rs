@@ -5,34 +5,23 @@
 //
 
 use std::{
-    fs::{File, OpenOptions},
-    os::unix::{io::IntoRawFd, prelude::AsRawFd},
     sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, Mutex, RwLock,
+        mpsc::{Receiver, Sender},
+        Arc, RwLock,
     },
-    thread,
-    path::{Path, PathBuf}
+    path::PathBuf
 };
 
 use anyhow::{anyhow, Context, Result};
 use dragonball::{
     api::v1::{
-        BlockDeviceConfigInfo, BootSourceConfig, FsDeviceConfigInfo, FsMountConfigInfo,
-        InstanceInfo, InstanceState, VirtioNetDeviceConfigInfo, VmmAction, VmmActionError, VmmData,
-        VmmRequest, VmmResponse, VmmService, VsockDeviceConfigInfo, BootSourceConfigError, DEFAULT_KERNEL_CMDLINE
+        BlockDeviceConfigInfo, BootSourceConfig, InstanceInfo, VmmAction, VmmActionError, VmmData,
+        VmmRequest, VmmResponse
     },
-    vm::{VmConfigInfo, CpuTopology, KernelConfigInfo},
-    Vmm,
-    event_manager::EventManager,
-    StartMicroVmError
+    vm::{VmConfigInfo, CpuTopology},
 };
-use nix::sched::{setns, CloneFlags};
 use seccompiler::BpfProgram;
 use vmm_sys_util::eventfd::EventFd;
-
-use hypervisor::ShareFsOperation;
-
 use crate::parser::DBSArgs;
 
 const DRAGONBALL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -72,19 +61,11 @@ impl CliInstance {
         }
     }
 
-    pub fn get_shared_info(&self) -> Arc<RwLock<InstanceInfo>> {
-        self.vmm_shared_info.clone()
-    }
 
-    pub fn set_instance_id(&mut self, id: &str) {
-        let share_info_lock = self.vmm_shared_info.clone();
-        share_info_lock.write().unwrap().id = String::from(id);
-    }
-
-    pub fn run_vmm_server(&mut self, id: &str, args: DBSArgs) -> Result<()> {
+    pub fn run_vmm_server(&mut self, args: DBSArgs) -> Result<()> {
 
         // configuration
-        let mut vm_config = VmConfigInfo {
+        let vm_config = VmConfigInfo {
             vcpu_count: args.create_args.vcpu,
             max_vcpu_count: args.create_args.max_vcpu,
             cpu_pm: args.create_args.cpu_pm.clone(),
@@ -120,8 +101,6 @@ impl CliInstance {
             ..block_device_config_info
         };
 
-        /// put configuration to service
-        println!("Begin configuring");
         // set vm configuration
         self.set_vm_configuration(vm_config).expect("failed to set vm configuration");
 
@@ -134,7 +113,6 @@ impl CliInstance {
         // start micro-vm
         self.instance_start().expect("failed to start micro-vm");
 
-        println!("Configuration Complete.");
         Ok(())
     }
 
@@ -152,45 +130,11 @@ impl CliInstance {
         Ok(())
     }
 
-    pub fn is_uninitialized(&self) -> bool {
-        let share_info = self
-            .vmm_shared_info
-            .read()
-            .expect("Failed to read share_info due to poisoned lock");
-        matches!(share_info.state, InstanceState::Uninitialized)
-    }
-
-    pub fn is_running(&self) -> Result<()> {
-        let share_info_lock = self.vmm_shared_info.clone();
-        let share_info = share_info_lock
-            .read()
-            .expect("Failed to read share_info due to poisoned lock");
-        if let InstanceState::Running = share_info.state {
-            return Ok(());
-        }
-        Err(anyhow!("vmm is not running"))
-    }
-
-    pub fn get_machine_info(&self) -> Result<Box<VmConfigInfo>> {
-        if let Ok(VmmData::MachineConfiguration(vm_config)) =
-        self.handle_request(Request::Sync(VmmAction::GetVmConfiguration))
-        {
-            return Ok(vm_config);
-        }
-        Err(anyhow!("Failed to get machine info"))
-    }
-
     pub fn insert_block_device(&self, device_cfg: BlockDeviceConfigInfo) -> Result<()> {
         self.handle_request_with_retry(Request::Sync(VmmAction::InsertBlockDevice(
             device_cfg.clone(),
         )))
             .with_context(|| format!("Failed to insert block device {:?}", device_cfg))?;
-        Ok(())
-    }
-
-    pub fn remove_block_device(&self, id: &str) -> Result<()> {
-        self.handle_request(Request::Sync(VmmAction::RemoveBlockDevice(id.to_string())))
-            .with_context(|| format!("Failed to remove block device {:?}", id))?;
         Ok(())
     }
 
@@ -239,7 +183,7 @@ impl CliInstance {
 
     fn handle_request_with_retry(&self, req: Request) -> Result<VmmData> {
         let Request::Sync(vmm_action) = req;
-        for count in 0..REQUEST_RETRY {
+        for _ in 0..REQUEST_RETRY {
             match self.send_request(vmm_action.clone()) {
                 Ok(vmm_outcome) => match *vmm_outcome {
                     Ok(vmm_data) => {
