@@ -8,7 +8,7 @@
 ./dbs-cli \
   --kernel-path ~/data/build/dbs/vmlinux.bin \
   --rootfs ~/data/build/dbs/rootfs.dmg \
-  --boot_args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
+  --boot-args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
 ```
 
 For the rootfs from firecracker:
