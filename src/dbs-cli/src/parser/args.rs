@@ -69,9 +69,6 @@ pub struct CreateArgs {
     #[clap(short, long, value_parser, default_value_t = 128, help = "The memory size in Mib", display_order = 2)]
     pub mem_size: usize,
 
-    /// config file
-    #[clap(long, value_parser, value_name = "FILE")]
-    pub config_file: Option<PathBuf>,
 }
 
 /// Config boot source including rootfs file path
