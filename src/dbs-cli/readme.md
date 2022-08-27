@@ -17,7 +17,7 @@ For the rootfs from firecracker:
 ./dbs-cli \
   --kernel-path ~/data/build/dbs/vmlinux.bin \
   --rootfs ~/data/build/dbs/bionic.rootfs.ext4 \
-  --boot_args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda ;
+  --boot-args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda ;
 ```
 
 
@@ -27,7 +27,7 @@ For the rootfs build from kata:
 ./dbs-cli \
   --kernel-path ~/data/build/dbs/vmlinux.bin \
   --rootfs ~/data/build/dbs/kata-containers.img \
-  --boot_args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
+  --boot-args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
 ```
 
 # Usage
