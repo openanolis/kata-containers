@@ -2,7 +2,7 @@
 
 > for more details about args: refer to [`doc:args`](docs/args.md)
 
-# Examples:
+# 1. Examples:
 
 ```bash
 ./dbs-cli \
@@ -35,3 +35,18 @@ For the rootfs build from kata:
 ## 1. Exit vm
 
 > If you want to exit vm, just input `reboot` in vm's console.
+
+## 2. Show more information
+
+```bash
+RUST_LOG=debug ./dbs-cli <args>
+```
+
+# Acknowledgement
+Part of the code is based on the [Cloud Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) project, [`crosvm`](https://github.com/google/crosvm) project and [Firecracker](https://github.com/firecracker-microvm/firecracker) project. They are all rust written virtual machine managers with advantages on safety and security.
+
+`Dragonball sandbox` is designed to be a VMM that is customized for Kata Containers and we will focus on optimizing container workloads for Kata ecosystem. The focus on the Kata community is what differentiates us from other rust written virtual machines.
+
+# License
+
+`Dragonball` is licensed under [Apache License](http://www.apache.org/licenses/LICENSE-2.0), Version 2.0.
