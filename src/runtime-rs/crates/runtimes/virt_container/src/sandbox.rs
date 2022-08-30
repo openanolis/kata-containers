@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use agent::{self, kata::KataAgent, types::KernelModule, Agent};
+use agent::{self, kata::KataAgent, types::KernelModule, Agent, OnlineCPUMemRequest};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use common::{
@@ -15,7 +15,7 @@ use common::{
 };
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
-use kata_types::config::TomlConfig;
+use kata_types::config::{hypervisor::CpuInfo, TomlConfig};
 use resource::{
     manager::ManagerArgs,
     network::{NetworkConfig, NetworkWithNetNsConfig},
@@ -259,7 +259,42 @@ impl Sandbox for VirtSandbox {
     async fn cleanup(&self, _id: &str) -> Result<()> {
         self.resource_manager.delete_cgroups().await?;
         self.hypervisor.cleanup().await?;
-        // TODO: cleanup other snadbox resource
+        // TODO: cleanup other sandbox resource
+        Ok(())
+    }
+
+    async fn cpuinfo(&self) -> Result<CpuInfo> {
+        Ok(self.hypervisor.hypervisor_config().await.cpu_info)
+    }
+
+    // update sandbox's cpu resource
+    // if only plug is true, sandbox will only plug the vcpu, it does not unplug vcpus
+    // @params:
+    //  - @new_vcpus: the # of vcpu sandbox requires to update
+    //  - @only_plug: if sandbox can only plug vcpu, cannot unplug vcpu
+    //  - @cid: container id, for update cgroup
+    async fn update_cpu_resource(&self, new_vcpus: u32, _only_plug: bool) -> Result<()> {
+        info!(sl!(), "requesting vmm to update vcpus to {:?}", new_vcpus);
+        let (old, new) = self
+            .hypervisor
+            .resize_vcpu(new_vcpus)
+            .await
+            .context("failed for vmm for resize vcpu")?;
+
+        // if vcpus were increased, ask the agent to online them inside the sandbox
+        if old < new {
+            let added = new - old;
+            info!(sl!(), "request to onlineCpuMem with {:?} cpus", added);
+            self.agent
+                .online_cpu_mem(OnlineCPUMemRequest {
+                    wait: false,
+                    nb_cpus: added,
+                    cpu_only: true,
+                })
+                .await
+                .context("agent failed to online cpu")?;
+        }
+
         Ok(())
     }
 }

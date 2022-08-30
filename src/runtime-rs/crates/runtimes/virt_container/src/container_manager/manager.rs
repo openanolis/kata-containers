@@ -5,8 +5,9 @@
 //
 
 use anyhow::{anyhow, Context, Result};
+use kata_types::cpu::LinuxContainerCpuResources;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use agent::Agent;
 use async_trait::async_trait;
@@ -55,18 +56,22 @@ impl VirtContainerManager {
 #[async_trait]
 impl ContainerManager for VirtContainerManager {
     async fn create_container(&self, config: ContainerConfig, spec: oci::Spec) -> Result<PID> {
+        let linux_resources = match spec.linux.clone() {
+            Some(linux) => linux.resources,
+            _ => None,
+        };
         let container = Container::new(
             self.pid,
             config,
             self.agent.clone(),
             self.resource_manager.clone(),
+            linux_resources,
         )
         .context("new container")?;
 
         let mut containers = self.containers.write().await;
         container.create(spec).await.context("create")?;
         containers.insert(container.container_id.to_string(), container);
-
         Ok(PID { pid: self.pid })
     }
 
@@ -271,5 +276,39 @@ impl ContainerManager for VirtContainerManager {
     async fn is_sandbox_container(&self, process: &ContainerProcess) -> bool {
         process.process_type == ProcessType::Container
             && process.container_id.container_id == self.sid
+    }
+
+    // calculates the total required vpus by adding each containers' requirement within the pod
+    async fn get_total_vcpus(&self) -> Result<u32> {
+        let mut total_vcpu = 0;
+        let mut cpuset_count = 0;
+        let containers = self.containers.read().await;
+        for c in containers.values() {
+            if let Some(resource) = &c.linux_resources {
+                if let Some(cpu) = &resource.cpu {
+                    // calculate cpu # based on cpu-period and cpu-quota
+                    let cpu_resource = LinuxContainerCpuResources::try_from(cpu);
+                    if let Ok(cpu_resource) = cpu_resource {
+                        let vcpu = if let Some(v) = cpu_resource.get_vcpus() {
+                            v as u32
+                        } else {
+                            0
+                        };
+                        cpuset_count += cpu_resource.cpuset().len();
+                        total_vcpu += vcpu;
+                    }
+                }
+            }
+        }
+
+        //  If we aren't being constrained, then we could have two scenarios:
+        //  1. BestEffort QoS: no proper support today in Kata.
+        //  2. We could be constrained only by CPUSets. Check for this:
+        if total_vcpu == 0 && cpuset_count > 0 {
+            info!(sl!(), "(from cpuset)get total vcpus # {:?}", cpuset_count);
+            return Ok(cpuset_count as u32);
+        }
+        info!(sl!(), "get total vcpus # {:?}", total_vcpu);
+        Ok(total_vcpu)
     }
 }

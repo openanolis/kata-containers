@@ -260,6 +260,13 @@ pub struct CpuInfo {
     #[serde(default)]
     pub default_vcpus: i32,
 
+    /// Current number of vCPUs
+    /// when boot, the number is set to *default_vcpus*
+    /// when hotplug, the number changes
+    /// the semantic of i32 is the same with *default_vcpus*
+    #[serde(default)]
+    pub current_vcpus: i32,
+
     /// Default maximum number of vCPUs per SB/VM:
     /// - unspecified or == 0             --> will be set to the actual number of physical cores or
     ///                                       to the maximum number of vCPUs supported by KVM
@@ -289,6 +296,7 @@ impl CpuInfo {
     pub fn adjust_config(&mut self) -> Result<()> {
         let features: Vec<&str> = self.cpu_features.split(',').map(|v| v.trim()).collect();
         self.cpu_features = features.join(",");
+        self.current_vcpus = self.default_vcpus;
         Ok(())
     }
 
