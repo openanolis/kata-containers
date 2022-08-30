@@ -1,0 +1,26 @@
+{"msg":"VM: received instance start command","level":"INFO","ts":"2022-08-30T03:24:38.471623005Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: initializing guest memory...","level":"INFO","ts":"2022-08-30T03:24:38.471727557Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: mem_type:shmem mem_file_path:, mem_size:134217728, numa_regions:[NumaRegionInfo { size: 128, host_numa_node_id: None, guest_numa_node_id: Some(0), vcpu_ids: [0] }]","level":"INFO","ts":"2022-08-30T03:24:38.471824845Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: initializing guest memory done","level":"INFO","ts":"2022-08-30T03:24:38.472070336Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: start initializing microvm ...","level":"INFO","ts":"2022-08-30T03:24:38.472265961Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: create pit","level":"INFO","ts":"2022-08-30T03:24:38.472375681Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: initializing devices ...","level":"INFO","ts":"2022-08-30T03:24:38.47251236Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: create interrupt manager","level":"INFO","ts":"2022-08-30T03:24:38.472581782Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: create devices","level":"INFO","ts":"2022-08-30T03:24:38.472742416Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"init console path: Some(\"None\")","level":"INFO","ts":"2022-08-30T03:24:38.472913247Z","id":"dbs-cli","version":"0.1.0","subsystem":"device_manager"}
+{"msg":"This token is used to create stdio console. (Not to create sock console)","level":"INFO","ts":"2022-08-30T03:24:38.47300865Z","id":"dbs-cli","version":"0.1.0","subsystem":"device_manager"}
+{"msg":"ConsoleEpollHandler: stdin handler","level":"INFO","ts":"2022-08-30T03:24:38.473117322Z","subsystem":"console_manager","subsystem":"console_manager","id":"dbs-cli","version":"0.1.0"}
+{"msg":"attach virtio-blk device, drive_id rootfs, path /home/fanqiliang/data/build/dbs/rootfs.dmg","level":"INFO","ts":"2022-08-30T03:24:38.473226414Z","id":"dbs-cli","version":"0.1.0","subsystem":"block_manager"}
+{"msg":"Open block device \"/home/fanqiliang/data/build/dbs/rootfs.dmg\" in direct mode.","level":"INFO","ts":"2022-08-30T03:24:38.473312668Z","id":"dbs-cli","version":"0.1.0","subsystem":"block_manager"}
+{"msg":"Queue 0: block file opened","level":"INFO","ts":"2022-08-30T03:24:38.473493137Z","id":"dbs-cli","version":"0.1.0","subsystem":"block_manager"}
+{"msg":"Queue 0: Using io_uring Raw disk file, queue size 256.","level":"INFO","ts":"2022-08-30T03:24:38.473571638Z","id":"dbs-cli","version":"0.1.0","subsystem":"block_manager"}
+{"msg":"create virtio mmio device 0x2000@0xc0000000, irq: 0x5","level":"INFO","ts":"2022-08-30T03:24:38.502626049Z","id":"dbs-cli","version":"0.1.0","subsystem":"device_manager"}
+{"msg":"VM: start devices","level":"INFO","ts":"2022-08-30T03:24:38.502974835Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: initializing devices done","level":"INFO","ts":"2022-08-30T03:24:38.503130021Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: enable CPU disable_idle_exits capability","level":"INFO","ts":"2022-08-30T03:24:38.503283322Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: initializing microvm done","level":"INFO","ts":"2022-08-30T03:24:38.512030068Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: register events","level":"INFO","ts":"2022-08-30T03:24:38.512180925Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM: start vcpus","level":"INFO","ts":"2022-08-30T03:24:38.512281705Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"VM started","level":"INFO","ts":"2022-08-30T03:24:38.51263971Z","id":"dbs-cli","version":"0.1.0"}
+{"msg":"","level":"INFO","ts":"2022-08-30T03:24:39.859466712Z","subsystem":"dmesg","id":"dbs-cli","version":"0.1.0"}
+{"msg":"Welcome to Alibaba Kangaroo","level":"INFO","ts":"2022-08-30T03:24:39.861959267Z","subsystem":"dmesg","id":"dbs-cli","version":"0.1.0"}

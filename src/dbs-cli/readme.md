@@ -30,6 +30,18 @@ For the rootfs build from kata:
   --boot-args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
 ```
 
+Set the log level and log file:
+
+> The log-level argument is case-insensitive: ErrOR and InFO are valid.
+
+```bash
+./dbs-cli \
+  --log-file dbs-cli.log --log-level ERROR \
+  --kernel-path ~/data/build/dbs/vmlinux.bin \
+  --rootfs ~/data/build/dbs/kata-containers.img \
+  --boot-args console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1 ;
+```
+
 # Usage
 
 ## 1. Exit vm

@@ -14,6 +14,12 @@ pub struct DBSArgs {
 
     #[clap(flatten)]
     pub boot_args: BootArgs,
+
+    #[clap(long, value_parser, default_value = "dbs-cli.log", display_order = 1)]
+    pub log_file: String,
+
+    #[clap(long, value_parser, default_value = "Info", display_order = 1)]
+    pub log_level: String,
 }
 
 /// CPU related configurations
