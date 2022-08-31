@@ -53,7 +53,6 @@ impl DragonballInner {
             }
             error
         })?;
-
         Ok(())
     }
 

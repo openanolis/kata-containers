@@ -116,5 +116,6 @@ impl_agent!(
     get_oom_event | crate::Empty | crate::OomEventResponse | Some(0),
     get_ip_tables | crate::GetIPTablesRequest | crate::GetIPTablesResponse | None,
     set_ip_tables | crate::SetIPTablesRequest | crate::SetIPTablesResponse | None,
-    get_guest_details | crate::GetGuestDetailsRequest | crate::GuestDetailsResponse | None
+    get_guest_details | crate::GetGuestDetailsRequest | crate::GuestDetailsResponse | None,
+    online_cpu_mem | crate::OnlineCPUMemRequest | crate::Empty | None
 );

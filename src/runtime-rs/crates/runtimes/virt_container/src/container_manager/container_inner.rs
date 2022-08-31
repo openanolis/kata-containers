@@ -6,6 +6,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::container_manager::logger_with_process;
 use agent::Agent;
 use anyhow::{anyhow, Context, Result};
 use common::{
@@ -13,10 +14,9 @@ use common::{
     types::{ContainerID, ContainerProcess, ProcessExitStatus, ProcessStatus, ProcessType},
 };
 use nix::sys::signal::Signal;
+use oci::LinuxResources;
 use resource::{rootfs::Rootfs, volume::Volume};
 use tokio::sync::RwLock;
-
-use crate::container_manager::logger_with_process;
 
 use super::{
     io::ContainerIo,
@@ -27,6 +27,7 @@ use super::{
 pub struct ContainerInner {
     agent: Arc<dyn Agent>,
     logger: slog::Logger,
+    pub linux_resources: Option<LinuxResources>,
     pub(crate) init_process: Process,
     pub(crate) exec_processes: HashMap<String, Exec>,
     pub(crate) rootfs: Vec<Arc<dyn Rootfs>>,
@@ -34,7 +35,12 @@ pub struct ContainerInner {
 }
 
 impl ContainerInner {
-    pub(crate) fn new(agent: Arc<dyn Agent>, init_process: Process, logger: slog::Logger) -> Self {
+    pub(crate) fn new(
+        agent: Arc<dyn Agent>,
+        init_process: Process,
+        logger: slog::Logger,
+        linux_resources: Option<LinuxResources>,
+    ) -> Self {
         Self {
             agent,
             logger,
@@ -42,6 +48,7 @@ impl ContainerInner {
             exec_processes: HashMap::new(),
             rootfs: vec![],
             volumes: vec![],
+            linux_resources,
         }
     }
 

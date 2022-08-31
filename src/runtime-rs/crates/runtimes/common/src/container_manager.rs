@@ -37,4 +37,5 @@ pub trait ContainerManager: Send + Sync {
     async fn pid(&self) -> Result<PID>;
     async fn need_shutdown_sandbox(&self, req: &ShutdownRequest) -> bool;
     async fn is_sandbox_container(&self, process_id: &ContainerProcess) -> bool;
+    async fn total_mems(&self, guest_swap: bool) -> Result<(u64, bool, i64)>; // returns (memory_sandbox, need_pod_swap, swap_sandbox)
 }

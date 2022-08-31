@@ -157,7 +157,10 @@ impl Hypervisor for Dragonball {
         req_mem_mb: u32,
         curr_mem_mb: u32,
     ) -> Result<(u32, MemoryConfig)> {
-        let inner = self.inner.read().await;
+        let mut inner = self.inner.write().await;
+        if !inner.resize {
+            inner.add_balloon_device()?;
+        }
         inner.resize_memory(req_mem_mb, curr_mem_mb)
     }
 }

@@ -53,11 +53,16 @@ impl VirtContainerManager {
 #[async_trait]
 impl ContainerManager for VirtContainerManager {
     async fn create_container(&self, config: ContainerConfig, spec: oci::Spec) -> Result<PID> {
+        let linux_resources = match spec.linux.clone() {
+            Some(linux) => linux.resources,
+            _ => None,
+        };
         let container = Container::new(
             self.pid,
             config,
             self.agent.clone(),
             self.resource_manager.clone(),
+            linux_resources,
         )
         .context("new container")?;
 
@@ -251,6 +256,9 @@ impl ContainerManager for VirtContainerManager {
         let c = containers
             .get(container_id)
             .ok_or_else(|| Error::ContainerNotFound(container_id.to_string()))?;
+        let mut inner = c.inner.write().await;
+        inner.linux_resources = Some(resource.clone());
+        info!(sl!(), "update resource {:?}", resource);
         c.update(&resource).await.context("update_container")
     }
 
@@ -269,5 +277,64 @@ impl ContainerManager for VirtContainerManager {
     async fn is_sandbox_container(&self, process: &ContainerProcess) -> bool {
         process.process_type == ProcessType::Container
             && process.container_id.container_id == self.sid
+    }
+
+    // unit: byte
+    // if guest_swap is true, add swap to memory_sandbox
+    // returns, memory_sandbox, need_pod_swap, swap_sandbox
+    async fn total_mems(&self, use_guest_swap: bool) -> Result<(u64, bool, i64)> {
+        // sb stands for sandbox
+        let mut mem_sb = 0;
+        let mut need_pod_swap = false;
+        let mut swap_sb = 0;
+
+        let containers = self.containers.read().await;
+        // for each container, calculate its memory by
+        // - adding its hugepage limits
+        // - adding its memory limit
+        // - adding its swap size correspondingly
+        for c in containers.values() {
+            let inner = c.inner.read().await;
+            if let Some(resource) = &inner.linux_resources {
+                // Add hugepage memory, hugepage limit is u64
+                // https://github.com/opencontainers/runtime-spec/blob/master/specs-go/config.go#L242
+                for l in &resource.hugepage_limits {
+                    mem_sb += l.limit;
+                }
+
+                if let Some(memory) = &resource.memory {
+                    let current_limit = match memory.limit {
+                        Some(limit) => {
+                            mem_sb += limit as u64;
+                            info!(sl!(), "memory sb: {}, memory limit: {}", mem_sb, limit);
+                            limit
+                        }
+                        None => 0,
+                    };
+
+                    // add swap
+                    if let Some(swappiness) = memory.swappiness {
+                        if swappiness > 0 && use_guest_swap {
+                            match memory.swap {
+                                Some(swap) => {
+                                    if swap > current_limit {
+                                        swap_sb = swap.saturating_sub(current_limit);
+                                    }
+                                }
+                                None => {
+                                    if current_limit == 0 {
+                                        need_pod_swap = true;
+                                    } else {
+                                        swap_sb += current_limit;
+                                    }
+                                }
+                            };
+                        }
+                    } // end of if let Some(swappiness)
+                } // end of if let Some(memory)
+            } // end of if let Some(resource)
+        }
+
+        Ok((mem_sb, need_pod_swap, swap_sb))
     }
 }

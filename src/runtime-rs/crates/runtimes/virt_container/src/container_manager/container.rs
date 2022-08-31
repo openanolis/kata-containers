@@ -37,7 +37,7 @@ pub struct Container {
     pid: u32,
     pub container_id: ContainerID,
     config: ContainerConfig,
-    inner: Arc<RwLock<ContainerInner>>,
+    pub inner: Arc<RwLock<ContainerInner>>,
     agent: Arc<dyn Agent>,
     resource_manager: Arc<ResourceManager>,
     logger: slog::Logger,
@@ -49,6 +49,7 @@ impl Container {
         config: ContainerConfig,
         agent: Arc<dyn Agent>,
         resource_manager: Arc<ResourceManager>,
+        linux_resources: Option<LinuxResources>,
     ) -> Result<Self> {
         let container_id = ContainerID::new(&config.container_id).context("new container id")?;
         let logger = sl!().new(o!("container_id" => config.container_id.clone()));
@@ -71,6 +72,7 @@ impl Container {
                 agent.clone(),
                 init_process,
                 logger.clone(),
+                linux_resources.clone(),
             ))),
             agent,
             resource_manager,

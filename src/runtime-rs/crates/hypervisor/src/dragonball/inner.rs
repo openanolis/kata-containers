@@ -67,6 +67,9 @@ pub struct DragonballInner {
 
     /// the size of memory block of guestos
     pub(crate) guest_memory_block_size_mb: u32,
+
+    /// resize
+    pub(crate) resize: bool,
 }
 
 impl DragonballInner {
@@ -91,6 +94,7 @@ impl DragonballInner {
             cached_block_devices: Default::default(),
             capabilities,
             guest_memory_block_size_mb: 0,
+            resize: false,
         }
     }
 
@@ -351,20 +355,41 @@ impl DragonballInner {
         self.guest_memory_block_size_mb
     }
 
+    pub fn add_balloon_device(&mut self) -> Result<()> {
+        self.resize = true;
+        let balloon_config = BalloonDeviceConfigInfo {
+            balloon_id: format!("balloon0"),
+            size_mib: 0,
+            use_shared_irq: None,
+            use_generic_irq: None,
+            f_deflate_on_oom: false,
+            f_reporting: false,
+        };
+        self.vmm_instance
+            .insert_balloon_device(balloon_config)
+            .context("failed to insert balloon device")
+    }
     // curr_mem_m size = default + hotplug
     pub(crate) fn resize_memory(
         &self,
         req_mem_mb: u32,
         curr_mem_mb: u32,
     ) -> Result<(u32, MemoryConfig)> {
-        if req_mem_mb > curr_mem_mb {
-            let add_mem_mb = req_mem_mb - curr_mem_mb;
+        info!(
+            sl!(),
+            "resize memory from {} mb to {} mb", curr_mem_mb as u64, req_mem_mb as u64
+        );
+        let curr_mem = curr_mem_mb as u64;
+        let req_mem = req_mem_mb as u64;
+        if req_mem > curr_mem {
+            //let add_mem_mb = req_mem_mb - curr_mem_mb;
+
             if self.config.memory_info.enable_virtio_mem {
                 let mem_config = MemDeviceConfigInfo {
-                    mem_id: format!("mem{}", curr_mem_mb),
-                    size_mib: add_mem_mb as u64,
-                    capacity_mib: add_mem_mb as u64,
-                    multi_region: false,
+                    mem_id: "memmr0".to_string(),
+                    size_mib: req_mem - self.config.memory_info.default_memory as u64,
+                    capacity_mib: 0,
+                    multi_region: true,
                     host_numa_node_id: None,
                     guest_numa_node_id: None,
                     use_shared_irq: None,
@@ -374,10 +399,10 @@ impl DragonballInner {
                     .insert_mem_device(mem_config)
                     .context("failed to insert memory device")?;
             }
-        } else if req_mem_mb < curr_mem_mb {
+        } else if req_mem < curr_mem {
             let balloon_config = BalloonDeviceConfigInfo {
-                balloon_id: format!("mem{}", curr_mem_mb),
-                size_mib: (curr_mem_mb - req_mem_mb) as u64,
+                balloon_id: format!("balloon0"),
+                size_mib: curr_mem - req_mem,
                 use_shared_irq: None,
                 use_generic_irq: None,
                 f_deflate_on_oom: false,
@@ -389,7 +414,7 @@ impl DragonballInner {
         }
 
         return Ok((
-            req_mem_mb,
+            req_mem_mb - self.config.memory_info.default_memory,
             MemoryConfig {
                 ..Default::default()
             },
@@ -437,6 +462,7 @@ impl Persist for DragonballInner {
             cached_block_devices: hypervisor_state.cached_block_devices,
             capabilities: Capabilities::new(),
             guest_memory_block_size_mb: 0,
+            resize: false,
         })
     }
 }

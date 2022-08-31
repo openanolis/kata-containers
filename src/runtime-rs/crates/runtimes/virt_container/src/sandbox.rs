@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use agent::{
     self, kata::KataAgent, types::KernelModule, Agent, GetGuestDetailsRequest, GetIPTablesRequest,
-    SetIPTablesRequest,
+    OnlineCPUMemRequest, SetIPTablesRequest,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -22,6 +22,7 @@ use kata_types::{
     capabilities::CapabilityBits,
     config::{
         default::{DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT},
+        hypervisor::MemoryInfo,
         TomlConfig,
     },
 };
@@ -51,12 +52,14 @@ pub enum SandboxState {
 
 struct SandboxInner {
     state: SandboxState,
+    hotplug_memory: u32,
 }
 
 impl SandboxInner {
     pub fn new() -> Self {
         Self {
             state: SandboxState::Init,
+            hotplug_memory: 0,
         }
     }
 }
@@ -320,6 +323,10 @@ impl Sandbox for VirtSandbox {
         self.agent.agent_sock().await
     }
 
+    async fn meminfo(&self) -> Result<MemoryInfo> {
+        Ok(self.hypervisor.hypervisor_config().await.memory_info)
+    }
+
     async fn set_iptables(&self, is_ipv6: bool, data: Vec<u8>) -> Result<Vec<u8>> {
         info!(sl!(), "sb: set_iptables invoked");
         let req = SetIPTablesRequest { is_ipv6, data };
@@ -340,6 +347,29 @@ impl Sandbox for VirtSandbox {
             .await
             .context("sandbox: failed to get iptables")?;
         Ok(resp.data)
+    }
+
+    // todo: setup swap space in guest, when block device hot plug is supported
+    // todo: use memory_hotplug_byprobe between hotplug and online when supported
+    async fn update_mem_resource(&self, new_mem: u32, _swap_sz_byte: i64) -> Result<()> {
+        info!(sl!(), "requesting vmm to update memory to {:?}", new_mem);
+        let (hotplug, _) = self
+            .hypervisor
+            .resize_memory(
+                new_mem,
+                self.meminfo().await?.default_memory + self.inner.read().await.hotplug_memory,
+            )
+            .await?;
+        let mut inner = self.inner.write().await;
+        inner.hotplug_memory = hotplug;
+        self.agent
+            .online_cpu_mem(OnlineCPUMemRequest {
+                wait: false,
+                cpu_only: false,
+                ..Default::default()
+            })
+            .await?;
+        Ok(())
     }
 }
 

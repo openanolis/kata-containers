@@ -237,6 +237,7 @@ impl RuntimeHandlerManager {
                 .await
                 .context("create container")?;
 
+            instance.update_sandbox_resource().await?;
             Ok(Response::CreateContainer(shim_pid))
         } else {
             self.handler_request(req).await.context("handler request")
@@ -322,6 +323,10 @@ impl RuntimeHandlerManager {
             }
             Request::UpdateContainer(req) => {
                 cm.update_container(req).await.context("update container")?;
+                instance
+                    .update_sandbox_resource()
+                    .await
+                    .context("update sandbox resource")?;
                 Ok(Response::UpdateContainer)
             }
             Request::Pid => Ok(Response::Pid(cm.pid().await.context("pid")?)),
