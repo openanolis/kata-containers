@@ -307,7 +307,7 @@ impl DragonballInner {
     // returns Result<(old, new)> if old_vcpus > 0
     // returns Result<(0, new)> if old_vcpus <= 0
     // the old_vcpus has an i32 semantic, check the comment in *struct CpuInfo*
-    pub fn do_check_resize_vcpus(&self, new_vcpus: u32) -> Result<(u32, u32)> {
+    pub fn check_resize_vcpus(&self, new_vcpus: u32) -> Result<(u32, u32)> {
         let old_vcpus = self.config.cpu_info.current_vcpus;
         if old_vcpus <= 0 {
             // if old_vcpus = 0, it is default_vcpus
@@ -344,7 +344,7 @@ impl DragonballInner {
 
     // do the check before resizing, returns Result<(old, new)>
     pub async fn resize_vcpu(&mut self, new_vcpus: u32) -> Result<(u32, u32)> {
-        let (old_vcpus, new_vcpus) = self.do_check_resize_vcpus(new_vcpus)?;
+        let (old_vcpus, new_vcpus) = self.check_resize_vcpus(new_vcpus)?;
         if old_vcpus == new_vcpus {
             info!(sl!(), "resize_vcpu: no need to resize vcpus");
             return Ok((new_vcpus, new_vcpus));

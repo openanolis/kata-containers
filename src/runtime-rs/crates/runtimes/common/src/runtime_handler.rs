@@ -44,33 +44,55 @@ pub trait RuntimeHandler: Send + Sync {
 }
 
 impl RuntimeInstance {
-    // TODO: support update memory
     // NOTE THAT: if static resource management is configured, this returns an Error
-    // update_resources will:
-    // 1. calculate the resources required for the virtual machine, and adjust the virtual machine
-    // sizing accordingly.
-    //      - this recalculate the total number of vcpus instead of adding vcpu directly because
-    //        if some of the containers are down/non-running, we can have less vcpu to add
-    //      - the total # of vcpus will be the result of the calculation PLUS default vcpu from hypervisor
+    // 1. hotplug vcpu/memory
+    //   - vcpu: the sum of each ctr, plus default vcpu
+    //   - memory: the sum of each ctr, plus default memory, and setup swap
     // 2. agent will online the resources provided
     pub async fn update_sandbox_resource(&self) -> Result<()> {
         // todo: skip if static resource mgmt
-        // todo: support mem update when mem hotplug is supported
         // calculate the number of vcpu to be updated
         let cpuinfo = self
             .sandbox
             .cpuinfo()
             .await
             .context("failed to get cpuinfo")?;
-        let nr_vcpus =
-            self.container_manager.get_total_vcpus().await? + (cpuinfo.default_vcpus as u32);
+        let nr_vcpus = self.container_manager.total_vcpus().await? + (cpuinfo.default_vcpus as u32);
 
-        // let hypervisor update the cpus
-        // only_plug is true now since dragonball now only support hotplug, not hotunplug
-        self.sandbox
-            .update_cpu_resource(nr_vcpus, true)
+        // calculate the memory to be updated
+        let meminfo = self
+            .sandbox
+            .meminfo()
             .await
-            .context("fail to update_cpu_resource")?;
+            .context("failed to get meminfo")?;
+        // the unit here is byte
+        let (mut mem_sb_byte, need_pod_swap, mut swap_sb_byte) = self
+            .container_manager
+            .total_mems(meminfo.enable_guest_swap)
+            .await
+            .context("failed to calculate total memory requirement for containers")?;
+        // default_memory is in MiB
+        mem_sb_byte += (meminfo.default_memory << 20) as u64;
+        if need_pod_swap {
+            swap_sb_byte += (meminfo.default_memory << 20) as i64;
+        }
+
+        // todo: handle err if guest does not support hotplug
+        // let hypervisor update the cpus
+        self.sandbox
+            .update_cpu_resource(nr_vcpus)
+            .await
+            .context("failed to update_cpu_resource")?;
+
+        // todo: setup swap space in guest, when block device hot plug is supported
+        // todo: handle err if guest does not support hotplug
+        // let hypervisor update the memory
+        let mem_sb_mb = (mem_sb_byte >> 20) as u32;
+        self.sandbox
+            .update_mem_resource(mem_sb_mb, swap_sb_byte)
+            .await
+            .context("failed to update_mem_resource")?;
+
         Ok(())
     }
 }
