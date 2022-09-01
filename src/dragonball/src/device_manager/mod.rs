@@ -161,7 +161,7 @@ pub type DbsVirtioDevice = Box<
 /// Type of the dragonball virtio mmio devices.
 #[cfg(feature = "dbs-virtio-devices")]
 pub type DbsMmioV2Device =
-MmioV2Device<GuestAddressSpaceImpl, virtio_queue::QueueState, vm_memory::GuestRegionMmap>;
+    MmioV2Device<GuestAddressSpaceImpl, virtio_queue::QueueState, vm_memory::GuestRegionMmap>;
 
 /// Struct to support transactional operations for device management.
 pub struct DeviceManagerTx {
@@ -546,8 +546,8 @@ impl DeviceManager {
         ctx: &mut DeviceOpContext,
     ) -> std::result::Result<(), StartMicroVmError> {
         #[cfg(any(
-        target_arch = "x86_64",
-        all(target_arch = "aarch64", feature = "dbs-virtio-devices")
+            target_arch = "x86_64",
+            all(target_arch = "aarch64", feature = "dbs-virtio-devices")
         ))]
         {
             let mut tx = ctx.io_context.begin_tx();

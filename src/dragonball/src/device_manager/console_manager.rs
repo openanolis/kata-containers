@@ -74,7 +74,10 @@ impl ConsoleManager {
 
     /// Create a console backend device by using stdio streams.
     pub fn create_stdio_console(&mut self, device: Arc<Mutex<SerialDevice>>) -> Result<()> {
-        device.lock().unwrap().set_output_stream(Some(Box::new(std::io::stdout())));
+        device
+            .lock()
+            .unwrap()
+            .set_output_stream(Some(Box::new(std::io::stdout())));
         let stdin_handle = std::io::stdin();
         stdin_handle
             .lock()
