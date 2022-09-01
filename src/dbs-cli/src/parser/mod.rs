@@ -3,29 +3,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-pub mod args;
-
-use anyhow::Result;
-use dragonball::{
-    api::v1::VmmService,
-    Vmm,
-};
 use std::{
     fs::OpenOptions,
     os::unix::io::IntoRawFd,
     sync::{
-        mpsc::channel,
-        Arc, Mutex,
+        Arc,
+        mpsc::channel, Mutex,
     },
     thread,
 };
 
-const KVM_DEVICE: &str = "/dev/kvm";
-
+use anyhow::Result;
 
 pub use args::DBSArgs;
+use dragonball::{
+    api::v1::VmmService,
+    Vmm,
+};
 
 use crate::cli_instance::CliInstance;
+
+pub mod args;
+
+const KVM_DEVICE: &str = "/dev/kvm";
+
 
 pub fn run_with_cli(args: DBSArgs) -> Result<i32> {
     let mut cli_instance = CliInstance::new("dbs-cli");
@@ -55,8 +56,5 @@ pub fn run_with_cli(args: DBSArgs) -> Result<i32> {
             cli_instance.run_vmm_server(args).expect("Failed to run server.");
         }).unwrap();
 
-    let exit_code =
-        Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service);
-
-    return Ok(exit_code);
+    Ok(Vmm::run_vmm_event_loop(Arc::new(Mutex::new(vmm)), vmm_service))
 }

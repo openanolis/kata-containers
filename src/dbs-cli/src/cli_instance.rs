@@ -5,23 +5,25 @@
 //
 
 use std::{
+    path::PathBuf,
     sync::{
-        mpsc::{Receiver, Sender},
-        Arc, RwLock,
+        Arc,
+        mpsc::{Receiver, Sender}, RwLock,
     },
-    path::PathBuf
 };
 
 use anyhow::{anyhow, Context, Result};
+use seccompiler::BpfProgram;
+use vmm_sys_util::eventfd::EventFd;
+
 use dragonball::{
     api::v1::{
         BlockDeviceConfigInfo, BootSourceConfig, InstanceInfo, VmmAction, VmmActionError, VmmData,
-        VmmRequest, VmmResponse
+        VmmRequest, VmmResponse,
     },
-    vm::{VmConfigInfo, CpuTopology},
+    vm::{CpuTopology, VmConfigInfo},
 };
-use seccompiler::BpfProgram;
-use vmm_sys_util::eventfd::EventFd;
+
 use crate::parser::DBSArgs;
 
 const DRAGONBALL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -81,7 +83,7 @@ impl CliInstance {
             mem_size_mib: args.create_args.mem_size,
             // as in crate `dragonball` serial_path will be assigned with a default value,
             // we need a special token to enable the stdio console.
-            serial_path: Some("None".to_owned())
+            serial_path: Some("None".to_owned()),
         };
 
         // boot source

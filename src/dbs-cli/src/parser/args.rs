@@ -2,7 +2,7 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::{Parser, Args};
+use clap::{Args, Parser};
 use serde_derive::{Deserialize, Serialize};
 
 /// A simple command-line tool to start DragonBall micro-VM
@@ -87,7 +87,7 @@ pub struct BootArgs {
     pub initrd_path: Option<String>,
 
     // for kata_rootfs: 'root=/dev/vda1'
-    #[clap(short, long, value_parser,  default_value = "console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1", help = "The boot arguments passed to the kernel (Optional)", display_order = 3)]
+    #[clap(short, long, value_parser, default_value = "console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda1", help = "The boot arguments passed to the kernel (Optional)", display_order = 3)]
     pub boot_args: String,
 
     /// rootfs

@@ -1,22 +1,23 @@
 // #![allow(unused)]
 
-mod parser;
-mod cli_instance;
+extern crate slog_term;
 
 use std::str::FromStr;
-use clap::Parser;
-use parser::DBSArgs;
-use parser::run_with_cli;
-use anyhow::Result;
-
-
 use std::sync::Mutex;
+
+use anyhow::Result;
+use clap::Parser;
 use slog::*;
-extern crate slog_term;
 use slog::Drain;
 use slog_scope::set_global_logger;
 
-fn main() -> Result<()>{
+use parser::DBSArgs;
+use parser::run_with_cli;
+
+mod parser;
+mod cli_instance;
+
+fn main() -> Result<()> {
     let args: DBSArgs = DBSArgs::parse();
 
     let log_file = &args.log_file;
@@ -26,7 +27,7 @@ fn main() -> Result<()>{
 
     let root = slog::Logger::root(
         Mutex::new(slog_json::Json::default(file).filter_level(log_level)).map(slog::Fuse),
-        o!("version" => env!("CARGO_PKG_VERSION"))
+        o!("version" => env!("CARGO_PKG_VERSION")),
     );
 
     let _guard = set_global_logger(root);

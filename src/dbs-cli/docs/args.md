@@ -1,4 +1,5 @@
-The configuration of `dbs-cli` refers to `dragonball`, while the only difference lies on that the `serial_path` argument is disabled.
+The configuration of `dbs-cli` refers to `dragonball`, while the only difference lies on that the `serial_path` argument
+is disabled.
 
 As a result, dbs-cli connect to vm via the stdio console.
 

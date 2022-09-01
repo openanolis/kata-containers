@@ -20,7 +20,6 @@ For the rootfs from firecracker:
   --boot-args "console=ttyS0 tty0 reboot=k debug panic=1 pci=off root=/dev/vda" ;
 ```
 
-
 For the rootfs build from kata:
 
 ```bash
@@ -49,9 +48,15 @@ Set the log level and log file:
 > If you want to exit vm, just input `reboot` in vm's console.
 
 # Acknowledgement
-Part of the code is based on the [Cloud Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) project, [`crosvm`](https://github.com/google/crosvm) project and [Firecracker](https://github.com/firecracker-microvm/firecracker) project. They are all rust written virtual machine managers with advantages on safety and security.
 
-`Dragonball sandbox` is designed to be a VMM that is customized for Kata Containers and we will focus on optimizing container workloads for Kata ecosystem. The focus on the Kata community is what differentiates us from other rust written virtual machines.
+Part of the code is based on the [Cloud Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor)
+project, [`crosvm`](https://github.com/google/crosvm) project
+and [Firecracker](https://github.com/firecracker-microvm/firecracker) project. They are all rust written virtual machine
+managers with advantages on safety and security.
+
+`Dragonball sandbox` is designed to be a VMM that is customized for Kata Containers and we will focus on optimizing
+container workloads for Kata ecosystem. The focus on the Kata community is what differentiates us from other rust
+written virtual machines.
 
 # License
 
