@@ -7,15 +7,15 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use clap::Parser;
-use slog::*;
 use slog::Drain;
+use slog::*;
 use slog_scope::set_global_logger;
 
-use parser::DBSArgs;
 use parser::run_with_cli;
+use parser::DBSArgs;
 
-mod parser;
 mod cli_instance;
+mod parser;
 
 fn main() -> Result<()> {
     let args: DBSArgs = DBSArgs::parse();
@@ -23,7 +23,13 @@ fn main() -> Result<()> {
     let log_file = &args.log_file;
     let log_level = Level::from_str(&args.log_level).unwrap();
 
-    let file = std::fs::OpenOptions::new().truncate(true).read(true).create(true).write(true).open(log_file).expect("Cannot write to the log file.");
+    let file = std::fs::OpenOptions::new()
+        .truncate(true)
+        .read(true)
+        .create(true)
+        .write(true)
+        .open(log_file)
+        .expect("Cannot write to the log file.");
 
     let root = slog::Logger::root(
         Mutex::new(slog_json::Json::default(file).filter_level(log_level)).map(slog::Fuse),
@@ -31,7 +37,6 @@ fn main() -> Result<()> {
     );
 
     let _guard = set_global_logger(root);
-
 
     run_with_cli(args)?;
     Ok(())

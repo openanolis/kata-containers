@@ -7,8 +7,8 @@
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
-        mpsc::{Receiver, Sender}, RwLock,
+        mpsc::{Receiver, Sender},
+        Arc, RwLock,
     },
 };
 
@@ -44,12 +44,10 @@ pub struct CliInstance {
 
 impl CliInstance {
     pub fn new(id: &str) -> Self {
-        let vmm_shared_info = Arc::new(RwLock::new(
-            InstanceInfo::new(
-                String::from(id),
-                DRAGONBALL_VERSION.to_string(),
-            )
-        ));
+        let vmm_shared_info = Arc::new(RwLock::new(InstanceInfo::new(
+            String::from(id),
+            DRAGONBALL_VERSION.to_string(),
+        )));
 
         let to_vmm_fd = EventFd::new(libc::EFD_NONBLOCK)
             .unwrap_or_else(|_| panic!("Failed to create eventfd for vmm {}", id));
@@ -63,9 +61,7 @@ impl CliInstance {
         }
     }
 
-
     pub fn run_vmm_server(&mut self, args: DBSArgs) -> Result<()> {
-
         // configuration
         let vm_config = VmConfigInfo {
             vcpu_count: args.create_args.vcpu,
@@ -104,13 +100,16 @@ impl CliInstance {
         };
 
         // set vm configuration
-        self.set_vm_configuration(vm_config).expect("failed to set vm configuration");
+        self.set_vm_configuration(vm_config)
+            .expect("failed to set vm configuration");
 
         // set boot source config
-        self.put_boot_source(boot_source_config).expect("failed to set boot source");
+        self.put_boot_source(boot_source_config)
+            .expect("failed to set boot source");
 
         // set rootfs
-        self.insert_block_device(block_device_config_info).expect("failed to set block device");
+        self.insert_block_device(block_device_config_info)
+            .expect("failed to set block device");
 
         // start micro-vm
         self.instance_start().expect("failed to start micro-vm");
@@ -122,7 +121,7 @@ impl CliInstance {
         self.handle_request(Request::Sync(VmmAction::ConfigureBootSource(
             boot_source_cfg,
         )))
-            .context("Failed to configure boot source")?;
+        .context("Failed to configure boot source")?;
         Ok(())
     }
 
@@ -136,7 +135,7 @@ impl CliInstance {
         self.handle_request_with_retry(Request::Sync(VmmAction::InsertBlockDevice(
             device_cfg.clone(),
         )))
-            .with_context(|| format!("Failed to insert block device {:?}", device_cfg))?;
+        .with_context(|| format!("Failed to insert block device {:?}", device_cfg))?;
         Ok(())
     }
 
@@ -144,7 +143,7 @@ impl CliInstance {
         self.handle_request(Request::Sync(VmmAction::SetVmConfiguration(
             vm_config.clone(),
         )))
-            .with_context(|| format!("Failed to set vm configuration {:?}", vm_config))?;
+        .with_context(|| format!("Failed to set vm configuration {:?}", vm_config))?;
         Ok(())
     }
 
