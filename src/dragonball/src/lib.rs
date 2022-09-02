@@ -32,7 +32,7 @@ pub mod vcpu;
 /// Virtual machine manager for virtual machines.
 pub mod vm;
 
-mod event_manager;
+pub mod event_manager;
 mod io_manager;
 mod vmm;
 
