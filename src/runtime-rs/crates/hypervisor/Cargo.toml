@@ -30,4 +30,3 @@ logging = { path = "../../../libs/logging" }
 dragonball = { path = "../../../dragonball", features = ["atomic-guest-memory", "virtio-vsock", "hotplug", "virtio-blk", "virtio-net", "virtio-fs"] }
 
 [features]
-
