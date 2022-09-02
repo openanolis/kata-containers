@@ -52,12 +52,10 @@ use crate::IoManagerCached;
 
 /// Virtual machine console device manager.
 pub mod console_manager;
-
 /// Console Manager for virtual machines console device.
 pub use self::console_manager::ConsoleManager;
 
 mod legacy;
-
 pub use self::legacy::{Error as LegacyDeviceError, LegacyDeviceManager};
 
 #[cfg(target_arch = "aarch64")]
@@ -66,38 +64,32 @@ pub use self::legacy::aarch64::{COM1, COM2, RTC};
 #[cfg(feature = "virtio-vsock")]
 /// Device manager for user-space vsock devices.
 pub mod vsock_dev_mgr;
-
 #[cfg(feature = "virtio-vsock")]
 use self::vsock_dev_mgr::VsockDeviceMgr;
 
 #[cfg(feature = "virtio-blk")]
 /// virtio-block device manager
 pub mod blk_dev_mgr;
-
 #[cfg(feature = "virtio-blk")]
 use self::blk_dev_mgr::BlockDeviceMgr;
 
 #[cfg(feature = "virtio-net")]
 /// Device manager for virtio-net devices.
 pub mod virtio_net_dev_mgr;
-
 #[cfg(feature = "virtio-net")]
 use self::virtio_net_dev_mgr::VirtioNetDeviceMgr;
 
 #[cfg(feature = "virtio-fs")]
 /// virtio-block device manager
 pub mod fs_dev_mgr;
-
 #[cfg(feature = "virtio-fs")]
 use self::fs_dev_mgr::FsDeviceMgr;
-
 #[cfg(feature = "virtio-fs")]
 mod memory_region_handler;
-
 #[cfg(feature = "virtio-fs")]
 pub use self::memory_region_handler::*;
 
-macro_rules! info (
+macro_rules! info(
     ($l:expr, $($args:tt)+) => {
         slog::info!($l, $($args)+; slog::o!("subsystem" => "device_manager"))
     };
@@ -602,7 +594,6 @@ impl DeviceManager {
 
         match com1_sock_path {
             Some(path) => {
-                println!("{:?}", path);
                 if path == "None" {
                     info!(
                         _ctx.logger(),
