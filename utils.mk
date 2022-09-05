@@ -133,7 +133,7 @@ BUILD_TYPE = release
 HOST_ARCH = $(shell uname -m)
 ARCH ?= $(HOST_ARCH)
 ##VAR LIBC=musl|gnu
-LIBC ?= musl
+LIBC ?= gnu
 ifneq ($(LIBC),musl)
     ifeq ($(LIBC),gnu)
         override LIBC = gnu
