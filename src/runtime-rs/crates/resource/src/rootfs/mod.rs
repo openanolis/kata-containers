@@ -4,24 +4,30 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+mod nydus_rootfs;
 mod share_fs_rootfs;
 
-use std::{sync::Arc, vec::Vec};
-
+use agent::Storage;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use hypervisor::Hypervisor;
 use kata_types::mount::Mount;
 use nix::sys::stat::{self, SFlag};
+use std::{sync::Arc, vec::Vec};
 use tokio::sync::RwLock;
 
 use crate::share_fs::ShareFs;
 
-const ROOTFS: &str = "rootfs";
+use self::nydus_rootfs::NYDUS_ROOTFS_TYPE;
 
+const ROOTFS: &str = "rootfs";
+const HYBRID_ROOTFS_WRITABLE_LAYER_LOWER_DIR: &str = "rootfs_lower";
+const TYPE_OVERLAY_FS: &str = "overlay";
 #[async_trait]
 pub trait Rootfs: Send + Sync {
     async fn get_guest_rootfs_path(&self) -> Result<String>;
     async fn get_rootfs_mount(&self) -> Result<Vec<oci::Mount>>;
+    async fn get_storage(&self) -> Option<Storage>;
 }
 
 #[derive(Default)]
@@ -49,15 +55,25 @@ impl RootFsResource {
     pub async fn handler_rootfs(
         &self,
         share_fs: &Option<Arc<dyn ShareFs>>,
+        hypervisor: &dyn Hypervisor,
+        sid: &str,
         cid: &str,
         bundle_path: &str,
         rootfs_mounts: &[Mount],
     ) -> Result<Arc<dyn Rootfs>> {
+        if rootfs_mounts[0].fs_type == NYDUS_ROOTFS_TYPE {
+            let rootfs = nydus_rootfs::NydusRootfs::new(hypervisor, sid, cid, &rootfs_mounts[0])
+                .await
+                .context("new nydus rootfs")?;
+            let mut inner = self.inner.write().await;
+            let r = Arc::new(rootfs);
+            inner.rootfs.push(r.clone());
+            return Ok(r);
+        }
         match rootfs_mounts {
             mounts_vec if is_single_layer_rootfs(mounts_vec) => {
                 // Safe as single_layer_rootfs must have one layer
                 let layer = &mounts_vec[0];
-
                 let rootfs = if let Some(share_fs) = share_fs {
                     // share fs rootfs
                     let share_fs_mount = share_fs.get_share_fs_mount();

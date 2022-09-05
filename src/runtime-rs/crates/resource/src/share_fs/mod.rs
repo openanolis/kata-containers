@@ -5,11 +5,13 @@
 //
 
 mod share_virtio_fs;
+pub use share_virtio_fs::rafs_mount;
 mod share_virtio_fs_inline;
 use share_virtio_fs_inline::ShareVirtioFsInline;
 mod share_virtio_fs_standalone;
 use share_virtio_fs_standalone::ShareVirtioFsStandalone;
 mod utils;
+pub use utils::{do_get_guest_path, do_get_guest_virtiofs_path, get_host_rw_shared_path};
 mod virtio_fs_share_mount;
 use virtio_fs_share_mount::VirtiofsShareMount;
 
@@ -22,13 +24,15 @@ use hypervisor::Hypervisor;
 use kata_types::config::hypervisor::SharedFsInfo;
 
 const VIRTIO_FS: &str = "virtio-fs";
+const _VIRTIO_FS_NYDUS: &str = "virtio-fs-nydus";
 const INLINE_VIRTIO_FS: &str = "inline-virtio-fs";
 
 const KATA_HOST_SHARED_DIR: &str = "/run/kata-containers/shared/sandboxes/";
-const KATA_GUEST_SHARE_DIR: &str = "/run/kata-containers/shared/containers/";
+pub const KATA_GUEST_SHARE_DIR: &str = "/run/kata-containers/shared/containers/";
 pub(crate) const DEFAULT_KATA_GUEST_SANDBOX_DIR: &str = "/run/kata-containers/sandbox/";
 
-const PASSTHROUGH_FS_DIR: &str = "passthrough";
+pub const PASSTHROUGH_FS_DIR: &str = "passthrough";
+const RAFS_DIR: &str = "rafs";
 
 #[async_trait]
 pub trait ShareFs: Send + Sync {

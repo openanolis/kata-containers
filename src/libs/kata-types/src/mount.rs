@@ -68,6 +68,19 @@ pub fn is_kata_host_dir_volume(ty: &str) -> bool {
     ty == KATA_HOST_DIR_VOLUME_TYPE
 }
 
+/// nydus extraoptions
+#[derive(Debug, serde::Deserialize)]
+pub struct NydusExtraOption {
+    /// source path
+    pub source: String,
+    /// nydus config
+    pub config: String,
+    /// snapshotter directory
+    pub snapshotdir: String,
+    /// fs version
+    pub fs_version: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
