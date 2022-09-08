@@ -15,6 +15,7 @@ pub enum ShareFsOperation {
 pub enum ShareFsMountType {
     PASSTHROUGH,
     RAFS,
+    BLOBFS,
 }
 
 /// ShareFsMountConfig: share fs mount config
@@ -40,4 +41,11 @@ pub struct ShareFsMountConfig {
 
     /// prefetch_list_path: path to file that contains file lists that should be prefetched by rafs
     pub prefetch_list_path: Option<String>,
+
+    // What size file supports dax
+    // If dax_threshold_size_kb == None, DAX will disable to all files.
+    // If dax_threshold_size_kb == 0, DAX will enable all files.
+    // If dax_threshold_size_kb == N KB, DAX will enable only when the file
+    // size is greater than or equal to N KB.
+    pub dax_threshold_size_kb: Option<u64>,
 }

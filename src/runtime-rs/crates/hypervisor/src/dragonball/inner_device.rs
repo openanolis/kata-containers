@@ -258,6 +258,7 @@ impl DragonballInner {
         let fstype = match config.fstype {
             ShareFsMountType::PASSTHROUGH => "passthroughfs",
             ShareFsMountType::RAFS => "rafs",
+            ShareFsMountType::BLOBFS => "blobfs",
         };
 
         let cfg = FsMountConfigInfo {
@@ -268,7 +269,7 @@ impl DragonballInner {
             config: config.config.clone(),
             tag: config.tag.clone(),
             prefetch_list_path: config.prefetch_list_path.clone(),
-            dax_threshold_size_kb: None,
+            dax_threshold_size_kb: config.dax_threshold_size_kb,
         };
 
         self.vmm_instance.patch_fs(&cfg, config.op).map_err(|e| {

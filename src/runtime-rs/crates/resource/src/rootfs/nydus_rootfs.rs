@@ -6,10 +6,10 @@
 
 use super::{Rootfs, TYPE_OVERLAY_FS};
 use crate::{
-    rootfs::HYBRID_ROOTFS_WRITABLE_LAYER_LOWER_DIR,
+    rootfs::{HYBRID_ROOTFS_WRITABLE_LAYER_LOWER_DIR, RINK_BLOB_CACHE_DIR, RINK_BOOTSTRAP_DIR},
     share_fs::{
-        do_get_guest_path, do_get_guest_virtiofs_path, get_host_rw_shared_path, rafs_mount,
-        KATA_GUEST_SHARE_DIR, PASSTHROUGH_FS_DIR,
+        blobfs_mount, do_get_guest_path, do_get_guest_virtiofs_path, get_host_rw_shared_path,
+        passthrough_mount, rafs_mount, KATA_GUEST_SHARE_DIR, PASSTHROUGH_FS_DIR,
     },
 };
 use agent::Storage;
@@ -18,13 +18,13 @@ use async_trait::async_trait;
 use hypervisor::Hypervisor;
 use kata_sys_util::mount;
 use kata_types::mount::{Mount, NydusExtraOption};
-use std::fs;
+use std::{fs, path::Path};
 
 // Used for nydus rootfs
 pub(crate) const NYDUS_ROOTFS_TYPE: &str = "fuse.nydus-overlayfs";
 const NYDUS_ROOTFS_V5: &str = "v5";
 // Used for Nydus v6 rootfs version
-const _NYDUS_ROOTFS_V6: &str = "v6";
+const NYDUS_ROOTFS_V6: &str = "v6";
 
 const SNAPSHOTDIR: &str = "snapshotdir";
 pub(crate) struct NydusRootfs {
@@ -44,6 +44,19 @@ impl NydusRootfs {
             + &"/".to_string()
             + cid
             + &"/rootfs".to_string();
+        /*
+        let rootfs_guest_path = "/".to_string()
+            + PASSTHROUGH_FS_DIR
+            + &"/".to_string()
+            + cid
+            + &"/rootfs".to_string();
+        */
+        let container_share_dir = get_host_rw_shared_path(sid)
+            .join(PASSTHROUGH_FS_DIR)
+            .join(cid);
+        let rootfs_dir = container_share_dir.join("rootfs");
+        fs::create_dir_all(rootfs_dir)?;
+        //let rootfs_guest_path = do_get_guest_path(PASSTHROUGH_FS_DIR,cid,false,true);
         let rootfs_storage = match extra_options.fs_version.as_str() {
             NYDUS_ROOTFS_V5 => {
                 rafs_mount(
@@ -54,11 +67,6 @@ impl NydusRootfs {
                     None,
                 )
                 .await?;
-                let container_share_dir = get_host_rw_shared_path(sid)
-                    .join(PASSTHROUGH_FS_DIR)
-                    .join(cid);
-                let rootfs_dir = container_share_dir.join("rootfs");
-                fs::create_dir_all(rootfs_dir)?;
                 let snapshotdir = container_share_dir.join(SNAPSHOTDIR);
                 mount::bind_mount_unchecked(
                     extra_options.snapshotdir.clone(),
@@ -106,6 +114,54 @@ impl NydusRootfs {
                     driver: TYPE_OVERLAY_FS.to_string(),
                     source: TYPE_OVERLAY_FS.to_string(),
                     fs_type: TYPE_OVERLAY_FS.to_string(),
+                    options,
+                    mount_point: rootfs_guest_path.clone(),
+                    ..Default::default()
+                })
+            }
+            NYDUS_ROOTFS_V6 => {
+                blobfs_mount(
+                    h,
+                    extra_options.source.clone(),
+                    do_get_guest_virtiofs_path(RINK_BLOB_CACHE_DIR, cid, true),
+                    extra_options.config,
+                    None,
+                    Some(0),
+                )
+                .await
+                .with_context(|| "failed to mount blob cache dir".to_string())?;
+
+                let bootstrap_dir = {
+                    let dir: &Path = extra_options.source.as_str().as_ref();
+                    dir.parent().unwrap().to_str().unwrap().to_string()
+                };
+                passthrough_mount(
+                    h,
+                    bootstrap_dir,
+                    do_get_guest_virtiofs_path(RINK_BOOTSTRAP_DIR, cid, true),
+                    Some(0),
+                )
+                .await
+                .with_context(|| "failed to mount bootstrap dir".to_string())?;
+
+                let bootstrap_path = {
+                    let bootstrap: &Path = extra_options.source.as_str().as_ref();
+                    do_get_guest_path(RINK_BOOTSTRAP_DIR, cid, false, true)
+                        + "/"
+                        + bootstrap.file_name().unwrap().to_str().unwrap()
+                };
+
+                let blob_dir_path = do_get_guest_path(RINK_BLOB_CACHE_DIR, cid, false, true);
+
+                let mut options: Vec<String> = Vec::new();
+                options.push("bootstrap_path=".to_string() + bootstrap_path.as_str());
+                options.push("blob_dir_path=".to_string() + blob_dir_path.as_str());
+                options.push("user_xattr".to_string());
+
+                Ok(Storage {
+                    driver: TYPE_OVERLAY_FS.to_string(),
+                    source: TYPE_OVERLAY_FS.to_string(),
+                    fs_type: "erofs".to_string(),
                     options,
                     mount_point: rootfs_guest_path.clone(),
                     ..Default::default()

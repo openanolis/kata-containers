@@ -75,6 +75,7 @@ pub(crate) async fn setup_inline_virtiofs(id: &str, h: &dyn Hypervisor) -> Resul
         tag: String::from(MOUNT_GUEST_TAG),
         op: ShareFsOperation::Mount,
         prefetch_list_path: None,
+        dax_threshold_size_kb: None,
     });
     h.add_device(virtio_fs)
         .await
@@ -85,7 +86,7 @@ pub async fn rafs_mount(
     h: &dyn Hypervisor,
     rafs_meta: String,
     rafs_mnt: String,
-    config_content: String,
+    config: String,
     prefetch_list_path: Option<String>,
 ) -> Result<()> {
     info!(
@@ -96,10 +97,60 @@ pub async fn rafs_mount(
         source: rafs_meta,
         fstype: ShareFsMountType::RAFS,
         mount_point: rafs_mnt,
-        config: Some(config_content),
+        config: Some(config),
         tag: String::from(MOUNT_GUEST_TAG),
         op: ShareFsOperation::Mount,
         prefetch_list_path,
+        dax_threshold_size_kb: None,
+    });
+    h.add_device(virtio_fs).await.context("add device")?;
+    Ok(())
+}
+
+pub async fn blobfs_mount(
+    h: &dyn Hypervisor,
+    source: String,
+    mnt: String,
+    config: String,
+    prefetch_list_path: Option<String>,
+    dax_threshold_size_kb: Option<u64>,
+) -> Result<()> {
+    info!(
+        sl!(),
+        "Attaching dir {} to virtio-fs device, blobfs mount point {}, dax_threshold_size_kb {:?}",
+        source,
+        mnt,
+        dax_threshold_size_kb,
+    );
+    let virtio_fs = HypervisorDevice::ShareFsMount(ShareFsMountConfig {
+        source,
+        fstype: ShareFsMountType::BLOBFS,
+        mount_point: mnt,
+        config: Some(config),
+        tag: String::from(MOUNT_GUEST_TAG),
+        op: ShareFsOperation::Mount,
+        prefetch_list_path,
+        dax_threshold_size_kb,
+    });
+    h.add_device(virtio_fs).await.context("add device")?;
+    Ok(())
+}
+
+pub async fn passthrough_mount(
+    h: &dyn Hypervisor,
+    source: String,
+    mnt: String,
+    dax_threshold_size_kb: Option<u64>,
+) -> Result<()> {
+    let virtio_fs = HypervisorDevice::ShareFsMount(ShareFsMountConfig {
+        source,
+        fstype: ShareFsMountType::PASSTHROUGH,
+        mount_point: mnt,
+        config: None,
+        tag: String::from(MOUNT_GUEST_TAG),
+        op: ShareFsOperation::Mount,
+        prefetch_list_path: None,
+        dax_threshold_size_kb,
     });
     h.add_device(virtio_fs).await.context("add device")?;
     Ok(())

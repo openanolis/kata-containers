@@ -5,7 +5,7 @@
 //
 
 mod share_virtio_fs;
-pub use share_virtio_fs::rafs_mount;
+pub use share_virtio_fs::{blobfs_mount, passthrough_mount, rafs_mount};
 mod share_virtio_fs_inline;
 use share_virtio_fs_inline::ShareVirtioFsInline;
 mod share_virtio_fs_standalone;

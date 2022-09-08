@@ -23,6 +23,8 @@ use self::nydus_rootfs::NYDUS_ROOTFS_TYPE;
 const ROOTFS: &str = "rootfs";
 const HYBRID_ROOTFS_WRITABLE_LAYER_LOWER_DIR: &str = "rootfs_lower";
 const TYPE_OVERLAY_FS: &str = "overlay";
+const RINK_BLOB_CACHE_DIR: &str = "blob_cache_dir";
+const RINK_BOOTSTRAP_DIR: &str = "bootstrap";
 #[async_trait]
 pub trait Rootfs: Send + Sync {
     async fn get_guest_rootfs_path(&self) -> Result<String>;
