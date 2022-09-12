@@ -10,7 +10,10 @@ use agent::Storage;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use hypervisor::Hypervisor;
+use hypervisor::{device::Device as HypervisorDevice, ShareFsDeviceConfig};
+use kata_sys_util::mount;
 use kata_types::config::hypervisor::SharedFsInfo;
+const _ILLIS_PER_SEC: i32 = 1_000;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, Command},
@@ -21,14 +24,16 @@ use tokio::{
 };
 
 use super::{
-    share_virtio_fs::generate_sock_path, utils::get_host_ro_shared_path,
-    virtio_fs_share_mount::VirtiofsShareMount, ShareFs, ShareFsMount,
+    share_virtio_fs::{generate_sock_path, MOUNT_GUEST_TAG},
+    utils::{self, get_host_ro_shared_path},
+    virtio_fs_share_mount::VirtiofsShareMount,
+    ShareFs, ShareFsMount,
 };
 
 #[derive(Debug, Clone)]
 pub struct ShareVirtioFsStandaloneConfig {
     id: String,
-    jail_root: String,
+    _jail_root: String,
 
     // virtio_fs_daemon is the virtio-fs vhost-user daemon path
     pub virtio_fs_daemon: String,
@@ -49,16 +54,16 @@ pub(crate) struct ShareVirtioFsStandalone {
 }
 
 impl ShareVirtioFsStandalone {
-    pub(crate) fn new(id: &str, _config: &SharedFsInfo) -> Result<Self> {
+    pub(crate) async fn new(id: &str, config: &SharedFsInfo, h: &dyn Hypervisor) -> Result<Self> {
         Ok(Self {
             inner: Arc::new(RwLock::new(ShareVirtioFsStandaloneInner::default())),
             // TODO: update with config
             config: ShareVirtioFsStandaloneConfig {
                 id: id.to_string(),
-                jail_root: "".to_string(),
-                virtio_fs_daemon: "".to_string(),
-                virtio_fs_cache: "".to_string(),
-                virtio_fs_extra_args: vec![],
+                _jail_root: h.get_jailer_root().await?,
+                virtio_fs_daemon: config.virtio_fs_daemon.clone(),
+                virtio_fs_cache: config.virtio_fs_cache.clone(),
+                virtio_fs_extra_args: config.virtio_fs_extra_args.clone(),
             },
             share_fs_mount: Arc::new(VirtiofsShareMount::new(id)),
         })
@@ -72,8 +77,7 @@ impl ShareVirtioFsStandalone {
 
         let mut args: Vec<String> = vec![
             String::from("-f"),
-            String::from("-o"),
-            format!("vhost_user_socket={}", sock_path),
+            format!("--socket-path={}", sock_path),
             String::from("-o"),
             format!("source={}", source_path.to_str().unwrap()),
             String::from("-o"),
@@ -89,10 +93,11 @@ impl ShareVirtioFsStandalone {
     }
 
     async fn setup_virtiofsd(&self) -> Result<()> {
-        let sock_path = generate_sock_path(&self.config.jail_root);
+        let sock_path = generate_sock_path("");
         let args = self.virtiofsd_args(&sock_path).context("virtiofsd args")?;
-
+        info!(sl!(), "args:{:?}", &args);
         let mut cmd = Command::new(&self.config.virtio_fs_daemon);
+        info!(sl!(), "virtiofsd:{:?}", &self.config.virtio_fs_daemon);
         let child_cmd = cmd.args(&args).stderr(Stdio::piped());
         let child = child_cmd.spawn().context("spawn virtiofsd")?;
 
@@ -164,8 +169,23 @@ impl ShareFs for ShareVirtioFsStandalone {
         self.share_fs_mount.clone()
     }
 
-    async fn setup_device_before_start_vm(&self, _h: &dyn Hypervisor) -> Result<()> {
-        self.setup_virtiofsd().await.context("setup virtiofsd")?;
+    async fn setup_device_before_start_vm(&self, h: &dyn Hypervisor) -> Result<()> {
+        let host_ro_dest = utils::get_host_ro_shared_path(&self.config.id);
+        utils::ensure_dir_exist(&host_ro_dest)?;
+        let host_rw_dest = utils::get_host_rw_shared_path(&self.config.id);
+        utils::ensure_dir_exist(&host_rw_dest)?;
+        mount::bind_mount_unchecked(&host_rw_dest, &host_ro_dest, true)
+            .context("bind mount shared_fs directory")?;
+        self.setup_virtiofsd().await.context("set up virtiofsd")?;
+        let share_fs_device = HypervisorDevice::ShareFsDevice(ShareFsDeviceConfig {
+            sock_path: "/root/virtiofsd.sock".to_string(),
+            mount_tag: String::from(MOUNT_GUEST_TAG),
+            host_path: String::from(host_ro_dest.to_str().unwrap()),
+            fs_type: "virtio-fs".to_string(),
+            queue_size: 0,
+            queue_num: 0,
+        });
+        h.add_device(share_fs_device).await.context("add device")?;
         Ok(())
     }
 
