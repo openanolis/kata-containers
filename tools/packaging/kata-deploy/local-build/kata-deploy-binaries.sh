@@ -29,6 +29,7 @@ readonly shimv2_builder="${static_build_dir}/shim-v2/build.sh"
 readonly virtiofsd_builder="${static_build_dir}/virtiofsd/build-static-virtiofsd.sh"
 
 readonly rootfs_builder="${repo_root_dir}/tools/packaging/guest-image/build_image.sh"
+readonly rust_shimv2_builder="${static_build_dir}/shim-v2/rust_build.sh"
 
 ARCH=$(uname -m)
 
@@ -77,6 +78,7 @@ options:
 	rootfs-image
 	rootfs-initrd
 	shim-v2
+	rust-shim-v2
 	virtiofsd
 EOF
 
@@ -158,6 +160,10 @@ install_shimv2() {
 	DESTDIR="${destdir}" PREFIX="${prefix}" "${shimv2_builder}"
 }
 
+install_rust_shimv2() {
+	${rust_shimv2_builder}
+}
+
 get_kata_version() {
 	local v
 	v=$(cat "${version_file}")
@@ -178,6 +184,7 @@ handle_build() {
 		install_qemu
 		install_shimv2
 		install_virtiofsd
+		install_rust_shimv2
 		;;
 
 	cloud-hypervisor) install_clh ;;
@@ -198,6 +205,9 @@ handle_build() {
 
 	virtiofsd) install_virtiofsd ;;
 
+	rust-shim-v2) install_rust_shimv2 ;;
+
+	
 	*)
 		die "Invalid build target ${build_target}"
 		;;
@@ -236,6 +246,7 @@ main() {
 		rootfs-initrd
 		shim-v2
 		virtiofsd
+		rust-shim-v2
 	)
 	silent=false
 	while getopts "hs-:" opt; do
