@@ -20,6 +20,7 @@ pub mod resource_persist;
 use network::NetworkConfig;
 pub mod rootfs;
 pub mod share_fs;
+pub mod vm;
 pub mod volume;
 pub use manager::ResourceManager;
 

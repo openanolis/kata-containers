@@ -102,6 +102,14 @@ impl ResourceManager {
         let inner = self.inner.read().await;
         inner.delete_cgroups().await
     }
+
+    pub async fn update_vm_resources(
+        &self,
+        linux_resources: Option<&LinuxResources>,
+    ) -> Result<()> {
+        let inner = self.inner.read().await;
+        inner.update_vm_resources(linux_resources).await
+    }
 }
 
 #[async_trait]

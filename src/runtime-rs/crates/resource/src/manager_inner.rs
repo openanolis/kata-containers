@@ -22,6 +22,7 @@ use crate::{
     network::{self, Network},
     rootfs::{RootFsResource, Rootfs},
     share_fs::{self, ShareFs},
+    vm::VmResource,
     volume::{Volume, VolumeResource},
     ResourceConfig,
 };
@@ -37,6 +38,7 @@ pub(crate) struct ResourceManagerInner {
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
     pub cgroups_resource: CgroupsResource,
+    pub vm_resource: VmResource,
 }
 
 impl ResourceManagerInner {
@@ -57,6 +59,7 @@ impl ResourceManagerInner {
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
             cgroups_resource,
+            vm_resource: VmResource::new(),
         })
     }
 
@@ -197,6 +200,15 @@ impl ResourceManagerInner {
         self.cgroups_resource.delete().await
     }
 
+    pub async fn update_vm_resources(
+        &self,
+        linux_resources: Option<&LinuxResources>,
+    ) -> Result<()> {
+        self.vm_resource
+            .update_vm_resources(linux_resources, self.hypervisor.as_ref())
+            .await
+    }
+
     pub async fn dump(&self) {
         self.rootfs_resource.dump().await;
         self.volume_resource.dump().await;
@@ -240,6 +252,7 @@ impl Persist for ResourceManagerInner {
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
+            vm_resource: VmResource::new(),
             cgroups_resource: CgroupsResource::restore(
                 args,
                 resource_state.cgroup_state.unwrap_or_default(),
