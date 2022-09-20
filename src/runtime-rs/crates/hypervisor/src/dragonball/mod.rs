@@ -79,9 +79,14 @@ impl Hypervisor for Dragonball {
     }
 
     // returns Result<(old_vcpus, new_vcpus)>
-    async fn resize_vcpu(&self, new_vcpus: u32) -> Result<(u32, u32)> {
-        let mut inner = self.inner.write().await;
-        inner.resize_vcpu(new_vcpus).await
+    async fn resize_vcpu(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)> {
+        let inner = self.inner.read().await;
+        inner.resize_vcpu(old_vcpus, new_vcpus).await
+    }
+
+    async fn resize_memory(&self, new_mem_mb: u32) -> Result<()> {
+        let inner = self.inner.read().await;
+        inner.resize_memory(new_mem_mb).await
     }
 
     async fn add_device(&self, device: Device) -> Result<()> {

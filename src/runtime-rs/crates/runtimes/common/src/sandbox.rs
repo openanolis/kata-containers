@@ -6,7 +6,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use kata_types::config::hypervisor::{CpuInfo, MemoryInfo};
 
 #[async_trait]
 pub trait Sandbox: Send + Sync {
@@ -17,8 +16,6 @@ pub trait Sandbox: Send + Sync {
     async fn shutdown(&self) -> Result<()>;
 
     // sandbox resource management
-    async fn cpuinfo(&self) -> Result<CpuInfo>;
-    async fn meminfo(&self) -> Result<MemoryInfo>;
     async fn update_cpu_resource(&self, new_vcpus: u32) -> Result<()>;
     async fn update_mem_resource(&self, new_mem: u32, swap_sz_byte: i64) -> Result<()>;
 }

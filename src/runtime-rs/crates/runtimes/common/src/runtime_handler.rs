@@ -44,38 +44,21 @@ pub trait RuntimeHandler: Send + Sync {
 }
 
 impl RuntimeInstance {
-    // NOTE THAT: if static resource management is configured, this returns an Error
-    // 1. hotplug vcpu/memory
+    // NOTE: if static resource management is configured, a warning is logged
+    // hotplug vcpu/memory
     //   - vcpu: the sum of each ctr, plus default vcpu
     //   - memory: the sum of each ctr, plus default memory, and setup swap
-    // 2. agent will online the resources provided
+    // TODO: hotplug not supported returns an error
     pub async fn update_sandbox_resource(&self) -> Result<()> {
-        // todo: skip if static resource mgmt
         // calculate the number of vcpu to be updated
-        let cpuinfo = self
-            .sandbox
-            .cpuinfo()
-            .await
-            .context("failed to get cpuinfo")?;
-        let nr_vcpus = self.container_manager.total_vcpus().await? + (cpuinfo.default_vcpus as u32);
+        let nr_vcpus = self.container_manager.total_vcpus().await?;
 
-        // calculate the memory to be updated
-        let meminfo = self
-            .sandbox
-            .meminfo()
-            .await
-            .context("failed to get meminfo")?;
         // the unit here is byte
-        let (mut mem_sb_byte, need_pod_swap, mut swap_sb_byte) = self
+        let (mem_sb_byte, swap_sb_byte) = self
             .container_manager
-            .total_mems(meminfo.enable_guest_swap)
+            .total_mems()
             .await
             .context("failed to calculate total memory requirement for containers")?;
-        // default_memory is in MiB
-        mem_sb_byte += (meminfo.default_memory << 20) as u64;
-        if need_pod_swap {
-            swap_sb_byte += (meminfo.default_memory << 20) as i64;
-        }
 
         // todo: handle err if guest does not support hotplug
         // let hypervisor update the cpus

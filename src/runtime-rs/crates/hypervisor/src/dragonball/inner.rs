@@ -307,8 +307,7 @@ impl DragonballInner {
     // returns Result<(old, new)> if old_vcpus > 0
     // returns Result<(0, new)> if old_vcpus <= 0
     // the old_vcpus has an i32 semantic, check the comment in *struct CpuInfo*
-    pub fn check_resize_vcpus(&self, new_vcpus: u32) -> Result<(u32, u32)> {
-        let old_vcpus = self.config.cpu_info.current_vcpus;
+    fn check_resize_vcpus(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)> {
         if old_vcpus <= 0 {
             // if old_vcpus = 0, it is default_vcpus
             // if old_vcpus < 0, it is the # of physical cores
@@ -332,7 +331,7 @@ impl DragonballInner {
         Ok((current_vcpus, new_vcpus))
     }
 
-    pub async fn do_resize_vcpus(&mut self, new_vcpus: u32) -> Result<()> {
+    async fn do_resize_vcpus(&self, new_vcpus: u32) -> Result<()> {
         let cpu_resize_info = VmResizeInfo {
             vcpu_count: Some(new_vcpus as u8),
         };
@@ -343,8 +342,8 @@ impl DragonballInner {
     }
 
     // do the check before resizing, returns Result<(old, new)>
-    pub async fn resize_vcpu(&mut self, new_vcpus: u32) -> Result<(u32, u32)> {
-        let (old_vcpus, new_vcpus) = self.check_resize_vcpus(new_vcpus)?;
+    pub async fn resize_vcpu(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)> {
+        let (old_vcpus, new_vcpus) = self.check_resize_vcpus(old_vcpus, new_vcpus)?;
         if old_vcpus == new_vcpus {
             info!(sl!(), "resize_vcpu: no need to resize vcpus");
             return Ok((new_vcpus, new_vcpus));
@@ -353,10 +352,14 @@ impl DragonballInner {
         self.do_resize_vcpus(new_vcpus)
             .await
             .map(|_| {
-                self.config.cpu_info.current_vcpus = new_vcpus as i32;
                 Ok((old_vcpus, new_vcpus))
             })
             .context("do_resize_vcpus failed")?
+    }
+
+    // TODO: agent get guest detail
+    pub async fn resize_memory(&self, new_mem_mb: u32) -> Result<()> {
+        Ok(())
     }
 
     pub fn set_hypervisor_config(&mut self, config: HypervisorConfig) {

@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use agent::{self, kata::KataAgent, types::KernelModule, Agent, OnlineCPUMemRequest};
+use agent::{self, kata::KataAgent, types::KernelModule, Agent};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use common::{
@@ -16,7 +16,6 @@ use common::{
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
 use kata_types::config::{
-    hypervisor::{CpuInfo, MemoryInfo},
     TomlConfig,
 };
 use resource::{
@@ -266,14 +265,6 @@ impl Sandbox for VirtSandbox {
         Ok(())
     }
 
-    async fn cpuinfo(&self) -> Result<CpuInfo> {
-        Ok(self.hypervisor.hypervisor_config().await.cpu_info)
-    }
-
-    async fn meminfo(&self) -> Result<MemoryInfo> {
-        Ok(self.hypervisor.hypervisor_config().await.memory_info)
-    }
-
     // update sandbox's cpu resource
     // if the vmm does not support hotplug or hotunplug, it is vmm duty to
     // log warning and return correspondently
@@ -281,34 +272,15 @@ impl Sandbox for VirtSandbox {
     //  - new_vcpus: the # of vcpu sandbox requires to update
     async fn update_cpu_resource(&self, new_vcpus: u32) -> Result<()> {
         info!(sl!(), "requesting vmm to update vcpus to {:?}", new_vcpus);
-        let (old, new) = self.hypervisor.resize_vcpu(new_vcpus).await.map_err(|e| {
-            match e {
-                // todo: handle err if guest does not support hotplug
-                _ => return anyhow!("error on resizing vcpu"),
-            }
-        })?;
-
-        // if vcpus were increased, ask the agent to online them inside the sandbox
-        if old < new {
-            let added = new - old;
-            info!(sl!(), "request to onlineCpuMem with {:?} cpus", added);
-            self.agent
-                .online_cpu_mem(OnlineCPUMemRequest {
-                    wait: false,
-                    nb_cpus: added,
-                    cpu_only: true,
-                })
-                .await
-                .context("agent failed to online cpu")?;
-        }
-
+        self.resource_manager.update_cpu_resource(new_vcpus).await?;
         Ok(())
     }
 
     // todo: setup swap space in guest, when block device hot plug is supported
     // todo: use memory_hotplug_byprobe between hotplug and online when supported
-    async fn update_mem_resource(&self, new_mem: u32, _swap_sz_byte: i64) -> Result<()> {
-        info!(sl!(), "requesting vmm to update memory to {:?}", new_mem);
+    async fn update_mem_resource(&self, new_mem_mb: u32, swap_sz_byte: i64) -> Result<()> {
+        info!(sl!(), "requesting vmm to update memory to {:?}MiB, with swap {:?}B", new_mem_mb, swap_sz_byte);
+        self.resource_manager.update_memory_resource(new_mem_mb, swap_sz_byte).await?;
         Ok(())
     }
 }

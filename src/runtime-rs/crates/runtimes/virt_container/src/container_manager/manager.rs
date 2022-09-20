@@ -280,9 +280,10 @@ impl ContainerManager for VirtContainerManager {
 
     // unit: byte
     // if guest_swap is true, add swap to memory_sandbox
-    // returns, memory_sandbox, need_pod_swap, swap_sandbox
-    async fn total_mems(&self, use_guest_swap: bool) -> Result<(u64, bool, i64)> {
+    // returns `(memory_sandbox_b, swap_sandbox_b)`
+    async fn total_mems(&self) -> Result<(u64, i64)> {
         // sb stands for sandbox
+        let cpu_mem_info = self.resource_manager.sandbox_cpu_mem_info().await?;
         let mut mem_sb = 0;
         let mut need_pod_swap = false;
         let mut swap_sb = 0;
@@ -312,7 +313,7 @@ impl ContainerManager for VirtContainerManager {
 
                     // add swap
                     if let Some(swappiness) = memory.swappiness {
-                        if swappiness > 0 && use_guest_swap {
+                        if swappiness > 0 && cpu_mem_info.use_guest_swap()? {
                             match memory.swap {
                                 Some(swap) => {
                                     if swap > current_limit {
@@ -333,11 +334,18 @@ impl ContainerManager for VirtContainerManager {
             } // end of if let Some(resource)
         }
 
-        Ok((mem_sb, need_pod_swap, swap_sb))
+        // add default memory to this
+        mem_sb += (cpu_mem_info.default_mem_mb()? << 20) as u64;
+        if need_pod_swap {
+            swap_sb += (cpu_mem_info.default_mem_mb()? << 20) as i64;
+        }
+
+        Ok((mem_sb, swap_sb))
     }
 
     // calculates the total required vpus by adding each containers' requirement within the pod
     async fn total_vcpus(&self) -> Result<u32> {
+        let cpu_mem_info = self.resource_manager.sandbox_cpu_mem_info().await?;
         let mut total_vcpu = 0;
         let mut cpuset_count = 0;
         let containers = self.containers.read().await;
@@ -366,6 +374,9 @@ impl ContainerManager for VirtContainerManager {
             info!(sl!(), "(from cpuset)get total vcpus # {:?}", cpuset_count);
             return Ok(cpuset_count as u32);
         }
+
+        // add the default vcpu to it
+        total_vcpu += cpu_mem_info.default_vcpu()? as u32;
         info!(sl!(), "get total vcpus # {:?}", total_vcpu);
         Ok(total_vcpu)
     }

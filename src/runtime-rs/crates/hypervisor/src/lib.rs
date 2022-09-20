@@ -50,7 +50,8 @@ pub trait Hypervisor: Send + Sync {
     async fn pause_vm(&self) -> Result<()>;
     async fn save_vm(&self) -> Result<()>;
     async fn resume_vm(&self) -> Result<()>;
-    async fn resize_vcpu(&self, new_vcpus: u32) -> Result<(u32, u32)>; // returns (old_vcpus, new_vcpus)
+    async fn resize_vcpu(&self, old_vcpus: u32, new_vcpus: u32) -> Result<(u32, u32)>; // returns (old_vcpus, new_vcpus)
+    async fn resize_memory(&self, new_mem_mb: u32) -> Result<()>;
 
     // device manager
     async fn add_device(&self, device: device::Device) -> Result<()>;
