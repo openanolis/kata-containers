@@ -40,7 +40,7 @@ pub(crate) async fn prepare_virtiofs(
     mount::bind_mount_unchecked(&host_rw_dest, &host_ro_dest, true)
         .context("bind mount shared_fs directory")?;
 
-    let share_fs_device = device::Device::ShareFsDevice(device::ShareFsDeviceConfig {
+    let share_fs_device = device::DeviceConfig::ShareFsDevice(device::ShareFsDeviceConfig {
         sock_path: generate_sock_path(root),
         mount_tag: String::from(MOUNT_GUEST_TAG),
         host_path: String::from(host_ro_dest.to_str().unwrap()),

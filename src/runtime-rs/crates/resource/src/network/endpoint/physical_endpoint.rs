@@ -108,7 +108,7 @@ impl Endpoint for PhysicalEndpoint {
         };
 
         // add vfio device
-        let d = device::Device::Vfio(device::VfioConfig {
+        let d = device::DeviceConfig::Vfio(device::VfioConfig {
             id: format!("physical_nic_{}", self.name().await),
             sysfs_path: "".to_string(),
             bus_slot_func: self.bdf.clone(),

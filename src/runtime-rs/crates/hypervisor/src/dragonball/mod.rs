@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
 use tokio::sync::RwLock;
 
-use crate::{device::Device, Hypervisor, VcpuThreadIds};
+use crate::{device::DeviceConfig, Hypervisor, VcpuThreadIds};
 
 unsafe impl Send for Dragonball {}
 unsafe impl Sync for Dragonball {}
@@ -78,12 +78,12 @@ impl Hypervisor for Dragonball {
         inner.save_vm().await
     }
 
-    async fn add_device(&self, device: Device) -> Result<()> {
+    async fn add_device(&self, device: DeviceConfig) -> Result<()> {
         let mut inner = self.inner.write().await;
         inner.add_device(device).await
     }
 
-    async fn remove_device(&self, device: Device) -> Result<()> {
+    async fn remove_device(&self, device: DeviceConfig) -> Result<()> {
         let mut inner = self.inner.write().await;
         inner.remove_device(device).await
     }

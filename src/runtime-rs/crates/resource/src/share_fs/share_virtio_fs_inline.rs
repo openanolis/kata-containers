@@ -8,7 +8,9 @@ use agent::Storage;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use hypervisor::{
-    device::{Device as HypervisorDevice, ShareFsMountConfig, ShareFsMountType, ShareFsOperation},
+    device::{
+        DeviceConfig as HypervisorDevice, ShareFsMountConfig, ShareFsMountType, ShareFsOperation,
+    },
     Hypervisor,
 };
 use kata_types::config::hypervisor::SharedFsInfo;

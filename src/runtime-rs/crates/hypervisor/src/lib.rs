@@ -22,7 +22,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use hypervisor_persist::HypervisorState;
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
-
+pub mod device_manager;
 // Config which driver to use as vm root dev
 const VM_ROOTFS_DRIVER_BLK: &str = "virtio-blk";
 const VM_ROOTFS_DRIVER_PMEM: &str = "virtio-pmem";
@@ -52,8 +52,8 @@ pub trait Hypervisor: Send + Sync {
     async fn resume_vm(&self) -> Result<()>;
 
     // device manager
-    async fn add_device(&self, device: device::Device) -> Result<()>;
-    async fn remove_device(&self, device: device::Device) -> Result<()>;
+    async fn add_device(&self, device: device::DeviceConfig) -> Result<()>;
+    async fn remove_device(&self, device: device::DeviceConfig) -> Result<()>;
 
     // utils
     async fn get_agent_socket(&self) -> Result<String>;
