@@ -26,7 +26,7 @@ use nix::sched::{setns, CloneFlags};
 use seccompiler::BpfProgram;
 use vmm_sys_util::eventfd::EventFd;
 
-use crate::ShareFsOperation;
+use crate::device_type::ShareFsOperation;
 
 pub enum Request {
     Sync(VmmAction),

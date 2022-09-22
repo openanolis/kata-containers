@@ -15,6 +15,7 @@ pub use device::*;
 pub mod dragonball;
 mod kernel_param;
 pub mod qemu;
+use device::device_type::DeviceConfig;
 pub use kernel_param::Param;
 mod utils;
 use std::collections::HashMap;
@@ -43,6 +44,7 @@ const VM_ROOTFS_FILESYSTEM_EXT4: &str = "ext4";
 const VM_ROOTFS_FILESYSTEM_XFS: &str = "xfs";
 const VM_ROOTFS_FILESYSTEM_EROFS: &str = "erofs";
 
+const VM_ROOTFS_DRIVER_MMIO: &str = "virtio-blk-mmio";
 // before using hugepages for VM, we need to mount hugetlbfs
 // /dev/hugepages will be the mount point
 // mkdir -p /dev/hugepages
@@ -78,8 +80,8 @@ pub trait Hypervisor: Send + Sync {
     async fn resume_vm(&self) -> Result<()>;
 
     // device manager
-    async fn add_device(&self, device: device::Device) -> Result<()>;
-    async fn remove_device(&self, device: device::Device) -> Result<()>;
+    async fn add_device(&self, device: DeviceConfig) -> Result<()>;
+    async fn remove_device(&self, device: DeviceConfig) -> Result<()>;
 
     // utils
     async fn get_agent_socket(&self) -> Result<String>;

@@ -10,7 +10,7 @@ pub(crate) mod netns;
 
 use anyhow::{anyhow, Result};
 
-pub(crate) fn parse_mac(s: &str) -> Option<hypervisor::Address> {
+pub(crate) fn parse_mac(s: &str) -> Option<hypervisor::device_type::Address> {
     let v: Vec<_> = s.split(':').collect();
     if v.len() != 6 {
         return None;
@@ -20,12 +20,12 @@ pub(crate) fn parse_mac(s: &str) -> Option<hypervisor::Address> {
         bytes[i] = u8::from_str_radix(v[i], 16).ok()?;
     }
 
-    Some(hypervisor::Address(bytes))
+    Some(hypervisor::device_type::Address(bytes))
 }
 
 pub(crate) fn get_mac_addr(b: &[u8]) -> Result<String> {
     if b.len() != 6 {
-        return Err(anyhow!("invalid mac address {:?}", b));
+        Err(anyhow!("invalid mac address {:?}", b))
     } else {
         Ok(format!(
             "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
@@ -58,7 +58,7 @@ mod tests {
         assert!(parse_mac(fail).is_none());
 
         let v = [10, 11, 128, 3, 4, 5];
-        let expected_addr = hypervisor::Address(v);
+        let expected_addr = hypervisor::device_type::Address(v);
         let addr = parse_mac("0a:0b:80:03:04:05");
         assert!(addr.is_some());
         assert_eq!(expected_addr.0, addr.unwrap().0);

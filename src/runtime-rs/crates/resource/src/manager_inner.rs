@@ -4,17 +4,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{sync::Arc, thread};
-
 use crate::resource_persist::ResourceState;
 use agent::{Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
 use async_trait::async_trait;
-use hypervisor::Hypervisor;
+use hypervisor::{device::device_manager::DeviceManager, Hypervisor};
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
 use persist::sandbox_persist::Persist;
+use std::sync::RwLock;
+use std::{sync::Arc, thread};
 use tokio::runtime;
 
 use crate::{
@@ -34,29 +34,36 @@ pub(crate) struct ResourceManagerInner {
     hypervisor: Arc<dyn Hypervisor>,
     network: Option<Arc<dyn Network>>,
     share_fs: Option<Arc<dyn ShareFs>>,
-
+    _device_manager: Arc<RwLock<DeviceManager>>,
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
     pub cgroups_resource: CgroupsResource,
 }
 
 impl ResourceManagerInner {
-    pub(crate) fn new(
+    pub(crate) async fn new(
         sid: &str,
         agent: Arc<dyn Agent>,
         hypervisor: Arc<dyn Hypervisor>,
         toml_config: Arc<TomlConfig>,
     ) -> Result<Self> {
         let cgroups_resource = CgroupsResource::new(sid, &toml_config)?;
+
+        // create device manager
+        let dev_manager = DeviceManager::new(hypervisor.clone())
+            .await
+            .context("failed to create device manager")?;
+
         Ok(Self {
             sid: sid.to_string(),
             toml_config,
             agent,
-            hypervisor,
+            hypervisor: hypervisor.clone(),
             network: None,
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
+            _device_manager: Arc::new(RwLock::new(dev_manager)),
             cgroups_resource,
         })
     }
@@ -289,7 +296,7 @@ impl Persist for ResourceManagerInner {
         Ok(Self {
             sid: resource_args.sid,
             agent: resource_args.agent,
-            hypervisor: resource_args.hypervisor,
+            hypervisor: resource_args.hypervisor.clone(),
             network: None,
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
@@ -300,6 +307,9 @@ impl Persist for ResourceManagerInner {
             )
             .await?,
             toml_config: Arc::new(TomlConfig::default()),
+            _device_manager: Arc::new(RwLock::new(
+                DeviceManager::new(resource_args.hypervisor).await?,
+            )),
         })
     }
 }

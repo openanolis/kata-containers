@@ -13,6 +13,7 @@ use anyhow::{Context, Ok, Result};
 use kata_types::capabilities::Capabilities;
 
 use super::inner::DragonballInner;
+use crate::device::device_type::{DeviceConfig::HybridVsock, HybridVsockConfig};
 use crate::{utils, VcpuThreadIds, VmmState};
 use shim_interface::KATA_PATH;
 const DEFAULT_HYBRID_VSOCK_NAME: &str = "kata.hvsock";
@@ -32,7 +33,7 @@ impl DragonballInner {
 
         // prepare vsock
         let uds_path = [&self.jailer_root, DEFAULT_HYBRID_VSOCK_NAME].join("/");
-        let d = crate::device::Device::HybridVsock(crate::device::HybridVsockConfig {
+        let d = HybridVsock(HybridVsockConfig {
             id: format!("vsock-{}", &self.id),
             guest_cid: 3,
             uds_path,

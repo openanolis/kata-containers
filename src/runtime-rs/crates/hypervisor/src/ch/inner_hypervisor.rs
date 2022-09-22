@@ -6,9 +6,9 @@
 use super::inner::CloudHypervisorInner;
 use crate::ch::utils::get_api_socket_path;
 use crate::ch::utils::{get_jailer_root, get_sandbox_path, get_vsock_path};
+use crate::device::device_type::DeviceConfig;
+use crate::device::device_type::VsockConfig;
 use crate::kernel_param::KernelParams;
-use crate::Device;
-use crate::VsockConfig;
 use crate::VM_ROOTFS_DRIVER_PMEM;
 use crate::{VcpuThreadIds, VmmState};
 use anyhow::{anyhow, Context, Result};
@@ -421,7 +421,7 @@ impl CloudHypervisorInner {
 
         let vsock_cfg = VsockConfig::new(self.id.clone()).await?;
 
-        let dev = Device::Vsock(vsock_cfg);
+        let dev = DeviceConfig::Vsock(vsock_cfg);
         self.add_device(dev).await.context("add vsock device")?;
 
         self.start_hypervisor(self.timeout_secs).await?;

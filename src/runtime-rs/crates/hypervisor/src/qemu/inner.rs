@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 
+use crate::device::device_type::DeviceConfig;
 use crate::{HypervisorConfig, VcpuThreadIds};
 use kata_types::capabilities::{Capabilities, CapabilityBits};
 
@@ -133,16 +134,14 @@ impl QemuInner {
     }
 }
 
-use crate::device::Device;
-
 // device manager part of Hypervisor
 impl QemuInner {
-    pub(crate) async fn add_device(&mut self, device: Device) -> Result<()> {
+    pub(crate) async fn add_device(&mut self, device: DeviceConfig) -> Result<()> {
         info!(sl!(), "QemuInner::add_device() {}", device);
         todo!()
     }
 
-    pub(crate) async fn remove_device(&mut self, device: Device) -> Result<()> {
+    pub(crate) async fn remove_device(&mut self, device: DeviceConfig) -> Result<()> {
         info!(sl!(), "QemuInner::remove_device() {} ", device);
         todo!()
     }
