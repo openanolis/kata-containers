@@ -97,7 +97,7 @@ default_bridges = @DEFBRIDGES@
 default_memory = @DEFMEMSZ@
 
 # Block storage driver to be used for the hypervisor in case the container
-# rootfs is backed by a block device. DB only supports virtio-blk.
+# rootfs is backed by a block device. dragonball only supports virtio-mmio.
 block_device_driver = "@DEFBLOCKSTORAGEDRIVER_DB@"
 
 # This option changes the default hypervisor and kernel parameters

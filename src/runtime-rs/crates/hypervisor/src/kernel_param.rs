@@ -7,7 +7,7 @@
 use anyhow::{anyhow, Result};
 
 use crate::{
-    VM_ROOTFS_DRIVER_BLK, VM_ROOTFS_DRIVER_PMEM, VM_ROOTFS_FILESYSTEM_EROFS,
+    VM_ROOTFS_DRIVER_BLK, VM_ROOTFS_DRIVER_MMIO, VM_ROOTFS_DRIVER_PMEM, VM_ROOTFS_FILESYSTEM_EROFS,
     VM_ROOTFS_FILESYSTEM_EXT4, VM_ROOTFS_FILESYSTEM_XFS, VM_ROOTFS_ROOT_BLK, VM_ROOTFS_ROOT_PMEM,
 };
 use kata_types::config::LOG_VPORT_OPTION;
@@ -19,7 +19,7 @@ const VSOCK_LOGS_PORT: &str = "1025";
 const KERNEL_KV_DELIMITER: &str = "=";
 const KERNEL_PARAM_DELIMITER: &str = " ";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Param {
     pub key: String,
     pub value: String,
@@ -91,7 +91,7 @@ impl KernelParams {
                     }
                 }
             }
-            VM_ROOTFS_DRIVER_BLK => {
+            VM_ROOTFS_DRIVER_BLK | VM_ROOTFS_DRIVER_MMIO => {
                 params.push(Param::new("root", VM_ROOTFS_ROOT_BLK));
                 match rootfs_type {
                     VM_ROOTFS_FILESYSTEM_EXT4 | VM_ROOTFS_FILESYSTEM_XFS => {

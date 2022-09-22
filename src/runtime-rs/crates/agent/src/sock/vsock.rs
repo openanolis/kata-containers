@@ -16,7 +16,10 @@ use tokio::net::UnixStream;
 
 use super::{ConnectConfig, Sock, Stream};
 
-#[derive(Debug, PartialEq)]
+unsafe impl Send for Vsock {}
+unsafe impl Sync for Vsock {}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Vsock {
     vsock_cid: u32,
     port: u32,

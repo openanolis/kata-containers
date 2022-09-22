@@ -10,11 +10,12 @@ use crate::resource_persist::ResourceState;
 use agent::{Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
 use async_trait::async_trait;
-use hypervisor::Hypervisor;
+use hypervisor::{device::device_manager::DeviceManager, device_manager::VIRTIO_MMIO, Hypervisor};
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
 use persist::sandbox_persist::Persist;
+use std::sync::RwLock;
 use tokio::runtime;
 
 use crate::{
@@ -34,7 +35,7 @@ pub(crate) struct ResourceManagerInner {
     hypervisor: Arc<dyn Hypervisor>,
     network: Option<Arc<dyn Network>>,
     share_fs: Option<Arc<dyn ShareFs>>,
-
+    _device_manager: Arc<RwLock<DeviceManager>>,
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
     pub cgroups_resource: CgroupsResource,
@@ -48,15 +49,27 @@ impl ResourceManagerInner {
         toml_config: Arc<TomlConfig>,
     ) -> Result<Self> {
         let cgroups_resource = CgroupsResource::new(sid, &toml_config)?;
+        let hypervisor_name = &toml_config.runtime.hypervisor_name;
+        let block_device_driver = &toml_config
+            .hypervisor
+            .get(hypervisor_name)
+            .context("failed to get hypervisor config")?
+            .blockdev_info
+            .block_device_driver
+            .clone();
         Ok(Self {
             sid: sid.to_string(),
             toml_config,
             agent,
-            hypervisor,
+            hypervisor: hypervisor.clone(),
             network: None,
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
+            _device_manager: Arc::new(RwLock::new(DeviceManager::new(
+                block_device_driver.to_string(),
+                hypervisor,
+            )?)),
             cgroups_resource,
         })
     }
@@ -289,7 +302,7 @@ impl Persist for ResourceManagerInner {
         Ok(Self {
             sid: resource_args.sid,
             agent: resource_args.agent,
-            hypervisor: resource_args.hypervisor,
+            hypervisor: resource_args.hypervisor.clone(),
             network: None,
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
@@ -300,6 +313,10 @@ impl Persist for ResourceManagerInner {
             )
             .await?,
             toml_config: Arc::new(TomlConfig::default()),
+            _device_manager: Arc::new(RwLock::new(DeviceManager::new(
+                VIRTIO_MMIO.to_string(),
+                resource_args.hypervisor,
+            )?)),
         })
     }
 }

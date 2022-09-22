@@ -7,9 +7,12 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use hypervisor::device_type::DeviceConfig::{ShareFsDevice, ShareFsMount};
 use hypervisor::{
-    device::{Device as HypervisorDevice, ShareFsMountConfig, ShareFsMountType, ShareFsOperation},
-    Hypervisor, ShareFsDeviceConfig,
+    device::device_type::{
+        ShareFsDeviceConfig, ShareFsMountConfig, ShareFsMountType, ShareFsOperation,
+    },
+    Hypervisor,
 };
 use kata_sys_util::mount;
 
@@ -42,7 +45,7 @@ pub(crate) async fn prepare_virtiofs(
     mount::bind_mount_unchecked(&host_rw_dest, &host_ro_dest, true)
         .context("bind mount shared_fs directory")?;
 
-    let share_fs_device = HypervisorDevice::ShareFsDevice(ShareFsDeviceConfig {
+    let share_fs_device = ShareFsDevice(ShareFsDeviceConfig {
         sock_path: generate_sock_path(root),
         mount_tag: String::from(MOUNT_GUEST_TAG),
         host_path: String::from(host_ro_dest.to_str().unwrap()),
@@ -66,7 +69,7 @@ pub(crate) async fn setup_inline_virtiofs(id: &str, h: &dyn Hypervisor) -> Resul
     let ro_source = utils::get_host_ro_shared_path(id).join(PASSTHROUGH_FS_DIR);
     let source = String::from(ro_source.to_str().unwrap());
 
-    let virtio_fs = HypervisorDevice::ShareFsMount(ShareFsMountConfig {
+    let virtio_fs = ShareFsMount(ShareFsMountConfig {
         source: source.clone(),
         fstype: ShareFsMountType::PASSTHROUGH,
         mount_point: mnt,
@@ -91,7 +94,7 @@ pub async fn rafs_mount(
         sl!(),
         "Attaching rafs meta file {} to virtio-fs device, rafs mount point {}", rafs_meta, rafs_mnt
     );
-    let virtio_fs = HypervisorDevice::ShareFsMount(ShareFsMountConfig {
+    let virtio_fs = ShareFsMount(ShareFsMountConfig {
         source: rafs_meta.clone(),
         fstype: ShareFsMountType::RAFS,
         mount_point: rafs_mnt,
