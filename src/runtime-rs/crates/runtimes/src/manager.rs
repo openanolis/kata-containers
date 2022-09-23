@@ -8,7 +8,10 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::{shim_mgmt::server::MgmtServer, static_resource::StaticResourceManager};
+use crate::{
+    shim_mgmt::server::MgmtServer, static_resource::StaticResourceManager,
+    tracer::trace_extract_root_ctx,
+};
 use common::{
     message::Message,
     types::{Request, Response},
@@ -19,6 +22,8 @@ use kata_types::{annotations::Annotation, config::TomlConfig};
 use linux_container::LinuxContainer;
 use persist::sandbox_persist::Persist;
 use tokio::sync::{mpsc::Sender, RwLock};
+use tracing::{instrument, span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use virt_container::sandbox::SandboxRestoreArgs;
 use virt_container::sandbox::VirtSandbox;
 use virt_container::sandbox_persist::{SandboxState, SandboxTYPE};
@@ -33,6 +38,15 @@ struct RuntimeHandlerManagerInner {
     runtime_instance: Option<Arc<RuntimeInstance>>,
 }
 
+impl std::fmt::Debug for RuntimeHandlerManagerInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeHandlerManagerInner")
+            .field("id", &self.id)
+            .field("msg_sender", &self.msg_sender)
+            .finish()
+    }
+}
+
 impl RuntimeHandlerManagerInner {
     fn new(id: &str, msg_sender: Sender<Message>) -> Result<Self> {
         Ok(Self {
@@ -42,6 +56,7 @@ impl RuntimeHandlerManagerInner {
         })
     }
 
+    #[instrument]
     async fn init_runtime_handler(
         &mut self,
         netns: Option<String>,
@@ -74,6 +89,7 @@ impl RuntimeHandlerManagerInner {
         Ok(())
     }
 
+    #[instrument]
     async fn try_init(&mut self, spec: &oci::Spec) -> Result<()> {
         // return if runtime instance has init
         if self.runtime_instance.is_some() {
@@ -133,6 +149,13 @@ pub struct RuntimeHandlerManager {
     inner: Arc<RwLock<RuntimeHandlerManagerInner>>,
 }
 
+// todo: a more detailed impl for fmt::Debug
+impl std::fmt::Debug for RuntimeHandlerManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeHandlerManager").finish()
+    }
+}
+
 impl RuntimeHandlerManager {
     pub async fn new(id: &str, msg_sender: Sender<Message>) -> Result<Self> {
         Ok(Self {
@@ -182,37 +205,46 @@ impl RuntimeHandlerManager {
             .ok_or_else(|| anyhow!("runtime not ready"))
     }
 
+    #[instrument]
     async fn try_init_runtime_instance(&self, spec: &oci::Spec) -> Result<()> {
         let mut inner = self.inner.write().await;
         inner.try_init(spec).await
     }
 
     pub async fn handler_message(&self, req: Request) -> Result<Response> {
-        if let Request::CreateContainer(req) = req {
-            // get oci spec
-            let bundler_path = format!("{}/{}", req.bundle, oci::OCI_SPEC_CONFIG_FILE_NAME);
-            let spec = oci::Spec::load(&bundler_path).context("load spec")?;
+        {
+            // ttrpc lands here, setup a separate span for each call, hung below root span
+            let span = span!(tracing::Level::TRACE, "handler_message");
+            span.set_parent(trace_extract_root_ctx(&span.context()));
+            let _span_guard = span.enter();
 
-            self.try_init_runtime_instance(&spec)
-                .await
-                .context("try init runtime instance")?;
-            let instance = self
-                .get_runtime_instance()
-                .await
-                .context("get runtime instance")?;
+            if let Request::CreateContainer(req) = req {
+                // get oci spec
+                let bundler_path = format!("{}/{}", req.bundle, oci::OCI_SPEC_CONFIG_FILE_NAME);
+                let spec = oci::Spec::load(&bundler_path).context("load spec")?;
 
-            let shim_pid = instance
-                .container_manager
-                .create_container(req, spec)
-                .await
-                .context("create container")?;
+                self.try_init_runtime_instance(&spec)
+                    .await
+                    .context("try init runtime instance")?;
+                let instance = self
+                    .get_runtime_instance()
+                    .await
+                    .context("get runtime instance")?;
 
-            Ok(Response::CreateContainer(shim_pid))
-        } else {
-            self.handler_request(req).await.context("handler request")
+                let shim_pid = instance
+                    .container_manager
+                    .create_container(req, spec)
+                    .await
+                    .context("create container")?;
+
+                Ok(Response::CreateContainer(shim_pid))
+            } else {
+                self.handler_request(req).await.context("handler request")
+            }
         }
     }
 
+    #[instrument(name = "handler_request")]
     pub async fn handler_request(&self, req: Request) -> Result<Response> {
         let instance = self
             .get_runtime_instance()
