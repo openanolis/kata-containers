@@ -62,6 +62,7 @@ impl Device for BlockDevice {
                 }
             }
         }
+        self.set_device_info(device_info.clone()).await?;
         h.add_device(DeviceConfig::Block(self.drive.clone())).await
     }
     async fn detach(&mut self, h: &dyn hypervisor) -> Result<()> {
@@ -70,6 +71,9 @@ impl Device for BlockDevice {
     }
     async fn device_id(&self) -> &str {
         self.base.device_id().await
+    }
+    async fn set_device_info(&mut self, device_info: GenericConfig) -> Result<()> {
+        self.base.set_device_info(device_info).await
     }
     async fn get_device_info(&self) -> Result<GenericConfig> {
         self.base.get_device_info().await

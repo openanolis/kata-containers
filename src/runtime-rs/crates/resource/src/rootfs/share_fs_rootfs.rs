@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use agent::Storage;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use kata_sys_util::mount::Mounter;
@@ -55,5 +56,13 @@ impl Rootfs for ShareFsRootfs {
 
     async fn get_rootfs_mount(&self) -> Result<Vec<oci::Mount>> {
         todo!()
+    }
+
+    async fn get_storage(&self) -> Result<Option<Storage>> {
+        Ok(None)
+    }
+
+    async fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
     }
 }

@@ -29,7 +29,7 @@ pub struct ContainerInner {
     logger: slog::Logger,
     pub(crate) init_process: Process,
     pub(crate) exec_processes: HashMap<String, Exec>,
-    pub(crate) rootfs: Vec<Arc<dyn Rootfs>>,
+    pub(crate) rootfs: Option<Arc<dyn Rootfs>>,
     pub(crate) volumes: Vec<Arc<dyn Volume>>,
 }
 
@@ -40,7 +40,7 @@ impl ContainerInner {
             logger,
             init_process,
             exec_processes: HashMap::new(),
-            rootfs: vec![],
+            rootfs: None,
             volumes: vec![],
         }
     }

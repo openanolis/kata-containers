@@ -5,19 +5,6 @@
 //
 
 use crate::resource_persist::ResourceState;
-use agent::{Agent, Storage};
-use anyhow::{Context, Result};
-use async_trait::async_trait;
-use hypervisor::{
-    device_manager::{DeviceManager, VIRTIO_BLOCK},
-    Hypervisor,
-};
-use kata_types::config::TomlConfig;
-use kata_types::mount::Mount;
-use oci::LinuxResources;
-use persist::sandbox_persist::Persist;
-use std::sync::{Arc, RwLock};
-
 use crate::{
     cgroups::{CgroupArgs, CgroupsResource},
     manager::ManagerArgs,
@@ -27,6 +14,17 @@ use crate::{
     volume::{Volume, VolumeResource},
     ResourceConfig,
 };
+use agent::{Agent, Storage};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use hypervisor::device_manager::VIRTIO_MMIO;
+use hypervisor::{device_manager::DeviceManager, Hypervisor};
+use kata_types::config::TomlConfig;
+use kata_types::mount::Mount;
+use oci::LinuxResources;
+use persist::sandbox_persist::Persist;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub(crate) struct ResourceManagerInner {
     sid: String,
@@ -35,7 +33,7 @@ pub(crate) struct ResourceManagerInner {
     hypervisor: Arc<dyn Hypervisor>,
     network: Option<Arc<dyn Network>>,
     share_fs: Option<Arc<dyn ShareFs>>,
-    _device_manager: Arc<RwLock<DeviceManager>>,
+    device_manager: Arc<RwLock<DeviceManager>>,
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
     pub cgroups_resource: CgroupsResource,
@@ -58,7 +56,7 @@ impl ResourceManagerInner {
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
-            _device_manager: Arc::new(RwLock::new(DeviceManager::new(VIRTIO_BLOCK))),
+            device_manager: Arc::new(RwLock::new(DeviceManager::new(VIRTIO_MMIO))),
             cgroups_resource,
         })
     }
@@ -172,7 +170,15 @@ impl ResourceManagerInner {
         rootfs_mounts: &[Mount],
     ) -> Result<Arc<dyn Rootfs>> {
         self.rootfs_resource
-            .handler_rootfs(&self.share_fs, cid, bundle_path, rootfs_mounts)
+            .handler_rootfs(
+                &self.share_fs,
+                self.device_manager.clone(),
+                self.hypervisor.as_ref(),
+                &self.sid,
+                cid,
+                bundle_path,
+                rootfs_mounts,
+            )
             .await
     }
 
@@ -249,7 +255,7 @@ impl Persist for ResourceManagerInner {
             )
             .await?,
             toml_config: Arc::new(TomlConfig::default()),
-            _device_manager: Arc::new(RwLock::new(DeviceManager::new(VIRTIO_BLOCK))),
+            device_manager: Arc::new(RwLock::new(DeviceManager::new(VIRTIO_MMIO))),
         })
     }
 }

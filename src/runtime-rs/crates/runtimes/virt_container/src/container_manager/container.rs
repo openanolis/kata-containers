@@ -83,6 +83,8 @@ impl Container {
         amend_spec(&mut spec, toml_config.runtime.disable_guest_seccomp).context("amend spec")?;
         let sandbox_pidns = is_pid_namespace_enabled(&spec);
 
+        let mut storages = vec![];
+
         // handler rootfs
         let rootfs = self
             .resource_manager
@@ -100,7 +102,13 @@ impl Container {
             }
             None => return Err(anyhow!("spec miss root field")),
         };
-        inner.rootfs.push(rootfs);
+
+        if let Some(storage) = rootfs.get_storage().await? {
+            let mut s = vec![storage];
+            storages.append(&mut s);
+        }
+
+        inner.rootfs = Some(rootfs);
 
         // handler volumes
         let volumes = self
@@ -109,7 +117,7 @@ impl Container {
             .await
             .context("handler volumes")?;
         let mut oci_mounts = vec![];
-        let mut storages = vec![];
+
         for v in volumes {
             let mut volume_mounts = v.get_volume_mount().context("get volume mount")?;
             if !volume_mounts.is_empty() {
@@ -135,7 +143,6 @@ impl Container {
                     .and_then(|linux| linux.resources.as_ref()),
             )
             .await?;
-
         // create container
         let r = agent::CreateContainerRequest {
             process_id: agent::ContainerProcessID::new(&config.container_id, ""),
@@ -147,7 +154,6 @@ impl Container {
             sandbox_pidns,
             rootfs_mounts: vec![],
         };
-
         self.agent
             .create_container(r)
             .await

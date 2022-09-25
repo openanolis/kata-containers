@@ -49,6 +49,7 @@ pub trait Device: Send + Sync {
     async fn attach(&mut self, h: &dyn hypervisor, da: DeviceArgument) -> Result<()>;
     async fn detach(&mut self, h: &dyn hypervisor) -> Result<()>;
     async fn device_id(&self) -> &str;
+    async fn set_device_info(&mut self, di: GenericConfig) -> Result<()>;
     async fn get_device_info(&self) -> Result<GenericConfig>;
     async fn get_major_minor(&self) -> (i64, i64);
     async fn get_host_path(&self) -> &str;
