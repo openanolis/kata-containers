@@ -46,4 +46,8 @@ pub trait DeviceManagerInner {
     ) -> Result<Option<u64>>;
     // generate agent device
     async fn generate_agent_device(&self, device_id: String) -> Result<AgentDevice>;
+    // get the device guest path
+    async fn get_device_guest_path(&self, id: &str) -> Option<String>;
+    // get device manager driver options
+    async fn get_driver_options(&self) -> Result<String>;
 }

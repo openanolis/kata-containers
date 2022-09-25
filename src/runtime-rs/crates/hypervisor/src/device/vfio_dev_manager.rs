@@ -23,10 +23,10 @@ pub struct VfioDeviceManager {
 }
 
 impl VfioDeviceManager {
-    pub fn _new() -> Result<Self> {
+    pub fn _new(block_driver: &str) -> Result<Self> {
         Ok(VfioDeviceManager {
             devices: HashMap::new(),
-            driver: "".to_owned(),
+            driver: block_driver.to_string(),
         })
     }
 
@@ -58,6 +58,7 @@ impl DeviceManagerInner for VfioDeviceManager {
     ) -> Result<String> {
         Ok("".to_owned())
     }
+
     async fn try_remove_device(
         &mut self,
         _device_id: &str,
@@ -65,7 +66,16 @@ impl DeviceManagerInner for VfioDeviceManager {
     ) -> Result<Option<u64>> {
         todo!()
     }
+
     async fn generate_agent_device(&self, _device_id: String) -> Result<AgentDevice> {
+        todo!()
+    }
+
+    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
+        todo!()
+    }
+
+    async fn get_driver_options(&self) -> Result<String> {
         todo!()
     }
 }

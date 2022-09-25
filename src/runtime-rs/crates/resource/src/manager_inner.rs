@@ -13,9 +13,9 @@ use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
 use oci::LinuxResources;
 use persist::sandbox_persist::Persist;
-use std::sync::RwLock;
 use std::{sync::Arc, thread};
 use tokio::runtime;
+use tokio::sync::RwLock;
 
 use crate::{
     cgroups::{CgroupArgs, CgroupsResource},
@@ -34,7 +34,7 @@ pub(crate) struct ResourceManagerInner {
     hypervisor: Arc<dyn Hypervisor>,
     network: Option<Arc<dyn Network>>,
     share_fs: Option<Arc<dyn ShareFs>>,
-    _device_manager: Arc<RwLock<DeviceManager>>,
+    device_manager: Arc<RwLock<DeviceManager>>,
     pub rootfs_resource: RootFsResource,
     pub volume_resource: VolumeResource,
     pub cgroups_resource: CgroupsResource,
@@ -63,7 +63,7 @@ impl ResourceManagerInner {
             share_fs: None,
             rootfs_resource: RootFsResource::new(),
             volume_resource: VolumeResource::new(),
-            _device_manager: Arc::new(RwLock::new(dev_manager)),
+            device_manager: Arc::new(RwLock::new(dev_manager)),
             cgroups_resource,
         })
     }
@@ -210,6 +210,7 @@ impl ResourceManagerInner {
         self.rootfs_resource
             .handler_rootfs(
                 &self.share_fs,
+                self.device_manager.clone(),
                 self.hypervisor.as_ref(),
                 &self.sid,
                 cid,
@@ -307,7 +308,7 @@ impl Persist for ResourceManagerInner {
             )
             .await?,
             toml_config: Arc::new(TomlConfig::default()),
-            _device_manager: Arc::new(RwLock::new(
+            device_manager: Arc::new(RwLock::new(
                 DeviceManager::new(resource_args.hypervisor).await?,
             )),
         })

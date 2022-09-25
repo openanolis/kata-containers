@@ -21,6 +21,8 @@ const SYS_DEV_PREFIX: &str = "/sys/dev";
 pub(crate) const VIRTIO_BLOCK_MMIO: &str = "virtio-blk-mmio";
 /// VIRTIO_BLOCK_PCI indicates block driver is virtio-pci based
 pub(crate) const VIRTIO_BLOCK_PCI: &str = "virtio-blk-pci";
+pub(crate) const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
+pub(crate) const KATA_BLK_DEV_TYPE: &str = "blk";
 
 /// block_index and released_block_index are used to search an available block index
 /// in Sandbox.
@@ -123,6 +125,20 @@ impl DeviceManager {
             self.shared_info.release_device_index(index);
         }
         Err(anyhow!("invalid device class {:?}", class))
+    }
+
+    pub async fn get_driver_options(&self, class: &DeviceType) -> Result<String> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            return dev_manager.read().await.get_driver_options().await;
+        }
+        Err(anyhow!("invalid device class {:?}", class))
+    }
+
+    pub async fn get_device_guest_path(&self, id: &str, class: &DeviceType) -> Option<String> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            return dev_manager.read().await.get_device_guest_path(id).await;
+        }
+        None
     }
 
     // get_virt_drive_name returns the disk name format for virtio-blk

@@ -39,6 +39,7 @@ impl DeviceManagerInner for VhostUserDeviceManager {
     ) -> Result<String> {
         Ok("".to_owned())
     }
+
     async fn try_remove_device(
         &mut self,
         _device_id: &str,
@@ -46,7 +47,16 @@ impl DeviceManagerInner for VhostUserDeviceManager {
     ) -> Result<Option<u64>> {
         todo!()
     }
+
     async fn generate_agent_device(&self, _device_id: String) -> Result<AgentDevice> {
+        todo!()
+    }
+
+    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
+        todo!()
+    }
+
+    async fn get_driver_options(&self) -> Result<String> {
         todo!()
     }
 }
