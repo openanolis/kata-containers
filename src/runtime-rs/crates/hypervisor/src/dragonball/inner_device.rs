@@ -105,6 +105,8 @@ impl DragonballInner {
             is_direct: self.config.blockdev_info.block_device_cache_direct,
             no_drop,
             is_read_only: read_only,
+            use_shared_irq: Some(false),
+            use_generic_irq: Some(true),
             ..Default::default()
         };
         self.vmm_instance

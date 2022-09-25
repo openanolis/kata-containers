@@ -141,8 +141,12 @@ impl Rootfs for NydusRootfs {
         Ok(vec![])
     }
 
-    async fn get_storage(&self) -> Option<Storage> {
-        Some(self.rootfs.clone())
+    async fn get_storage(&self) -> Result<Option<Storage>> {
+        Ok(Some(self.rootfs.clone()))
+    }
+
+    async fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
     }
 
     async fn cleanup(&self) -> Result<()> {

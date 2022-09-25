@@ -114,12 +114,14 @@ impl Container {
             .context("get guest rootfs path")?;
 
         let mut storages = vec![];
-        if let Some(storage) = rootfs.get_storage().await {
-            storages.push(storage);
+        if let Some(storage) = rootfs.get_storage().await? {
+            let mut s = vec![storage];
+            storages.append(&mut s);
         }
+
         inner.rootfs.push(rootfs);
 
-        // handler volumes
+        // handle volumes
         let volumes = self
             .resource_manager
             .handler_volumes(&config.container_id, &spec)
@@ -151,7 +153,6 @@ impl Container {
                     .and_then(|linux| linux.resources.as_ref()),
             )
             .await?;
-
         // create container
         let r = agent::CreateContainerRequest {
             process_id: agent::ContainerProcessID::new(&config.container_id, ""),
@@ -160,7 +161,6 @@ impl Container {
             sandbox_pidns,
             ..Default::default()
         };
-
         self.agent
             .create_container(r)
             .await

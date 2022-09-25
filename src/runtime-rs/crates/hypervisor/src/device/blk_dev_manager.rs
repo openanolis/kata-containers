@@ -10,16 +10,14 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 
 use crate::{
-    device_manager::{get_host_path, VIRTIO_BLOCK, VIRTIO_MMIO},
+    device_manager::{
+        get_host_path, KATA_BLK_DEV_TYPE, KATA_MMIO_BLK_DEV_TYPE, VIRTIO_BLOCK, VIRTIO_MMIO,
+    },
     device_type::{BlockDevice, Device, DeviceArgument, GenericConfig},
     DeviceManagerInner, Hypervisor,
 };
 use agent::types::Device as AgentDevice;
 use kata_sys_util::rand;
-
-const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
-const KATA_BLK_DEV_TYPE: &str = "blk";
-
 // Device manager will manage the lifecycle of sandbox device
 pub struct BlockDeviceManager {
     devices: HashMap<String, Arc<Mutex<BlockDevice>>>,
@@ -43,19 +41,6 @@ impl BlockDeviceManager {
             block_index: 0,
             released_index: vec![],
         })
-    }
-
-    async fn get_block_driver(&self) -> &str {
-        self.block_driver.as_str()
-    }
-
-    async fn _get_device_guest_path(&self, id: &str) -> Option<String> {
-        if let Some(device) = self.devices.get(id) {
-            if let Ok(dev_info) = device.lock().await.get_device_info().await {
-                return dev_info.virt_path;
-            }
-        }
-        None
     }
 
     async fn try_create_device(
@@ -277,7 +262,7 @@ impl DeviceManagerInner for BlockDeviceManager {
             ..Default::default()
         };
 
-        match self.get_block_driver().await {
+        match self.block_driver.as_str() {
             VIRTIO_MMIO => {
                 if let Some(path) = base_info.virt_path {
                     device.id = device_id;
@@ -294,8 +279,16 @@ impl DeviceManagerInner for BlockDeviceManager {
             }
             _ => (),
         }
-
         Ok(device)
+    }
+
+    async fn get_device_guest_path(&self, id: &str) -> Option<String> {
+        if let Some(device) = self.devices.get(id) {
+            if let Ok(dev_info) = device.lock().await.get_device_info().await {
+                return dev_info.virt_path;
+            }
+        }
+        None
     }
 }
 

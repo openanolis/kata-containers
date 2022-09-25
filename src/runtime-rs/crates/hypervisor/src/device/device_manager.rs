@@ -15,16 +15,17 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
 pub type ArcBoxDevice = Arc<Mutex<Box<dyn Device>>>;
 const SYS_DEV_PREFIX: &str = "/sys/dev";
-
 /// VirtioMmio indicates block driver is virtio-mmio based
 pub const VIRTIO_MMIO: &str = "virtio-mmio";
 pub const VIRTIO_BLOCK: &str = "virtio-blk";
 pub const VFIO: &str = "vfio";
-
+pub const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
+pub const KATA_BLK_DEV_TYPE: &str = "blk";
 #[derive(Clone)]
 pub struct DeviceManager {
     pub dev_managers: HashMap<DeviceType, Arc<RwLock<Box<dyn DeviceManagerInner + Send + Sync>>>>,
     hypervisor: Arc<dyn Hypervisor>,
+    pub block_driver: String,
 }
 
 impl DeviceManager {
@@ -42,6 +43,7 @@ impl DeviceManager {
         Ok(DeviceManager {
             dev_managers: managers,
             hypervisor,
+            block_driver,
         })
     }
 
@@ -60,6 +62,17 @@ impl DeviceManager {
             return Ok(device_id);
         }
         Err(anyhow!("invalid device class {:?}", class))
+    }
+
+    pub fn get_block_driver(&self) -> String {
+        self.block_driver.clone()
+    }
+
+    pub async fn get_device_guest_path(&self, id: &str, class: &DeviceType) -> Option<String> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            return dev_manager.read().await.get_device_guest_path(id).await;
+        }
+        None
     }
 }
 

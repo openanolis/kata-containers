@@ -63,4 +63,7 @@ impl DeviceManagerInner for VfioDeviceManager {
     async fn generate_agent_device(&self, _device_id: String) -> Result<AgentDevice> {
         todo!()
     }
+    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
+        todo!()
+    }
 }

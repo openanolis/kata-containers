@@ -4,12 +4,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use std::sync::Arc;
+
 use agent::Storage;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use kata_sys_util::mount::{umount_timeout, Mounter};
 use kata_types::mount::Mount;
-use std::sync::Arc;
 
 use super::{Rootfs, ROOTFS};
 use crate::share_fs::{ShareFs, ShareFsRootfsConfig};
@@ -70,8 +71,12 @@ impl Rootfs for ShareFsRootfs {
         todo!()
     }
 
-    async fn get_storage(&self) -> Option<Storage> {
-        None
+    async fn get_storage(&self) -> Result<Option<Storage>> {
+        Ok(None)
+    }
+
+    async fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
     }
 
     async fn cleanup(&self) -> Result<()> {

@@ -39,4 +39,6 @@ pub trait DeviceManagerInner {
     async fn try_remove_device(&mut self, device_id: &str, h: &dyn Hypervisor) -> Result<()>;
     // generate agent device
     async fn generate_agent_device(&self, device_id: String) -> Result<AgentDevice>;
+    // get the device guest path
+    async fn get_device_guest_path(&self, id: &str) -> Option<String>;
 }
