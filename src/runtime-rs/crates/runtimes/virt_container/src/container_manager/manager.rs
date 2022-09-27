@@ -164,6 +164,7 @@ impl ContainerManager for VirtContainerManager {
         Ok(())
     }
 
+    #[instrument]
     async fn wait_process(&self, process: &ContainerProcess) -> Result<ProcessExitStatus> {
         let logger = logger_with_process(process);
 
@@ -278,18 +279,22 @@ impl ContainerManager for VirtContainerManager {
         c.update(&resource).await.context("stats")
     }
 
+    #[instrument]
     async fn pid(&self) -> Result<PID> {
         Ok(PID { pid: self.pid })
     }
 
+    #[instrument]
     async fn connect_container(&self, _id: &ContainerID) -> Result<PID> {
         Ok(PID { pid: self.pid })
     }
 
+    #[instrument]
     async fn need_shutdown_sandbox(&self, req: &ShutdownRequest) -> bool {
         req.is_now || self.containers.read().await.is_empty() || self.sid == req.container_id
     }
 
+    #[instrument]
     async fn is_sandbox_container(&self, process: &ContainerProcess) -> bool {
         process.process_type == ProcessType::Container
             && process.container_id.container_id == self.sid

@@ -9,8 +9,9 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context, Result};
 
 use crate::{
-    shim_mgmt::server::MgmtServer, static_resource::StaticResourceManager,
-    tracer::trace_extract_root_ctx,
+    shim_mgmt::server::MgmtServer,
+    static_resource::StaticResourceManager,
+    tracer::{trace_enter_root, trace_exit_root, trace_setup, ROOTSPAN},
 };
 use common::{
     message::Message,
@@ -22,8 +23,7 @@ use kata_types::{annotations::Annotation, config::TomlConfig};
 use linux_container::LinuxContainer;
 use persist::sandbox_persist::Persist;
 use tokio::sync::{mpsc::Sender, RwLock};
-use tracing::{instrument, span};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing::instrument;
 use virt_container::sandbox::SandboxRestoreArgs;
 use virt_container::sandbox::VirtSandbox;
 use virt_container::sandbox_persist::{SandboxState, SandboxTYPE};
@@ -121,6 +121,12 @@ impl RuntimeHandlerManagerInner {
         };
 
         let config = load_config(spec).context("load config")?;
+        if config.runtime.enable_tracing {
+            info!(sl!(), "enable tracing");
+            trace_setup(&self.id)?;
+            trace_enter_root();
+        }
+
         self.init_runtime_handler(netns, Arc::new(config))
             .await
             .context("init runtime handler")?;
@@ -211,40 +217,34 @@ impl RuntimeHandlerManager {
         inner.try_init(spec).await
     }
 
+    #[instrument(parent = &*(ROOTSPAN))]
     pub async fn handler_message(&self, req: Request) -> Result<Response> {
-        {
-            // ttrpc lands here, setup a separate span for each call, hung below root span
-            let span = span!(tracing::Level::TRACE, "handler_message");
-            span.set_parent(trace_extract_root_ctx(&span.context()));
-            let _span_guard = span.enter();
+        if let Request::CreateContainer(req) = req {
+            // get oci spec
+            let bundler_path = format!("{}/{}", req.bundle, oci::OCI_SPEC_CONFIG_FILE_NAME);
+            let spec = oci::Spec::load(&bundler_path).context("load spec")?;
 
-            if let Request::CreateContainer(req) = req {
-                // get oci spec
-                let bundler_path = format!("{}/{}", req.bundle, oci::OCI_SPEC_CONFIG_FILE_NAME);
-                let spec = oci::Spec::load(&bundler_path).context("load spec")?;
+            self.try_init_runtime_instance(&spec)
+                .await
+                .context("try init runtime instance")?;
+            let instance = self
+                .get_runtime_instance()
+                .await
+                .context("get runtime instance")?;
 
-                self.try_init_runtime_instance(&spec)
-                    .await
-                    .context("try init runtime instance")?;
-                let instance = self
-                    .get_runtime_instance()
-                    .await
-                    .context("get runtime instance")?;
+            let shim_pid = instance
+                .container_manager
+                .create_container(req, spec)
+                .await
+                .context("create container")?;
 
-                let shim_pid = instance
-                    .container_manager
-                    .create_container(req, spec)
-                    .await
-                    .context("create container")?;
-
-                Ok(Response::CreateContainer(shim_pid))
-            } else {
-                self.handler_request(req).await.context("handler request")
-            }
+            Ok(Response::CreateContainer(shim_pid))
+        } else {
+            self.handler_request(req).await.context("handler request")
         }
     }
 
-    #[instrument(name = "handler_request")]
+    #[instrument(parent = &(*ROOTSPAN))]
     pub async fn handler_request(&self, req: Request) -> Result<Response> {
         let instance = self
             .get_runtime_instance()
@@ -274,6 +274,7 @@ impl RuntimeHandlerManager {
             Request::ShutdownContainer(req) => {
                 if cm.need_shutdown_sandbox(&req).await {
                     sandbox.shutdown().await.context("do shutdown")?;
+                    trace_exit_root();
                 }
                 Ok(Response::ShutdownContainer)
             }
@@ -341,6 +342,7 @@ impl RuntimeHandlerManager {
 /// 2. shimv2 create task option
 /// TODO: https://github.com/kata-containers/kata-containers/issues/3961
 /// 3. environment
+#[instrument]
 fn load_config(spec: &oci::Spec) -> Result<TomlConfig> {
     const KATA_CONF_FILE: &str = "KATA_CONF_FILE";
     let annotation = Annotation::new(spec.annotations.clone());

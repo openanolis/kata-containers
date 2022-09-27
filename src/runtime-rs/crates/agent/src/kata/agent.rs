@@ -6,8 +6,8 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ttrpc::context as ttrpc_ctx;
 use tracing::instrument;
+use ttrpc::context as ttrpc_ctx;
 
 use kata_types::config::Agent as AgentConfig;
 
@@ -75,6 +75,7 @@ macro_rules! impl_agent {
     ($($name: tt | $req: ty | $resp: ty | $new_timeout: expr),*) => {
         #[async_trait]
         impl Agent for KataAgent {
+            #[instrument(skip(req))]
             $(async fn $name(&self, req: $req) -> Result<$resp> {
                 let r = req.into();
                 let (mut client, mut timeout, _) = self.get_agent_client().await.context("get client")?;

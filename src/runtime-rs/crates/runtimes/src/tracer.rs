@@ -4,87 +4,115 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::collections::HashMap;
+use std::cmp::min;
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
 use opentelemetry::global;
-use opentelemetry::sdk::propagation::TraceContextPropagator;
-use opentelemetry::Context;
+use tracing::span;
+use tracing::subscriber::NoSubscriber;
+use tracing::Span;
+use tracing::Subscriber;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
 
 lazy_static! {
-    static ref KATATRACER: Mutex<KataTracer> = Mutex::new(KataTracer::new());
+    /// The static KATATRACER is the variable to provide public functions to outside modules
+    static ref KATATRACER: Arc<Mutex<KataTracer>> = Arc::new(Mutex::new(KataTracer::new()));
+
+    /// The ROOTSPAN is a phantom span that is running by calling [`trace_enter_root`] at the background
+    /// once the configuration is read and config.runtime.enable_tracing is enabled
+    /// The ROOTSPAN exits by calling [`trace_exit_root`] on shutdown request sent from containerd
+    pub static ref ROOTSPAN: Span = span!(tracing::Level::TRACE, "root-span");
 }
 
-/// The tracer wrapper for kata-containers
-#[derive(Default, Debug)]
-pub struct KataTracer {
-    /// The root span inject its span context into this map, this is an object
-    /// that satifies both injector trait and extractor trait, which are used
-    /// by TextMapPropagator
-    ///
-    /// When any other span needs to be hung below the root span, it use this as
-    /// extractor to acquire the root span's context and set it as parent
-    root_ctx_obj: HashMap<String, String>,
+/// The tracer wrapper for kata-containers, this contains the global static variable
+/// the tracing utilities might need
+/// The fields and member methods should ALWAYS be PRIVATE and be exposed in a safe
+/// way to other modules
+unsafe impl Send for KataTracer {}
+unsafe impl Sync for KataTracer {}
+struct KataTracer {
+    subscriber: Arc<dyn Subscriber + Send + Sync>,
+    enabled: bool,
 }
 
 impl KataTracer {
-    /// Constructor
-    pub fn new() -> Self {
+    /// Constructor of KataTracer, this is a dummy implementation for static initialization
+    fn new() -> Self {
         Self {
-            root_ctx_obj: HashMap::new(),
+            subscriber: Arc::new(NoSubscriber::default()),
+            enabled: false,
         }
     }
 
-    /// Inject the context into the root_ctx_obj, which can be extracted later from
-    /// another thread/function.
-    /// Currently, this is used to store root span's context
-    pub fn inject_ctx(&mut self, ctx: &Context) {
-        global::get_text_map_propagator(|prop| prop.inject_context(ctx, &mut self.root_ctx_obj));
+    /// Set the tracing enabled flag
+    fn enable(&mut self) {
+        self.enabled = true;
     }
 
-    /// Extract the context, if the extraction failed, return a copy of the parameter `ctx`
-    /// If the extraction succeeded, the root_ctx_obj's corresponding context will be returned
-    /// Currently, this is used to extract root span's context
-    pub fn extract_with_ctx(&self, ctx: &Context) -> Context {
-        global::get_text_map_propagator(|prop| prop.extract_with_context(ctx, &self.root_ctx_obj))
+    /// Return whether the tracing is enabled, enabled by [`trace_setup`]
+    fn enabled(&self) -> bool {
+        self.enabled
     }
 }
 
-/// Call once before the root span is generated (in main.rs), do
-/// all the setup works
-pub fn trace_setup() -> Result<()> {
-    global::set_text_map_propagator(TraceContextPropagator::new());
+/// Call when the tracing is enabled (set in toml configuration file)
+/// This setup the subscriber, which maintains the span's information, to global and
+/// inside KATATRACER.
+/// 
+/// Note that the span will be noop(not collected) if a valid subscriber is set
+pub fn trace_setup(sid: &str) -> Result<()> {
+    let mut kt = KATATRACER.lock().unwrap();
+
+    // enable tracing
+    kt.enable();
+
+    // derive a subscriber to collect span info
     let tracer = opentelemetry_jaeger::new_agent_pipeline()
-        .with_service_name("kata-trace")
+        .with_service_name(format!("test-{}", &sid[0..min(8, sid.len())]))
         .install_simple()?;
     let layer = tracing_opentelemetry::layer().with_tracer(tracer);
-    let subscriber = Registry::default().with(layer);
-    tracing::subscriber::set_global_default(subscriber)?;
+    let sub = Registry::default().with(layer);
 
-    info!(sl!(), "setup tracing");
+    // we use Arc to let global subscriber and katatracer to SHARE the SAME subscriber
+    // this is for record the global subscriber into a global variable KATATRACER for more usages
+    let subscriber = Arc::new(sub);
+    tracing::subscriber::set_global_default(subscriber.clone())?;
+    kt.subscriber = subscriber;
+
     Ok(())
 }
 
 /// Global function to shutdown the tracer and emit the span info to jaeger agent
-///
-/// The tracing information is only partially update to jaeger agent if this function
-/// before this function is called
+/// The tracing information is only partially update to jaeger agent before this function is called
 pub fn trace_end() {
-    global::shutdown_tracer_provider();
+    if KATATRACER.lock().unwrap().enabled() {
+        global::shutdown_tracer_provider();
+    }
 }
 
-/// Wrapper of KataTracer::inject_ctx
-pub fn trace_inject(ctx: &Context) {
-    let mut tracer = KATATRACER.lock().unwrap();
-    tracer.inject_ctx(ctx)
+pub fn trace_enter_root() {
+    enter(&ROOTSPAN);
 }
 
-/// Wrapper of KataTracer::extract_with_ctx
-pub fn trace_extract_root_ctx(ctx: &Context) -> Context {
-    let tracer = KATATRACER.lock().unwrap();
-    tracer.extract_with_ctx(ctx)
+pub fn trace_exit_root() {
+    exit(&ROOTSPAN);
+}
+
+/// let the subscriber enter the span, this has to be called in pair with exit(span)
+/// This function allows **cross function span** to run without span guard
+fn enter(span: &Span) {
+    let kt = KATATRACER.lock().unwrap();
+    let id: Option<span::Id> = span.into();
+    kt.subscriber.enter(&id.unwrap());
+}
+
+/// let the subscriber exit the span, this has to be called in pair to enter(span)
+fn exit(span: &Span) {
+    let kt = KATATRACER.lock().unwrap();
+    let id: Option<span::Id> = span.into();
+    kt.subscriber.exit(&id.unwrap());
 }

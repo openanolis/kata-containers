@@ -14,10 +14,9 @@ use nix::{
     mount::{mount, MsFlags},
     sched::{self, CloneFlags},
 };
-use runtimes::tracer::{trace_end, trace_inject, trace_setup};
+use runtimes::tracer::trace_end;
 use shim::{config, Args, Error, ShimExecutor};
-use tracing::span;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
+// use tracing::span;
 
 // default tokio runtime worker threads
 const DEFAULT_TOKIO_RUNTIME_WORKER_THREADS: usize = 2;
@@ -152,22 +151,13 @@ fn real_main() -> Result<()> {
             trace_end();
         }
         Action::Run(args) => {
-            // XXX: start tracing here
-            // XXX: every functions with attribute [instrument] should be AFTER THIS
-            trace_setup()?;
-            {
-                let root_span = span!(tracing::Level::TRACE, "root-span");
-                let _span_guard = root_span.enter();
-                trace_inject(&root_span.context());
+            // set mnt namespace
+            // need setup before other async call
+            setup_mnt().context("setup mnt")?;
 
-                // set mnt namespace
-                // need setup before other async call
-                setup_mnt().context("setup mnt")?;
-
-                let mut shim = ShimExecutor::new(args);
-                let rt = get_tokio_runtime().context("get tokio runtime")?;
-                rt.block_on(shim.run())?;
-            }
+            let mut shim = ShimExecutor::new(args);
+            let rt = get_tokio_runtime().context("get tokio runtime")?;
+            rt.block_on(shim.run())?;
         }
         Action::Help => show_help(&args[0]),
         Action::Version => show_version(None),
