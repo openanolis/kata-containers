@@ -56,7 +56,6 @@ dependencies = [
  "slog",
  "slog-scope",
  "tokio",
- "tracing",
  "ttrpc",
  "url",
 ]
@@ -80,25 +79,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08f9b8508dccb7687a1d6c4ce66b2b0ecef467c94667de27d8d7fe1f8d2a9cdc"
-
-[[package]]
-name = "arc-swap"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dabe5a181f83789739c194cbe5a897dde195078fac08568d09221fd6137a7ba8"
 
 [[package]]
 name = "arc-swap"
@@ -282,23 +266,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "constant_time_eq",
  "digest 0.10.3",
-]
-
-[[package]]
-name = "blobfs"
-version = "0.1.0"
-source = "git+https://github.com/dragonflyoss/image-service.git?rev=316380792092f73c99f832c4cb44ef4319d6f76b#316380792092f73c99f832c4cb44ef4319d6f76b"
-dependencies = [
- "fuse-backend-rs",
- "libc",
- "log",
- "nydus-error",
- "rafs",
- "serde",
- "serde_json",
- "serde_with",
- "storage",
- "vm-memory",
 ]
 
 [[package]]
@@ -490,18 +457,18 @@ dependencies = [
 
 [[package]]
 name = "core-foundation-sys"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "065a5d7ffdcbc8fa145d6f0746f3555025b9097a9e9cda59f7467abae670c78d"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "cpufeatures"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28d997bd5e24a5928dd43e46dc529867e207907fe0b239c3477d924f7f2ca320"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "cpuid-bool"
@@ -595,22 +562,20 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.2.0"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
+checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
 dependencies = [
  "cfg-if 1.0.0",
  "num_cpus",
- "parking_lot 0.12.1",
 ]
 
 [[package]]
 name = "dbs-address-space"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9acd47f8b1ad8a6a62450d2d83ced5452dbf9549e2b98709d945554b22a45ed7"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
- "arc-swap 1.5.0",
+ "arc-swap",
  "libc",
  "nix 0.23.1",
  "thiserror",
@@ -630,7 +595,7 @@ dependencies = [
 [[package]]
 name = "dbs-arch"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "kvm-bindings",
  "kvm-ioctls",
@@ -643,7 +608,7 @@ dependencies = [
 [[package]]
 name = "dbs-boot"
 version = "0.2.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "dbs-arch",
  "kvm-bindings",
@@ -658,7 +623,7 @@ dependencies = [
 [[package]]
 name = "dbs-device"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "thiserror",
 ]
@@ -666,7 +631,7 @@ dependencies = [
 [[package]]
 name = "dbs-interrupt"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "dbs-device",
  "kvm-bindings",
@@ -678,7 +643,7 @@ dependencies = [
 [[package]]
 name = "dbs-legacy-devices"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "dbs-device",
  "dbs-utils",
@@ -690,9 +655,9 @@ dependencies = [
 
 [[package]]
 name = "dbs-uhttp"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b773f7f1b9088438e9746890c7c0836b133b07935812867a33e06e81c92c0cdc"
+checksum = "6fd0544fe7ba81fa8deb8800843836d279a81b051e2e8ab046fe1b0cb096c1cc"
 dependencies = [
  "libc",
  "mio",
@@ -701,7 +666,7 @@ dependencies = [
 [[package]]
 name = "dbs-utils"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
  "anyhow",
  "event-manager",
@@ -716,9 +681,8 @@ dependencies = [
 [[package]]
 name = "dbs-virtio-devices"
 version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"
+source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323#c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323"
 dependencies = [
- "blobfs",
  "byteorder",
  "caps",
  "dbs-device",
@@ -732,7 +696,8 @@ dependencies = [
  "libc",
  "log",
  "nix 0.23.1",
- "rafs",
+ "nydus-blobfs",
+ "nydus-rafs",
  "rlimit",
  "serde",
  "serde_json",
@@ -776,20 +741,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "diskarbitration-sys"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f82432ae94d42f160b6e17389d6e1c1eee29827b99ad32d35a0a96bb98bedb5"
-dependencies = [
- "core-foundation-sys 0.2.3",
- "libc",
-]
-
-[[package]]
 name = "dragonball"
 version = "0.1.0"
 dependencies = [
- "arc-swap 1.5.0",
+ "arc-swap",
  "bytes 1.1.0",
  "dbs-address-space",
  "dbs-allocator",
@@ -932,20 +887,24 @@ checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 
 [[package]]
 name = "fuse-backend-rs"
-version = "0.9.0"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a96ec48cd39ee2504eaa4a31b88262b7d13151a4da0b53af8fd212c7c9ffa5d"
+checksum = "994a3bfb694ee52bf8f3bca80d784b723f150810998219337e429cc5dbe92717"
 dependencies = [
- "arc-swap 1.5.0",
+ "arc-swap",
  "bitflags",
  "caps",
- "core-foundation-sys 0.2.3",
- "diskarbitration-sys",
+ "core-foundation-sys",
+ "io-uring",
  "lazy_static",
  "libc",
  "log",
  "mio",
- "nix 0.23.1",
+ "nix 0.24.2",
+ "scoped-tls",
+ "slab",
+ "socket2",
+ "tokio-uring",
  "virtio-queue",
  "vm-memory",
  "vmm-sys-util",
@@ -1134,16 +1093,16 @@ dependencies = [
 
 [[package]]
 name = "governor"
-version = "0.4.2"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19775995ee20209163239355bc3ad2f33f83da35d9ef72dea26e5af753552c87"
+checksum = "7df0ee4b237afb71e99f7e2fbd840ffec2d6c4bb569f69b2af18aa1f63077d38"
 dependencies = [
  "dashmap",
  "futures 0.3.21",
  "futures-timer",
  "no-std-compat",
  "nonzero_ext",
- "parking_lot 0.12.1",
+ "parking_lot 0.11.2",
  "quanta",
  "rand 0.8.5",
  "smallvec",
@@ -1277,7 +1236,6 @@ dependencies = [
  "slog-scope",
  "thiserror",
  "tokio",
- "tracing",
  "vmm-sys-util",
 ]
 
@@ -1288,7 +1246,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad2bfd338099682614d3ee3fe0cd72e0b6a41ca6a87f6a74a3bd593c91650501"
 dependencies = [
  "android_system_properties",
- "core-foundation-sys 0.8.3",
+ "core-foundation-sys",
  "js-sys",
  "wasm-bindgen",
  "winapi",
@@ -1329,12 +1287,6 @@ checksum = "7a5bbe824c507c5da5956355e86a746d82e0e1464f65d862cc5e71da70e94b2c"
 dependencies = [
  "cfg-if 1.0.0",
 ]
-
-[[package]]
-name = "integer-encoding"
-version = "3.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "io-lifetimes"
@@ -1478,9 +1430,9 @@ checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
 name = "linux-loader"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a5e77493808403a6bd56a301a64ea6b9342e36ea845044bf0dfdf56fe52fa08"
+checksum = "62a2f912deca034ec34b0a43a390059ea98daac40e440ebe8bea88f3315fe168"
 dependencies = [
  "vm-memory",
 ]
@@ -1742,9 +1694,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "nydus-api"
+version = "0.1.1"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
+dependencies = [
+ "dbs-uhttp",
+ "http",
+ "lazy_static",
+ "libc",
+ "log",
+ "mio",
+ "nydus-error",
+ "nydus-utils",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "url",
+ "vmm-sys-util",
+]
+
+[[package]]
+name = "nydus-blobfs"
+version = "0.1.0"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
+dependencies = [
+ "fuse-backend-rs",
+ "libc",
+ "log",
+ "nydus-error",
+ "nydus-rafs",
+ "nydus-storage",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "vm-memory",
+]
+
+[[package]]
 name = "nydus-error"
-version = "0.2.0"
-source = "git+https://github.com/dragonflyoss/image-service.git?rev=316380792092f73c99f832c4cb44ef4319d6f76b#316380792092f73c99f832c4cb44ef4319d6f76b"
+version = "0.2.1"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
 dependencies = [
  "backtrace",
  "httpdate",
@@ -1755,21 +1744,79 @@ dependencies = [
 ]
 
 [[package]]
-name = "nydus-utils"
+name = "nydus-rafs"
 version = "0.1.0"
-source = "git+https://github.com/dragonflyoss/image-service.git?rev=316380792092f73c99f832c4cb44ef4319d6f76b#316380792092f73c99f832c4cb44ef4319d6f76b"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
 dependencies = [
+ "anyhow",
+ "arc-swap",
+ "bitflags",
  "blake3",
  "flate2",
  "fuse-backend-rs",
+ "futures 0.3.21",
  "lazy_static",
  "libc",
  "log",
  "lz4-sys",
+ "nix 0.24.2",
+ "nydus-api",
+ "nydus-error",
+ "nydus-storage",
+ "nydus-utils",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2 0.10.5",
+ "spmc",
+ "vm-memory",
+]
+
+[[package]]
+name = "nydus-storage"
+version = "0.5.0"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "bitflags",
+ "dbs-uhttp",
+ "fuse-backend-rs",
+ "futures 0.3.21",
+ "governor",
+ "lazy_static",
+ "libc",
+ "log",
+ "nix 0.24.2",
+ "nydus-api",
+ "nydus-error",
+ "nydus-utils",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2 0.10.5",
+ "tokio",
+ "vm-memory",
+ "vmm-sys-util",
+]
+
+[[package]]
+name = "nydus-utils"
+version = "0.3.1"
+source = "git+https://github.com/dragonflyoss/image-service.git?rev=e429be3e8623d47db0f97186f761aeda2983c6f4#e429be3e8623d47db0f97186f761aeda2983c6f4"
+dependencies = [
+ "blake3",
+ "flate2",
+ "lazy_static",
+ "libc",
+ "log",
+ "lz4-sys",
+ "nix 0.24.2",
  "nydus-error",
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.10.5",
+ "tokio",
  "zstd",
 ]
 
@@ -1794,97 +1841,15 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
 
 [[package]]
 name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
-
-[[package]]
-name = "opentelemetry"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69d6c3d7288a106c0a363e4b0e8d308058d56902adefb16f4936f417ffef086e"
-dependencies = [
- "opentelemetry_api",
- "opentelemetry_sdk",
-]
-
-[[package]]
-name = "opentelemetry-jaeger"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e785d273968748578931e4dc3b4f5ec86b26e09d9e0d66b55adda7fce742f7a"
-dependencies = [
- "async-trait",
- "futures 0.3.21",
- "futures-executor",
- "once_cell",
- "opentelemetry",
- "opentelemetry-semantic-conventions",
- "thiserror",
- "thrift",
-]
-
-[[package]]
-name = "opentelemetry-semantic-conventions"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b02e0230abb0ab6636d18e2ba8fa02903ea63772281340ccac18e0af3ec9eeb"
-dependencies = [
- "opentelemetry",
-]
-
-[[package]]
-name = "opentelemetry_api"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c24f96e21e7acc813c7a8394ee94978929db2bcc46cf6b5014fc612bf7760c22"
-dependencies = [
- "fnv",
- "futures-channel",
- "futures-util",
- "indexmap",
- "js-sys",
- "once_cell",
- "pin-project-lite",
- "thiserror",
-]
-
-[[package]]
-name = "opentelemetry_sdk"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ca41c4933371b61c2a2f214bf16931499af4ec90543604ec828f7a625c09113"
-dependencies = [
- "async-trait",
- "crossbeam-channel",
- "dashmap",
- "fnv",
- "futures-channel",
- "futures-executor",
- "futures-util",
- "once_cell",
- "opentelemetry_api",
- "percent-encoding",
- "rand 0.8.5",
- "thiserror",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "ordered-float"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3305af35278dd29f46fcdd139e0b1fbfae2153f0e5928b39b035542dd31e37b7"
-dependencies = [
- "num-traits",
-]
 
 [[package]]
 name = "parking"
@@ -1961,7 +1926,6 @@ dependencies = [
  "kata-sys-util",
  "kata-types",
  "libc",
- "rustc-serialize",
  "safe-path",
  "serde",
  "serde_json",
@@ -2155,34 +2119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rafs"
-version = "0.1.0"
-source = "git+https://github.com/dragonflyoss/image-service.git?rev=316380792092f73c99f832c4cb44ef4319d6f76b#316380792092f73c99f832c4cb44ef4319d6f76b"
-dependencies = [
- "anyhow",
- "arc-swap 0.4.8",
- "bitflags",
- "blake3",
- "flate2",
- "fuse-backend-rs",
- "futures 0.3.21",
- "lazy_static",
- "libc",
- "log",
- "lz4-sys",
- "nix 0.23.1",
- "nydus-error",
- "nydus-utils",
- "serde",
- "serde_json",
- "serde_with",
- "sha2",
- "spmc",
- "storage",
- "vm-memory",
-]
-
-[[package]]
 name = "rand"
 version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2372,8 +2308,8 @@ dependencies = [
  "serde",
  "slog",
  "slog-scope",
+ "test-utils",
  "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -2409,20 +2345,16 @@ dependencies = [
  "common",
  "hyper",
  "hyperlocal",
+ "hypervisor",
  "kata-types",
  "lazy_static",
  "linux_container",
  "logging",
  "oci",
- "opentelemetry",
- "opentelemetry-jaeger",
  "persist",
  "slog",
  "slog-scope",
  "tokio",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
  "virt_container",
  "wasm_container",
 ]
@@ -2432,12 +2364,6 @@ name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
-
-[[package]]
-name = "rustc-serialize"
-version = "0.3.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 
 [[package]]
 name = "rustix"
@@ -2471,6 +2397,12 @@ version = "0.1.0"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "scoped-tls"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea6a9290e3c9cf0f18145ef7ffa62d68ee0bf5fcd651017e586dc7fd5da448c2"
 
 [[package]]
 name = "scopeguard"
@@ -2576,7 +2508,6 @@ dependencies = [
  "slog",
  "slog-scope",
  "tokio",
- "tracing",
  "ttrpc",
 ]
 
@@ -2594,12 +2525,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "sharded-slab"
-version = "0.1.4"
+name = "sha2"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
+checksum = "cf9db03534dff993187064c4e0c05a5708d2a9728ace9a8959b77bedf415dac5"
 dependencies = [
- "lazy_static",
+ "cfg-if 1.0.0",
+ "cpufeatures",
+ "digest 0.10.3",
 ]
 
 [[package]]
@@ -2619,10 +2552,9 @@ dependencies = [
  "oci",
  "protobuf",
  "rand 0.8.5",
- "runtimes",
  "serial_test",
  "service",
- "sha2",
+ "sha2 0.9.3",
  "slog",
  "slog-async",
  "slog-scope",
@@ -2631,8 +2563,6 @@ dependencies = [
  "tests_utils",
  "thiserror",
  "tokio",
- "tracing",
- "tracing-opentelemetry",
  "unix_socket2",
 ]
 
@@ -2687,7 +2617,7 @@ version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f95a4b4c3274cd2869549da82b57ccc930859bdbf5bcea0424bc5f140b3c786"
 dependencies = [
- "arc-swap 1.5.0",
+ "arc-swap",
  "lazy_static",
  "slog",
 ]
@@ -2724,34 +2654,6 @@ name = "spmc"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02a8428da277a8e3a15271d79943e80ccc2ef254e78813a166a08d65e4c3ece5"
-
-[[package]]
-name = "storage"
-version = "0.5.0"
-source = "git+https://github.com/dragonflyoss/image-service.git?rev=316380792092f73c99f832c4cb44ef4319d6f76b#316380792092f73c99f832c4cb44ef4319d6f76b"
-dependencies = [
- "anyhow",
- "arc-swap 0.4.8",
- "bitflags",
- "dbs-uhttp",
- "fuse-backend-rs",
- "futures 0.3.21",
- "governor",
- "lazy_static",
- "libc",
- "log",
- "nix 0.23.1",
- "nydus-error",
- "nydus-utils",
- "serde",
- "serde_json",
- "serde_with",
- "sha2",
- "spmc",
- "tokio",
- "vm-memory",
- "vmm-sys-util",
-]
 
 [[package]]
 name = "strsim"
@@ -2829,6 +2731,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-utils"
+version = "0.1.0"
+dependencies = [
+ "nix 0.24.2",
+]
+
+[[package]]
 name = "tests_utils"
 version = "0.1.0"
 dependencies = [
@@ -2871,19 +2780,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
-]
-
-[[package]]
-name = "thrift"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09678c4cdbb4eed72e18b7c2af1329c69825ed16fcbac62d083fc3e2b0590ff0"
-dependencies = [
- "byteorder",
- "integer-encoding",
- "log",
- "ordered-float",
- "threadpool",
 ]
 
 [[package]]
@@ -2963,13 +2859,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-stream"
-version = "0.1.10"
+name = "tokio-uring"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6edf2d6bc038a43d31353570e27270603f4648d18f5ed10c0e179abe43255af"
+checksum = "d3ad494f39874984d990ade7f6319dafbcd3301ff0b1841f8a55a1ebb3e742c8"
 dependencies = [
- "futures-core",
- "pin-project-lite",
+ "io-uring",
+ "libc",
+ "scoped-tls",
+ "slab",
+ "socket2",
  "tokio",
 ]
 
@@ -3012,74 +2911,22 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tracing"
-version = "0.1.36"
+version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fce9567bd60a67d08a16488756721ba392f24f29006402881e43b19aac64307"
+checksum = "a400e31aa60b9d44a52a8ee0343b5b18566b03a8321e0d321f695cf56e940160"
 dependencies = [
  "cfg-if 1.0.0",
  "pin-project-lite",
- "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-attributes"
-version = "0.1.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c75893af559bc8e10716548bdef5cb2b983f8e637db9d0e15126b61b484ee2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
 name = "tracing-core"
-version = "0.1.29"
+version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeea4303076558a00714b823f9ad67d58a3bbda1df83d8827d21193156e22f7"
+checksum = "7b7358be39f2f274f322d2aaed611acc57f382e8eb1e5b48cb9ae30933495ce7"
 dependencies = [
  "once_cell",
- "valuable",
-]
-
-[[package]]
-name = "tracing-log"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78ddad33d2d10b1ed7eb9d1f518a5674713876e97e5bb9b7345a7984fbb4f922"
-dependencies = [
- "lazy_static",
- "log",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-opentelemetry"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21ebb87a95ea13271332df069020513ab70bdb5637ca42d6e492dc3bbbad48de"
-dependencies = [
- "once_cell",
- "opentelemetry",
- "tracing",
- "tracing-core",
- "tracing-log",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60db860322da191b40952ad9affe65ea23e7dd6a5c442c2c42865810c6ab8e6b"
-dependencies = [
- "ansi_term",
- "sharded-slab",
- "smallvec",
- "thread_local",
- "tracing-core",
- "tracing-log",
 ]
 
 [[package]]
@@ -3198,12 +3045,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "valuable"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
-
-[[package]]
 name = "value-bag"
 version = "1.0.0-alpha.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3249,7 +3090,6 @@ dependencies = [
  "slog-scope",
  "tokio",
  "toml 0.4.10",
- "tracing",
  "url",
 ]
 
@@ -3261,9 +3101,9 @@ checksum = "3ff512178285488516ed85f15b5d0113a7cdb89e9e8a760b269ae4f02b84bd6b"
 
 [[package]]
 name = "virtio-queue"
-version = "0.1.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f90da9e627f6aaf667cc7b6548a28be332d3e1f058f4ceeb46ab6bcee5c4b74d"
+checksum = "519c0a333c871650269cba303bc108075d52a0c0d64f9b91fae61829b53725af"
 dependencies = [
  "log",
  "vm-memory",
@@ -3278,11 +3118,11 @@ checksum = "f43fb5a6bd1a7d423ad72802801036719b7546cf847a103f8fe4575f5b0d45a6"
 
 [[package]]
 name = "vm-memory"
-version = "0.7.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339d4349c126fdcd87e034631d7274370cf19eb0e87b33166bcd956589fc72c5"
+checksum = "583f213899e8a5eea23d9c507252d4bed5bc88f0ecbe0783262f80034630744b"
 dependencies = [
- "arc-swap 1.5.0",
+ "arc-swap",
  "libc",
  "winapi",
 ]
@@ -3295,9 +3135,9 @@ checksum = "a4b5231d334edbc03b22704caa1a022e4c07491d6df736593f26094df8b04a51"
 
 [[package]]
 name = "vmm-sys-util"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "733537bded03aaa93543f785ae997727b30d1d9f4a03b7861d23290474242e11"
+checksum = "08604d7be03eb26e33b3cee3ed4aef2bf550b305d1cca60e84da5d28d3790b62"
 dependencies = [
  "bitflags",
  "libc",
@@ -3547,8 +3387,3 @@ dependencies = [
  "cc",
  "libc",
 ]
-
-[[patch.unused]]
-name = "dbs-upcall"
-version = "0.1.0"
-source = "git+https://github.com/openanolis/dragonball-sandbox.git?rev=7a8e832b53d66994d6a16f0513d69f540583dcd0#7a8e832b53d66994d6a16f0513d69f540583dcd0"

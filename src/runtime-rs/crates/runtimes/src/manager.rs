@@ -121,9 +121,17 @@ impl RuntimeHandlerManagerInner {
         };
 
         let config = load_config(spec).context("load config")?;
-        if config.runtime.enable_tracing {
-            info!(sl!(), "enable tracing");
-            trace_setup(&self.id)?;
+
+        // note that trace_setup() will only be called when enable_tracing is true
+        if config.runtime.enable_tracing
+            && trace_setup(
+                &self.id,
+                &config.runtime.jaeger_endpoint,
+                &config.runtime.jaeger_user,
+                &config.runtime.jaeger_password,
+            )
+            .is_ok()
+        {
             trace_enter_root();
         }
 
@@ -342,7 +350,6 @@ impl RuntimeHandlerManager {
 /// 2. shimv2 create task option
 /// TODO: https://github.com/kata-containers/kata-containers/issues/3961
 /// 3. environment
-#[instrument]
 fn load_config(spec: &oci::Spec) -> Result<TomlConfig> {
     const KATA_CONF_FILE: &str = "KATA_CONF_FILE";
     let annotation = Annotation::new(spec.annotations.clone());
