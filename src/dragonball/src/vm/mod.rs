@@ -4,6 +4,7 @@
 use std::io::{self, Read, Seek, SeekFrom};
 use std::ops::Deref;
 use std::os::unix::io::RawFd;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 
 use dbs_address_space::AddressSpace;
@@ -34,7 +35,7 @@ use crate::error::{LoadInitrdError, Result, StartMicroVmError, StopMicrovmError}
 use crate::event_manager::EventManager;
 use crate::kvm_context::KvmContext;
 use crate::resource_manager::ResourceManager;
-use crate::vcpu::{VcpuManager, VcpuManagerError};
+use crate::vcpu::{VcpuManager, VcpuManagerError, VcpuResizeError, VcpuResizeInfo};
 #[cfg(target_arch = "aarch64")]
 use dbs_arch::gic::Error as GICError;
 
@@ -789,6 +790,30 @@ impl Vm {
         } else {
             Err(StartMicroVmError::UpcallNotReady)
         }
+    }
+
+    /// Resize MicroVM vCPU number
+    #[cfg(feature = "hotplug")]
+    pub fn resize_vcpu(
+        &mut self,
+        config: VcpuResizeInfo,
+        sync_tx: Option<Sender<bool>>,
+    ) -> std::result::Result<(), VcpuResizeError> {
+        if self.upcall_client().is_none() {
+            return Err(VcpuResizeError::UpcallIsMissing);
+        } else if self.is_upcall_client_ready() {
+            if let Some(vcpu_count) = config.vcpu_count {
+                self.vcpu_manager()
+                    .map_err(VcpuResizeError::Vcpu)?
+                    .resize_vcpu(vcpu_count, sync_tx)?;
+
+                self.vm_config.vcpu_count = vcpu_count;
+            }
+        } else {
+            return Err(VcpuResizeError::UpcallNotReady);
+        }
+
+        Ok(())
     }
 
     // We will support hotplug without upcall in future stages.
