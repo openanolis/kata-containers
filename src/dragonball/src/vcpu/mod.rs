@@ -10,7 +10,7 @@ mod vcpu_manager;
 #[cfg(target_arch = "x86_64")]
 use dbs_arch::cpuid::VpmuFeatureLevel;
 
-pub use vcpu_manager::{VcpuManager, VcpuManagerError};
+pub use vcpu_manager::{VcpuManager, VcpuManagerError, VcpuResizeError, VcpuResizeInfo};
 
 /// vcpu config collection
 pub struct VcpuConfig {

@@ -35,6 +35,9 @@ pub use crate::device_manager::virtio_net_dev_mgr::{
 #[cfg(feature = "virtio-vsock")]
 pub use crate::device_manager::vsock_dev_mgr::{VsockDeviceConfigInfo, VsockDeviceError};
 
+#[cfg(feature = "hotplug")]
+pub use crate::vcpu::{VcpuResizeError, VcpuResizeInfo};
+
 use super::*;
 
 /// Wrapper for all errors associated with VMM actions.
@@ -43,6 +46,10 @@ pub enum VmmActionError {
     /// Invalid virtual machine instance ID.
     #[error("the virtual machine instance ID is invalid")]
     InvalidVMID,
+
+    /// VM doesn't exist and can't get VM information.
+    #[error("VM doesn't exist and can't get VM information")]
+    VmNotExist,
 
     /// Failed to hotplug, due to Upcall not ready.
     #[error("Upcall not ready, can't hotplug device.")]
@@ -85,6 +92,11 @@ pub enum VmmActionError {
     /// The action `InsertFsDevice` failed either because of bad user input or an internal error.
     #[error("virtio-fs device: {0}")]
     FsDevice(#[source] FsDeviceError),
+
+    #[cfg(feature = "hotplug")]
+    /// The action `ResizeVcpu` Failed
+    #[error("vcpu resize error : {0}")]
+    ResizeVcpu(#[source] VcpuResizeError),
 }
 
 /// This enum represents the public interface of the VMM. Each action contains various
@@ -156,6 +168,10 @@ pub enum VmmAction {
     #[cfg(feature = "virtio-fs")]
     /// Update fs rate limiter, after microVM start.
     UpdateFsDevice(FsDeviceConfigUpdateInfo),
+
+    #[cfg(feature = "hotplug")]
+    /// Resize Vcpu number in the guest.
+    ResizeVcpu(VcpuResizeInfo),
 }
 
 /// The enum represents the response sent by the VMM in case of success. The response is either
@@ -256,6 +272,8 @@ impl VmmService {
             VmmAction::UpdateFsDevice(fs_update_cfg) => {
                 self.update_fs_rate_limiters(vmm, fs_update_cfg)
             }
+            #[cfg(feature = "hotplug")]
+            VmmAction::ResizeVcpu(vcpu_resize_cfg) => self.resize_vcpu(vmm, vcpu_resize_cfg),
         };
 
         debug!("send vmm response: {:?}", response);
@@ -604,6 +622,32 @@ impl VmmService {
         FsDeviceMgr::update_device_ratelimiters(vm.device_manager_mut(), config)
             .map(|_| VmmData::Empty)
             .map_err(VmmActionError::FsDevice)
+    }
+
+    #[cfg(feature = "hotplug")]
+    fn resize_vcpu(&mut self, vmm: &mut Vmm, config: VcpuResizeInfo) -> VmmRequestResult {
+        if !cfg!(target_arch = "x86_64") {
+            // TODO: Arm need to support vcpu hotplug.
+            warn!("This arch do not support vm resize!");
+            return Ok(VmmData::Empty);
+        }
+
+        let vm = vmm.get_vm_mut().ok_or(VmmActionError::VmNotExist)?;
+
+        if !vm.is_vm_initialized() {
+            return Err(VmmActionError::ResizeVcpu(
+                VcpuResizeError::UpdateNotAllowedPreBoot,
+            ));
+        }
+
+        vm.resize_vcpu(config, None).map_err(|e| {
+            if let VcpuResizeError::UpcallNotReady = e {
+                return VmmActionError::UpcallNotReady;
+            }
+            VmmActionError::ResizeVcpu(e)
+        })?;
+
+        Ok(VmmData::Empty)
     }
 }
 
