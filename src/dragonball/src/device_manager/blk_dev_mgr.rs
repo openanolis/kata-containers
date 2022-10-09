@@ -71,8 +71,8 @@ pub enum BlockDeviceError {
     #[error("invalid block device id '{0}'")]
     InvalidDeviceId(String),
 
-    /// Cannot perform the requested operation after booting the microVM.
-    #[error("block device does not support runtime update")]
+    /// Cannot perform the requested operation after booting the microVM because hotplug feature is not enabled.
+    #[error("block device does not support runtime update because hotplug feature is not enabled")]
     UpdateNotAllowedPostBoot,
 
     /// A root block device was already added.
