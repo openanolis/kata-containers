@@ -1007,8 +1007,11 @@ impl VcpuEpollHandler {
         while let Ok(event) = self.rx.try_recv() {
             match event {
                 VcpuStateEvent::Hotplug((success, cpu_count)) => {
-                    info!("get vcpu event, cpu_index {}", cpu_count);
-                    self.process_cpu_action(success != 0, cpu_count);
+                    info!(
+                        "get vcpu event, cpu_index {} success {}",
+                        cpu_count, success
+                    );
+                    self.process_cpu_action(success == 0, cpu_count);
                 }
             }
         }

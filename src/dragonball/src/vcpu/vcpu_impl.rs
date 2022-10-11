@@ -216,7 +216,7 @@ pub enum VcpuResponse {
 
 /// List of events that the vcpu_state_sender can send.
 pub enum VcpuStateEvent {
-    /// (result, response) for hotplug, result 0 means failure, 1 means success.
+    /// (result, response) for hotplug, result 0 means success, 1 means failure.
     Hotplug((i32, u32)),
 }
 
