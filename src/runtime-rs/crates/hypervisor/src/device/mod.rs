@@ -20,7 +20,7 @@ mod vsock;
 use anyhow::Result;
 pub use vsock::VsockConfig;
 mod generic;
-pub use generic::{GenericConfig, GenericDevice};
+pub use generic::{GenericConfig, GenericDevice, IoLimits};
 use std::fmt;
 
 #[derive(Debug)]

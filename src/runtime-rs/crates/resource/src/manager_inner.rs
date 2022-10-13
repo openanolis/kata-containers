@@ -14,14 +14,15 @@ use crate::{
     volume::{Volume, VolumeResource},
     ResourceConfig,
 };
+use agent::types::Device;
 use agent::{Agent, Storage};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use hypervisor::device_manager::VIRTIO_MMIO;
+use hypervisor::device_manager::{new_device_info, VIRTIO_MMIO};
 use hypervisor::{device_manager::DeviceManager, Hypervisor};
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
-use oci::LinuxResources;
+use oci::{Linux, LinuxResources};
 use persist::sandbox_persist::Persist;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -197,6 +198,31 @@ impl ResourceManagerInner {
                 &self.sid,
             )
             .await
+    }
+
+    pub async fn handler_devices(
+        &self,
+        _cid: &str,
+        linux: &Linux,
+        devices_agent: &mut Vec<Device>,
+    ) -> Result<()> {
+        for d in linux.devices.iter() {
+            let mut device_info = new_device_info(d, None, None)?;
+            let device_id = self
+                .device_manager
+                .write()
+                .await
+                .try_add_device(&mut device_info, self.hypervisor.as_ref())
+                .await?;
+            let device = self
+                .device_manager
+                .read()
+                .await
+                .generate_agent_device(device_id)
+                .await?;
+            devices_agent.push(device);
+        }
+        return Ok(());
     }
 
     pub async fn update_cgroups(

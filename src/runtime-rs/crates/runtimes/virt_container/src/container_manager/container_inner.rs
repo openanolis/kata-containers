@@ -6,7 +6,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use agent::Agent;
+use agent::{types::Device, Agent};
 use anyhow::{anyhow, Context, Result};
 use common::{
     error::Error,
@@ -31,6 +31,7 @@ pub struct ContainerInner {
     pub(crate) exec_processes: HashMap<String, Exec>,
     pub(crate) rootfs: Option<Arc<dyn Rootfs>>,
     pub(crate) volumes: Vec<Arc<dyn Volume>>,
+    pub(crate) devices: Vec<Device>,
 }
 
 impl ContainerInner {
@@ -42,6 +43,7 @@ impl ContainerInner {
             exec_processes: HashMap::new(),
             rootfs: None,
             volumes: vec![],
+            devices: vec![],
         }
     }
 

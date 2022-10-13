@@ -1,4 +1,7 @@
-use crate::{utils, BlockDevice, Device, DeviceArgument, GenericConfig, GenericDevice, Hypervisor};
+use crate::{
+    utils, BlockDevice, Device, DeviceArgument, GenericConfig, GenericDevice, Hypervisor, IoLimits,
+};
+use agent::types::Device as AgentDevice;
 use anyhow::{anyhow, Result};
 use ini::Ini;
 use kata_sys_util::rand;
@@ -72,6 +75,35 @@ impl DeviceManager {
         // reference device if no error happens
         dev.lock().await.reference().await;
         Ok(id)
+    }
+
+    pub async fn generate_agent_device(&self, device_id: String) -> Result<AgentDevice> {
+        // Safe because we just attached the device
+        let dev = self.get_device_by_id(&device_id).await.unwrap();
+        let base_info = dev.lock().await.get_device_info().await?;
+        let mut device = AgentDevice {
+            container_path: base_info.container_path.clone(),
+            ..Default::default()
+        };
+
+        match self.get_block_driver().await {
+            VIRTIO_MMIO => {
+                if let Some(path) = base_info.virt_path {
+                    device.id = device_id;
+                    device.field_type = KATA_MMIO_BLK_DEV_TYPE.to_string();
+                    device.vm_path = path.clone();
+                }
+            }
+            VIRTIO_BLOCK => {
+                if let Some(path) = base_info.pci_addr {
+                    device.id = device_id;
+                    device.field_type = KATA_BLK_DEV_TYPE.to_string();
+                    device.vm_path = path.clone();
+                }
+            }
+            _ => (),
+        }
+        Ok(device)
     }
 
     pub async fn get_block_driver(&self) -> &str {
@@ -186,6 +218,10 @@ impl DeviceManager {
         None
     }
 
+    async fn get_device_by_id(&self, id: &str) -> Option<ArcBoxDevice> {
+        self.devices.get(id).map(Arc::clone)
+    }
+
     fn new_device_id(&self) -> Result<String> {
         for _ in 0..5 {
             let rand_bytes = rand::RandomBytes::new(8);
@@ -221,6 +257,53 @@ impl DeviceManager {
         self.released_index.sort_by(|a, b| b.cmp(a));
         Ok(())
     }
+}
+
+pub fn new_device_info(
+    device: &oci::LinuxDevice,
+    bdf: Option<String>,
+    io_limits: Option<IoLimits>,
+) -> Result<GenericConfig> {
+    let allow_device_type: Vec<&str> = vec!["c", "b", "u", "p"];
+
+    info!(sl!(), "device type:{:?}", device.r#type);
+    if !allow_device_type.contains(&device.r#type.as_str()) {
+        return Err(anyhow!("runtime not support device type {}", device.r#type));
+    }
+
+    if device.path.is_empty() {
+        return Err(anyhow!("container path can not be empty"));
+    }
+
+    let mut file_mode: u32 = 0;
+    let mut uid: u32 = 0;
+    let mut gid: u32 = 0;
+    if device.file_mode.is_some() {
+        file_mode = device.file_mode.unwrap();
+    }
+    if device.uid.is_some() {
+        uid = device.uid.unwrap();
+    }
+    if device.gid.is_some() {
+        gid = device.gid.unwrap();
+    }
+
+    let dev_info = GenericConfig {
+        host_path: String::new(),
+        container_path: device.path.clone(),
+        dev_type: device.r#type.clone(),
+        major: device.major,
+        minor: device.minor,
+        file_mode: file_mode as u32,
+        uid,
+        gid,
+        id: "".to_string(),
+        bdf,
+        driver_options: HashMap::new(),
+        io_limits,
+        ..Default::default()
+    };
+    Ok(dev_info)
 }
 
 fn is_block(dev_info: &GenericConfig) -> bool {
