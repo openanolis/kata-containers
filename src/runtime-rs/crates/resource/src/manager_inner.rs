@@ -188,7 +188,14 @@ impl ResourceManagerInner {
         oci_mounts: &[oci::Mount],
     ) -> Result<Vec<Arc<dyn Volume>>> {
         self.volume_resource
-            .handler_volumes(&self.share_fs, cid, oci_mounts)
+            .handler_volumes(
+                &self.share_fs,
+                cid,
+                oci_mounts,
+                self.device_manager.clone(),
+                self.hypervisor.as_ref(),
+                &self.sid,
+            )
             .await
     }
 

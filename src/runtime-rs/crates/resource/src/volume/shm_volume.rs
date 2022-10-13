@@ -99,6 +99,10 @@ impl Volume for ShmVolume {
     fn cleanup(&self) -> Result<()> {
         todo!()
     }
+
+    fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
 }
 
 pub(crate) fn is_shim_volume(m: &oci::Mount) -> bool {

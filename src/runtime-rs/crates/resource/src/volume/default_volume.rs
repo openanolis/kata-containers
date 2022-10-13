@@ -33,4 +33,8 @@ impl Volume for DefaultVolume {
     fn cleanup(&self) -> Result<()> {
         todo!()
     }
+
+    fn get_device_id(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
 }
