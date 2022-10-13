@@ -1315,6 +1315,7 @@ dependencies = [
  "libc",
  "logging",
  "nix 0.24.3",
+ "oci",
  "persist",
  "rand 0.8.5",
  "rust-ini",

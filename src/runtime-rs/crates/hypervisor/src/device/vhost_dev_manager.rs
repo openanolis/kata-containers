@@ -6,7 +6,6 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use crate::device::AgentDevice;
 use crate::{
     device_type::{Device, DeviceArgument, GenericConfig},
     DeviceManagerInner, Hypervisor,
@@ -48,11 +47,11 @@ impl DeviceManagerInner for VhostUserDeviceManager {
         todo!()
     }
 
-    async fn generate_agent_device(&self, _device_id: String) -> Result<AgentDevice> {
+    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
         todo!()
     }
 
-    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
+    async fn get_device_vm_path(&self, _id: &str) -> Option<String> {
         todo!()
     }
 

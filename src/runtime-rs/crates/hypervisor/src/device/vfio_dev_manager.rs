@@ -14,7 +14,6 @@ use crate::{
     device_type::{Device, DeviceArgument, GenericConfig, VfioDevice},
     DeviceManagerInner, Hypervisor,
 };
-use agent::types::Device as AgentDevice;
 
 #[allow(dead_code)]
 pub struct VfioDeviceManager {
@@ -67,11 +66,11 @@ impl DeviceManagerInner for VfioDeviceManager {
         todo!()
     }
 
-    async fn generate_agent_device(&self, _device_id: String) -> Result<AgentDevice> {
+    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
         todo!()
     }
 
-    async fn get_device_guest_path(&self, _id: &str) -> Option<String> {
+    async fn get_device_vm_path(&self, _id: &str) -> Option<String> {
         todo!()
     }
 

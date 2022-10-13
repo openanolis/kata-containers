@@ -17,7 +17,6 @@ use crate::{
     device_type::{BlockDevice, Device, DeviceArgument, GenericConfig},
     DeviceManagerInner, Hypervisor,
 };
-use agent::types::Device as AgentDevice;
 use kata_sys_util::rand;
 
 pub struct BlockDeviceManager {
@@ -105,10 +104,6 @@ impl BlockDeviceManager {
             }
         }
         None
-    }
-
-    async fn get_device_by_id(&self, id: &str) -> Option<Arc<Mutex<BlockDevice>>> {
-        self.devices.get(id).map(Arc::clone)
     }
 
     fn new_device_id(&self) -> Result<String> {
@@ -201,33 +196,21 @@ impl DeviceManagerInner for BlockDeviceManager {
         ));
     }
 
-    async fn generate_agent_device(&self, device_id: String) -> Result<AgentDevice> {
-        // Safe because we just attached the device
-        let dev = self.get_device_by_id(&device_id).await.unwrap();
-        let base_info = dev.lock().await.get_device_info().await?;
-        let mut device = AgentDevice {
-            container_path: base_info.container_path.clone(),
-            ..Default::default()
-        };
-
-        match self.block_driver.as_str() {
-            VIRTIO_BLOCK_MMIO => {
-                if let Some(path) = base_info.virt_path {
-                    device.id = device_id;
-                    device.field_type = KATA_MMIO_BLK_DEV_TYPE.to_string();
-                    device.vm_path = path;
+    async fn get_device_vm_path(&self, id: &str) -> Option<String> {
+        if let Some(device) = self.devices.get(id) {
+            if let Ok(dev_info) = device.lock().await.get_device_info().await {
+                match self.block_driver.as_str() {
+                    VIRTIO_BLOCK_MMIO => {
+                        return dev_info.virt_path;
+                    }
+                    VIRTIO_BLOCK_PCI => {
+                        return dev_info.bdf;
+                    }
+                    _ => (),
                 }
             }
-            VIRTIO_BLOCK_PCI => {
-                if let Some(path) = base_info.pci_addr {
-                    device.id = device_id;
-                    device.field_type = KATA_BLK_DEV_TYPE.to_string();
-                    device.vm_path = path;
-                }
-            }
-            _ => (),
         }
-        Ok(device)
+        None
     }
 
     async fn get_device_guest_path(&self, id: &str) -> Option<String> {

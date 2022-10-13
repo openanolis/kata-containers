@@ -70,22 +70,21 @@ impl BlockVolume {
             .map_err(|e| anyhow!("failed to create rootfs dir {}: {:?}", host_path, e))?;
 
         // storage
-        let mut storage = Storage::default();
-
-        storage.driver = d
-            .read()
-            .await
-            .get_driver_options(&Block)
-            .await
-            .context("failed to get driver options")?;
-
-        storage.options = if read_only {
-            vec!["ro".to_string()]
-        } else {
-            Vec::new()
+        let mut storage = Storage {
+            driver: d
+                .read()
+                .await
+                .get_driver_options(&Block)
+                .await
+                .context("failed to get driver options")?,
+            options: if read_only {
+                vec!["ro".to_string()]
+            } else {
+                Vec::new()
+            },
+            mount_point: guest_path.clone(),
+            ..Default::default()
         };
-
-        storage.mount_point = guest_path.clone();
 
         if let Some(path) = d
             .read()

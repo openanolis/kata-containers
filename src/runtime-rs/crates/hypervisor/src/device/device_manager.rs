@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use crate::DeviceType::{Block, Undefined, Vfio};
 use crate::{
     device::blk_dev_manager::BlockDeviceManager,
     device_type::{Device, DeviceArgument, GenericConfig},
@@ -134,11 +135,75 @@ impl DeviceManager {
         Err(anyhow!("invalid device class {:?}", class))
     }
 
+    pub fn get_device_type(&self, dev_type: &str) -> DeviceType {
+        match dev_type {
+            "b" => Block,
+            "c" => Vfio,
+            _ => Undefined,
+        }
+    }
+
     pub async fn get_device_guest_path(&self, id: &str, class: &DeviceType) -> Option<String> {
         if let Some(dev_manager) = self.dev_managers.get(class) {
             return dev_manager.read().await.get_device_guest_path(id).await;
         }
         None
+    }
+
+    pub async fn attach_linux_device(&mut self, device_info: &mut GenericConfig) -> Result<String> {
+        let dev_class = self.get_device_type(device_info.dev_type.as_str());
+        // attach device
+        self.try_add_device(device_info, &dev_class)
+            .await
+            .context("failed to add device")
+    }
+
+    pub async fn get_vm_path(&self, id: &str, class: &DeviceType) -> Option<String> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            return dev_manager.read().await.get_device_vm_path(id).await;
+        }
+        None
+    }
+
+    pub fn new_device_info_from_oci(
+        &self,
+        device: &oci::LinuxDevice,
+        bdf: Option<String>,
+    ) -> Result<GenericConfig> {
+        info!(sl!(), "Linux device info: {:?}", device);
+        // b      block (buffered) special file
+        // c, u   character (unbuffered) special file
+        // p      FIFO
+        // refer to https://man7.org/linux/man-pages/man1/mknod.1.html
+        let allow_device_type: Vec<&str> = vec!["c", "b", "u", "p"];
+
+        if !allow_device_type.contains(&device.r#type.as_str()) {
+            return Err(anyhow!("runtime not support device type {}", device.r#type));
+        }
+
+        if device.path.is_empty() {
+            return Err(anyhow!("container path can not be empty"));
+        }
+
+        let file_mode = device.file_mode.unwrap_or(0);
+        let uid = device.uid.unwrap_or(0);
+        let gid = device.gid.unwrap_or(0);
+
+        let dev_info = GenericConfig {
+            host_path: String::new(),
+            container_path: device.path.clone(),
+            dev_type: device.r#type.clone(),
+            major: device.major,
+            minor: device.minor,
+            file_mode,
+            uid,
+            gid,
+            id: "".to_string(),
+            bdf,
+            driver_options: HashMap::new(),
+            ..Default::default()
+        };
+        Ok(dev_info)
     }
 
     // get_virt_drive_name returns the disk name format for virtio-blk

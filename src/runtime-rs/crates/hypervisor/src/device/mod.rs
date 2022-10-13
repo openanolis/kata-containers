@@ -13,7 +13,6 @@ pub mod device_manager;
 pub mod device_type;
 mod vfio_dev_manager;
 mod vhost_dev_manager;
-use agent::types::Device as AgentDevice;
 use anyhow::Result;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -44,10 +43,10 @@ pub trait DeviceManagerInner {
         device_id: &str,
         h: &dyn Hypervisor,
     ) -> Result<Option<u64>>;
-    // generate agent device
-    async fn generate_agent_device(&self, device_id: String) -> Result<AgentDevice>;
     // get the device guest path
     async fn get_device_guest_path(&self, id: &str) -> Option<String>;
+    // get the device vm path, it could be guest path or bdf path
+    async fn get_device_vm_path(&self, id: &str) -> Option<String>;
     // get device manager driver options
     async fn get_driver_options(&self) -> Result<String>;
 }

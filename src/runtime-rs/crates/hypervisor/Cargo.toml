@@ -27,13 +27,14 @@ tokio = { version = "1.8.0", features = ["sync", "fs"] }
 vmm-sys-util = "0.11.0"
 rand = "0.8.4"
 
+agent = { path = "../agent" }
+dragonball = { path = "../../../dragonball", features = ["atomic-guest-memory", "virtio-vsock", "hotplug", "virtio-blk", "virtio-net", "virtio-fs","dbs-upcall"] }
 kata-sys-util = { path = "../../../libs/kata-sys-util" }
 kata-types = { path = "../../../libs/kata-types" }
 logging = { path = "../../../libs/logging" }
+oci = { path = "../../../libs/oci" }
 shim-interface = { path = "../../../libs/shim-interface" }
 
-agent = { path = "../agent" }
-dragonball = { path = "../../../dragonball", features = ["atomic-guest-memory", "virtio-vsock", "hotplug", "virtio-blk", "virtio-net", "virtio-fs","dbs-upcall"] }
 
 ch-config = { path = "ch-config", optional = true }
 
