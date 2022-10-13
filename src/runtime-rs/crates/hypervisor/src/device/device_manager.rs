@@ -21,6 +21,7 @@ pub const VIRTIO_BLOCK: &str = "virtio-blk";
 pub const VFIO: &str = "vfio";
 pub const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
 pub const KATA_BLK_DEV_TYPE: &str = "blk";
+use crate::device::AgentDevice;
 #[derive(Clone)]
 pub struct DeviceManager {
     pub dev_managers: HashMap<DeviceType, Arc<RwLock<Box<dyn DeviceManagerInner + Send + Sync>>>>,
@@ -73,6 +74,64 @@ impl DeviceManager {
             return dev_manager.read().await.get_device_guest_path(id).await;
         }
         None
+    }
+
+    pub async fn generate_agent_device(
+        &self,
+        device_id: String,
+        class: &DeviceType,
+    ) -> Result<AgentDevice> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            return Ok(dev_manager
+                .read()
+                .await
+                .generate_agent_device(device_id)
+                .await
+                .context("failed to generate agent device")?);
+        }
+        Err(anyhow!("invalid device class {:?}", class))
+    }
+
+    pub fn new_device_info_oci(
+        &self,
+        device: &oci::LinuxDevice,
+        bdf: Option<String>,
+    ) -> Result<GenericConfig> {
+        info!(sl!(), "Linux device info: {:?}", device);
+        // b      block (buffered) special file
+        // c, u   character (unbuffered) special file
+        // p      FIFO
+        // refer to https://man7.org/linux/man-pages/man1/mknod.1.html
+
+        let allow_device_type: Vec<&str> = vec!["c", "b", "u", "p"];
+
+        if !allow_device_type.contains(&device.r#type.as_str()) {
+            return Err(anyhow!("runtime not support device type {}", device.r#type));
+        }
+
+        if device.path.is_empty() {
+            return Err(anyhow!("container path can not be empty"));
+        }
+
+        let file_mode = device.file_mode.unwrap_or(0);
+        let uid = device.uid.unwrap_or(0);
+        let gid = device.gid.unwrap_or(0);
+
+        let dev_info = GenericConfig {
+            host_path: String::new(),
+            container_path: device.path.clone(),
+            dev_type: device.r#type.clone(),
+            major: device.major,
+            minor: device.minor,
+            file_mode,
+            uid,
+            gid,
+            id: "".to_string(),
+            bdf,
+            driver_options: HashMap::new(),
+            ..Default::default()
+        };
+        Ok(dev_info)
     }
 }
 

@@ -142,7 +142,21 @@ impl Container {
         }
         spec.mounts = oci_mounts;
 
-        // TODO: handler device
+        // handler device
+        let linux = match spec.linux.as_ref() {
+            None => {
+                return Err(anyhow!("OCI spec missing linux field"));
+            }
+            Some(l) => l,
+        };
+
+        let mut devices_agent = vec![];
+
+        self.resource_manager
+            .handler_devices(&config.container_id, linux, &mut devices_agent)
+            .await?;
+
+        inner.devices = devices_agent.clone();
 
         // update cgroups
         self.resource_manager
@@ -156,6 +170,8 @@ impl Container {
         // create container
         let r = agent::CreateContainerRequest {
             process_id: agent::ContainerProcessID::new(&config.container_id, ""),
+            string_user: None,
+            devices: devices_agent,
             storages,
             oci: Some(spec),
             sandbox_pidns,
@@ -433,7 +449,6 @@ fn amend_spec(spec: &mut oci::Spec, disable_guest_seccomp: bool) -> Result<()> {
         }
 
         if let Some(resource) = linux.resources.as_mut() {
-            resource.devices = Vec::new();
             resource.pids = None;
             resource.block_io = None;
             resource.network = None;

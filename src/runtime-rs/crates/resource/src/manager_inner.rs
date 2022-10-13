@@ -4,17 +4,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{sync::Arc, thread};
-
 use crate::resource_persist::ResourceState;
+use agent::types::Device;
 use agent::{Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
 use async_trait::async_trait;
+use hypervisor::DeviceType::{Block, Undefined};
 use hypervisor::{device::device_manager::DeviceManager, device_manager::VIRTIO_MMIO, Hypervisor};
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
-use oci::LinuxResources;
+use oci::{Linux, LinuxResources};
 use persist::sandbox_persist::Persist;
+use std::{sync::Arc, thread};
 use tokio::runtime;
 use tokio::sync::RwLock;
 
@@ -241,6 +242,44 @@ impl ResourceManagerInner {
                 &self.sid,
             )
             .await
+    }
+
+    pub async fn handler_devices(
+        &self,
+        _cid: &str,
+        linux: &Linux,
+        devices_agent: &mut Vec<Device>,
+    ) -> Result<()> {
+        for d in linux.devices.iter() {
+            // generate device info from oci spec
+            let mut device_info = self
+                .device_manager
+                .read()
+                .await
+                .new_device_info_oci(d, None)?;
+            let dev_class = match device_info.dev_type.as_str() {
+                "b" => Block,
+                _ => Undefined,
+            };
+            // attach device
+            let device_id = self
+                .device_manager
+                .write()
+                .await
+                .try_add_device(&mut device_info, &dev_class)
+                .await
+                .context("failed to add device")?;
+            // generate agent device info
+            let device = self
+                .device_manager
+                .read()
+                .await
+                .generate_agent_device(device_id, &dev_class)
+                .await
+                .context("failed to generate agent device")?;
+            devices_agent.push(device);
+        }
+        Ok(())
     }
 
     pub async fn update_cgroups(
