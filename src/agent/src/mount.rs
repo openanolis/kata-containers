@@ -24,7 +24,7 @@ use crate::device::{
     get_scsi_device_name, get_virtio_blk_pci_device_name, online_device, wait_for_pmem_device,
     DRIVER_9P_TYPE, DRIVER_BLK_CCW_TYPE, DRIVER_BLK_TYPE, DRIVER_EPHEMERAL_TYPE, DRIVER_LOCAL_TYPE,
     DRIVER_MMIO_BLK_TYPE, DRIVER_NVDIMM_TYPE, DRIVER_OVERLAYFS_TYPE, DRIVER_SCSI_TYPE,
-    DRIVER_VIRTIOFS_TYPE, DRIVER_WATCHABLE_BIND_TYPE, FS_TYPE_HUGETLB,
+    DRIVER_VIRTIOFS_TYPE, DRIVER_WATCHABLE_BIND_TYPE, FS_TYPE_HUGETLB, get_virtio_mmio_device_name,
 };
 use crate::linux_abi::*;
 use crate::pci;
@@ -409,8 +409,10 @@ async fn virtiommio_blk_storage_handler(
     storage: &Storage,
     sandbox: Arc<Mutex<Sandbox>>,
 ) -> Result<String> {
+    let storage = storage.clone();
+    get_virtio_mmio_device_name(&sandbox,&storage.source).await?;
     //The source path is VmPath
-    common_storage_handler(logger, storage)
+    common_storage_handler(logger, &storage)
 }
 
 // virtiofs_storage_handler handles the storage for virtio-fs.

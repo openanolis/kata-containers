@@ -400,6 +400,53 @@ async fn get_vfio_device_name(sandbox: &Arc<Mutex<Sandbox>>, grp: IommuGroup) ->
     let uev = wait_for_uevent(sandbox, matcher).await?;
     Ok(format!("{}/{}", SYSTEM_DEV_PATH, &uev.devname))
 }
+#[derive(Debug)]
+struct MmioBlockMatcher {
+    suffix: String,
+}
+
+impl MmioBlockMatcher {
+    fn new(devname: &str) -> MmioBlockMatcher {
+        MmioBlockMatcher {
+            suffix: format!(r"/block/{}", devname),
+        }
+    }
+}
+
+impl UeventMatcher for MmioBlockMatcher {
+    fn is_match(&self, uev: &Uevent) -> bool {
+        uev.subsystem == "block"
+            && uev.devpath.ends_with(&self.suffix)
+            && !uev.devname.is_empty()
+    }
+}
+
+#[instrument]
+pub async fn get_virtio_mmio_device_name(
+    sandbox: &Arc<Mutex<Sandbox>>,
+    devpath: &str,
+) -> Result<()> {
+    let devname = match devpath.strip_prefix("/dev/") {
+        Some(dev) => dev,
+        None => {
+            return Err(anyhow!(
+                "Storage source '{}' must start with /dev/",
+                devpath
+            ))
+        }
+    };
+
+    let matcher = MmioBlockMatcher::new(devname);
+    let uev = wait_for_uevent(sandbox, matcher).await?;
+    if uev.devname != devname {
+        return Err(anyhow!(
+            "Unexpected device name {} for mmio device (expected {})",
+            uev.devname,
+            devname
+        ));
+    }
+    Ok(())
+}
 
 /// Scan SCSI bus for the given SCSI address(SCSI-Id and LUN)
 #[instrument]
@@ -636,11 +683,9 @@ pub fn update_env_pci(
 #[instrument]
 async fn virtiommio_blk_device_handler(
     device: &Device,
-    _sandbox: &Arc<Mutex<Sandbox>>,
+    sandbox: &Arc<Mutex<Sandbox>>,
 ) -> Result<SpecUpdate> {
-    if device.vm_path.is_empty() {
-        return Err(anyhow!("Invalid path for virtio mmio blk device"));
-    }
+    get_virtio_mmio_device_name(sandbox,&device.vm_path.to_string()).await?;
 
     Ok(DevNumUpdate::from_vm_path(&device.vm_path)?.into())
 }
