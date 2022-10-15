@@ -686,7 +686,7 @@ async fn virtiommio_blk_device_handler(
     sandbox: &Arc<Mutex<Sandbox>>,
 ) -> Result<SpecUpdate> {
     get_virtio_mmio_device_name(sandbox,&device.vm_path.to_string()).await?;
-
+    info!(sl!(), "tim ========== get the virtio mmio device ==========");
     Ok(DevNumUpdate::from_vm_path(&device.vm_path)?.into())
 }
 

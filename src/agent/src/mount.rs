@@ -411,6 +411,7 @@ async fn virtiommio_blk_storage_handler(
 ) -> Result<String> {
     let storage = storage.clone();
     get_virtio_mmio_device_name(&sandbox,&storage.source).await?;
+    info!(logger, "tim ========== get the virtio mmio device ==========");
     //The source path is VmPath
     common_storage_handler(logger, &storage)
 }
