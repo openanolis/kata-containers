@@ -38,6 +38,7 @@ pub struct Container {
     agent: Arc<dyn Agent>,
     resource_manager: Arc<ResourceManager>,
     logger: slog::Logger,
+    pub linux_resources: Option<LinuxResources>,
 }
 
 impl Container {
@@ -46,6 +47,7 @@ impl Container {
         config: ContainerConfig,
         agent: Arc<dyn Agent>,
         resource_manager: Arc<ResourceManager>,
+        linux_resources: Option<LinuxResources>,
     ) -> Result<Self> {
         let container_id = ContainerID::new(&config.container_id).context("new container id")?;
         let logger = sl!().new(o!("container_id" => config.container_id.clone()));
@@ -72,6 +74,7 @@ impl Container {
             agent,
             resource_manager,
             logger,
+            linux_resources,
         })
     }
 
