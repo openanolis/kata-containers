@@ -11,14 +11,15 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use netlink_packet_route::{
-    self, neighbour::NeighbourMessage, nlas::neighbour::Nla, route::RouteMessage,
+    self,
+    link::{Link, LinkAttrs},
+    neighbour::NeighbourMessage,
+    nlas::neighbour::Nla,
+    route::RouteMessage,
 };
 
 use super::NetworkInfo;
-use crate::network::utils::{
-    address::{parse_ip, Address},
-    link::{self, LinkAttrs},
-};
+use crate::network::utils::address::{parse_ip, Address};
 
 #[derive(Debug)]
 pub(crate) struct NetworkInfoFromLink {
@@ -28,11 +29,7 @@ pub(crate) struct NetworkInfoFromLink {
 }
 
 impl NetworkInfoFromLink {
-    pub async fn new(
-        handle: &rtnetlink::Handle,
-        link: &dyn link::Link,
-        hw_addr: &str,
-    ) -> Result<Self> {
+    pub async fn new(handle: &rtnetlink::Handle, link: &dyn Link, hw_addr: &str) -> Result<Self> {
         let attrs = link.attrs();
         let name = &attrs.name;
 

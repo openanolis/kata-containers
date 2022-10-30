@@ -8,6 +8,7 @@ use std::{convert::TryFrom, sync::Arc, usize};
 
 use anyhow::{anyhow, Context, Result};
 use futures::stream::TryStreamExt;
+use netlink_packet_route::link::Link;
 
 use super::{
     network_model,
@@ -144,7 +145,7 @@ pub async fn create_link(
     handle: &rtnetlink::Handle,
     name: &str,
     queues: usize,
-) -> Result<Box<dyn link::Link>> {
+) -> Result<Box<dyn Link>> {
     link::create_link(name, link::LinkType::Tap, queues)?;
 
     let link = get_link_by_name(handle, name)
@@ -164,10 +165,7 @@ pub async fn create_link(
     Ok(link)
 }
 
-pub async fn get_link_by_name(
-    handle: &rtnetlink::Handle,
-    name: &str,
-) -> Result<Box<dyn link::Link>> {
+pub async fn get_link_by_name(handle: &rtnetlink::Handle, name: &str) -> Result<Box<dyn Link>> {
     let mut link_msg_list = handle.link().get().match_name(name.to_string()).execute();
     let msg = if let Some(msg) = link_msg_list.try_next().await? {
         msg
@@ -175,7 +173,7 @@ pub async fn get_link_by_name(
         return Err(anyhow!("failed to find link by name {}", name));
     };
 
-    Ok(link::get_link_from_message(msg))
+    Ok(msg.get_link_from_message())
 }
 
 #[cfg(test)]

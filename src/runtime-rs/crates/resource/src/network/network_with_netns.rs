@@ -14,6 +14,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use hypervisor::Hypervisor;
+use netlink_packet_route::link::Link;
 use scopeguard::defer;
 use tokio::sync::RwLock;
 
@@ -143,7 +144,7 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
 
     let idx = AtomicU32::new(0);
     while let Some(link) = links.try_next().await? {
-        let link = link::get_link_from_message(link);
+        let link = link.get_link_from_message();
         let attrs = link.attrs();
 
         if (attrs.flags & libc::IFF_LOOPBACK as u32) != 0 {
@@ -163,7 +164,7 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
 
 async fn create_endpoint(
     handle: &rtnetlink::Handle,
-    link: &dyn link::Link,
+    link: &dyn Link,
     idx: u32,
     config: &NetworkWithNetNsConfig,
 ) -> Result<(Arc<dyn Endpoint>, Arc<dyn NetworkInfo>)> {

@@ -12,3 +12,4 @@ dbs-legacy-devices = { git = "https://github.com/openanolis/dragonball-sandbox.g
 dbs-virtio-devices = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323" }
 dbs-boot = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323" }
 dbs-arch = { git = "https://github.com/openanolis/dragonball-sandbox.git", rev = "c3d7831aee7c3962b8a90f0afbfd0fb7e4d30323" }
+netlink-packet-route = { git = "https://github.com/Tim-0731-Hzt/netlink-packet-route.git", rev = "97b0a098573ad8d4859813b1920467ffb8453a28"}
