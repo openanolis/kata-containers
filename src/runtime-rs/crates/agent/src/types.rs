@@ -540,6 +540,11 @@ pub struct OomEventResponse {
     pub container_id: String,
 }
 
+#[derive(PartialEq, Clone, Default, Debug)]
+pub struct MetricsResponse {
+    pub metrics: String,
+}
+
 #[cfg(test)]
 mod test {
     use std::convert::TryFrom;

@@ -13,6 +13,8 @@ pub mod kata;
 mod log_forwarder;
 mod sock;
 pub mod types;
+
+use types::MetricsResponse;
 pub use types::{
     ARPNeighbor, ARPNeighbors, AddArpNeighborRequest, BlkioStatsEntry, CheckRequest,
     CloseStdinRequest, ContainerID, ContainerProcessID, CopyFileRequest, CreateContainerRequest,
@@ -85,4 +87,5 @@ pub trait Agent: AgentManager + HealthService + Send + Sync {
     // utils
     async fn copy_file(&self, req: CopyFileRequest) -> Result<Empty>;
     async fn get_oom_event(&self, req: Empty) -> Result<OomEventResponse>;
+    async fn get_metrics(&self, req: Empty) -> Result<MetricsResponse>;
 }

@@ -18,8 +18,8 @@ use crate::{
         CopyFileRequest, CpuStats, CpuUsage, CreateContainerRequest, CreateSandboxRequest, Device,
         Empty, ExecProcessRequest, FSGroup, FSGroupChangePolicy, GuestDetailsResponse,
         HealthCheckResponse, HugetlbStats, IPAddress, IPFamily, Interface, Interfaces,
-        KernelModule, MemHotplugByProbeRequest, MemoryData, MemoryStats, NetworkStats,
-        OnlineCPUMemRequest, PidsStats, ReadStreamRequest, ReadStreamResponse,
+        KernelModule, MemHotplugByProbeRequest, MemoryData, MemoryStats, MetricsResponse,
+        NetworkStats, OnlineCPUMemRequest, PidsStats, ReadStreamRequest, ReadStreamResponse,
         RemoveContainerRequest, ReseedRandomDevRequest, Route, Routes, SetGuestDateTimeRequest,
         SignalProcessRequest, StatsContainerResponse, Storage, StringUser, ThrottlingData,
         TtyWinResizeRequest, UpdateContainerRequest, UpdateInterfaceRequest, UpdateRoutesRequest,
@@ -807,6 +807,23 @@ impl From<agent::OOMEvent> for OomEventResponse {
     fn from(from: OOMEvent) -> Self {
         Self {
             container_id: from.container_id,
+        }
+    }
+}
+
+impl From<Empty> for agent::GetMetricsRequest {
+    fn from(_: Empty) -> Self {
+        Self {
+            unknown_fields: Default::default(),
+            cached_size: Default::default(),
+        }
+    }
+}
+
+impl From<agent::Metrics> for MetricsResponse {
+    fn from(from: agent::Metrics) -> Self {
+        Self {
+            metrics: from.metrics,
         }
     }
 }

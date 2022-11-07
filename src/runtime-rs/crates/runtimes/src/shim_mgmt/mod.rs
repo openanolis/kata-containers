@@ -7,3 +7,4 @@
 pub mod client;
 mod handlers;
 pub mod server;
+pub mod metrics;

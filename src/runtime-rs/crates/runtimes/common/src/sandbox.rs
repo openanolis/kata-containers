@@ -16,4 +16,6 @@ pub trait Sandbox: Send + Sync {
 
     // agent function
     async fn agent_sock(&self) -> Result<String>;
+
+    async fn get_agent_metrics(&self) -> Result<String>;
 }

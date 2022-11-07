@@ -11,7 +11,7 @@ use common::Sandbox;
 use hyper::{Body, Method, Request, Response, Result, StatusCode};
 use std::sync::Arc;
 
-use super::server::AGENT_URL;
+use super::server::{AGENT_URL,METRICS_URL};
 
 // main router for response, this works as a multiplexer on
 // http arrival which invokes the corresponding handler function
@@ -27,7 +27,8 @@ pub(crate) async fn handler_mux(
     );
     match (req.method(), req.uri().path()) {
         (&Method::GET, AGENT_URL) => agent_url_handler(sandbox, req).await,
-        _ => Ok(not_found(req).await),
+        (&Method::GET, METRICS_URL) => get_metrics(sandbox,req).await,
+        _ => Ok(not_found(req).await), 
     }
 }
 
@@ -49,4 +50,12 @@ async fn agent_url_handler(
         .await
         .unwrap_or_else(|_| String::from(""));
     Ok(Response::new(Body::from(agent_sock)))
+}
+
+async fn get_metrics(sandbox: Arc<dyn Sandbox>, _req: Request<Body>) -> Result<Response<Body>> {
+    let metrics = sandbox
+        .get_agent_metrics()
+        .await
+        .unwrap_or_else(|_| String::from(""));
+    Ok(Response::new(Body::from(metrics)))
 }

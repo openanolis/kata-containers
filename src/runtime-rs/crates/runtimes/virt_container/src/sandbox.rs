@@ -269,6 +269,10 @@ impl Sandbox for VirtSandbox {
     async fn agent_sock(&self) -> Result<String> {
         self.agent.agent_sock().await
     }
+
+    async fn get_agent_metrics(&self) -> Result<String> {
+        Ok(self.agent.get_metrics(agent::Empty::new()).await?.metrics)
+    }
 }
 
 #[async_trait]
