@@ -742,7 +742,10 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 
 	storages := setupStorages(ctx, sandbox)
 
-	kmodules := setupKernelModules(k.kmodules)
+	kmodules, err := setupKernelModules(k.kmodules)
+	if err != nil {
+		return err
+	}
 
 	req := &grpc.CreateSandboxRequest{
 		Hostname:      hostname,
@@ -762,7 +765,7 @@ func (k *kataAgent) startSandbox(ctx context.Context, sandbox *Sandbox) error {
 	return nil
 }
 
-func setupKernelModules(kmodules []string) []*grpc.KernelModule {
+func setupKernelModules(kmodules []string) ([]*grpc.KernelModule, error) {
 	modules := []*grpc.KernelModule{}
 
 	for _, m := range kmodules {
@@ -777,10 +780,31 @@ func setupKernelModules(kmodules []string) []*grpc.KernelModule {
 			continue
 		}
 
-		module.Parameters = append(module.Parameters, l[1:]...)
+		// Generally, parameters satisfy the form of key=value and are separated by whitespaces.
+		// However, there are cases where the 'value' contains spaces, and it will appear as key="v1 v2".
+		// So we need to do some processing on the parameters here.
+		var flag bool = false
+		for index := 1; index < len(l); index += 1 {
+			// If the former param contains \", pop the last and concat a new param
+			if flag {
+				lastParam := module.Parameters[len(module.Parameters)-1]
+				concatenateParam := lastParam + " " + l[index]
+				module.Parameters[len(module.Parameters)-1] = concatenateParam
+			} else {
+				module.Parameters = append(module.Parameters, l[index])
+			}
+
+			if strings.Contains(l[index], "\"") {
+				flag = !flag
+			}
+		}
+
+		if flag {
+			return nil, errors.New("Invalid kernel module parameters")
+		}
 	}
 
-	return modules
+	return modules, nil
 }
 
 func setupStorages(ctx context.Context, sandbox *Sandbox) []*grpc.Storage {
