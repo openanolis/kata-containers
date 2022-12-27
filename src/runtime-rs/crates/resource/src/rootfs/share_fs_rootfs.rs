@@ -75,10 +75,6 @@ impl Rootfs for ShareFsRootfs {
         None
     }
 
-    async fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(None)
-    }
-
     async fn cleanup(&self) -> Result<()> {
         // Umount the mount point shared to guest
         let share_fs_mount = self.share_fs.get_share_fs_mount();

@@ -225,10 +225,6 @@ impl Volume for ShareFsVolume {
 
         Ok(())
     }
-
-    fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(None)
-    }
 }
 
 pub(crate) fn is_share_fs_volume(m: &oci::Mount) -> bool {

@@ -26,7 +26,6 @@ const BIND: &str = "bind";
 pub trait Volume: Send + Sync {
     fn get_volume_mount(&self) -> Result<Vec<oci::Mount>>;
     fn get_storage(&self) -> Result<Vec<agent::Storage>>;
-    fn get_device_id(&self) -> Result<Option<String>>;
     async fn cleanup(&self) -> Result<()>;
 }
 
@@ -70,7 +69,7 @@ impl VolumeResource {
                 Arc::new(
                     block_volume::BlockVolume::new(Arc::clone(&d), m, read_only, cid, sid)
                         .await
-                        .with_context(|| format!("new share fs volume {:?}", m))?,
+                        .with_context(|| format!("new block volume {:?}", m))?,
                 )
             } else if let Some(options) =
                 get_huge_page_option(m).context("failed to check huge page")?

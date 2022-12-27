@@ -18,13 +18,6 @@ use tokio::sync::{Mutex, RwLock};
 pub type ArcBoxDevice = Arc<Mutex<Box<dyn Device>>>;
 const SYS_DEV_PREFIX: &str = "/sys/dev";
 
-/// VIRTIO_BLOCK_MMIO indicates block driver is virtio-mmio based
-pub(crate) const VIRTIO_BLOCK_MMIO: &str = "virtio-blk-mmio";
-/// VIRTIO_BLOCK_PCI indicates block driver is virtio-pci based
-pub(crate) const VIRTIO_BLOCK_PCI: &str = "virtio-blk-pci";
-pub(crate) const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
-pub(crate) const KATA_BLK_DEV_TYPE: &str = "blk";
-
 /// block_index and released_block_index are used to search an available block index
 /// in Sandbox.
 ///
@@ -124,6 +117,21 @@ impl DeviceManager {
         }
         if let Some(index) = da.index {
             self.shared_info.release_device_index(index);
+        }
+        Err(anyhow!("invalid device class {:?}", class))
+    }
+
+    pub async fn try_remove_device(&mut self, device_id: String, class: &DeviceType) -> Result<()> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            if let Some(index) = dev_manager
+                .write()
+                .await
+                .try_remove_device(&device_id, self.hypervisor.as_ref())
+                .await
+                .context("failed to remove device")?
+            {
+                self.shared_info.release_device_index(index);
+            }
         }
         Err(anyhow!("invalid device class {:?}", class))
     }

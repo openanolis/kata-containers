@@ -10,14 +10,18 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 
 use crate::{
-    device_manager::{
-        get_host_path, KATA_BLK_DEV_TYPE, KATA_MMIO_BLK_DEV_TYPE, VIRTIO_BLOCK_MMIO,
-        VIRTIO_BLOCK_PCI,
-    },
+    device_manager::get_host_path,
     device_type::{BlockDevice, Device, DeviceArgument, GenericConfig},
     DeviceManagerInner, Hypervisor,
 };
 use kata_sys_util::rand;
+
+/// VIRTIO_BLOCK_MMIO indicates block driver is virtio-mmio based
+const VIRTIO_BLOCK_MMIO: &str = "virtio-blk-mmio";
+/// VIRTIO_BLOCK_PCI indicates block driver is virtio-pci based
+const VIRTIO_BLOCK_PCI: &str = "virtio-blk-pci";
+const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
+const KATA_BLK_DEV_TYPE: &str = "blk";
 
 pub struct BlockDeviceManager {
     devices: HashMap<String, Arc<Mutex<BlockDevice>>>,
@@ -173,27 +177,26 @@ impl DeviceManagerInner for BlockDeviceManager {
         device_id: &str,
         h: &dyn Hypervisor,
     ) -> Result<Option<u64>> {
-        if let Some(dev) = self.devices.get(device_id) {
-            let skip = dev.lock().await.decrease_attach_count().await?;
-            if skip {
-                return Ok(None);
-            }
-            let result = match dev.lock().await.detach(h).await {
-                Ok(id) => Ok(id),
-                Err(e) => {
-                    dev.lock().await.increase_attach_count().await?;
-                    Err(e)
-                }
-            };
-            if result.is_ok() {
-                self.devices.remove(device_id);
-            }
-            return result;
+        let dev = self
+            .devices
+            .get(device_id)
+            .context("device with specified ID hasn't been created")?;
+
+        let skip = dev.lock().await.decrease_attach_count().await?;
+        if skip {
+            return Ok(None);
         }
-        return Err(anyhow!(
-            "device with specified ID hasn't been created. {}",
-            device_id
-        ));
+        let result = match dev.lock().await.detach(h).await {
+            Ok(id) => Ok(id),
+            Err(e) => {
+                dev.lock().await.increase_attach_count().await?;
+                Err(e)
+            }
+        };
+        if result.is_ok() {
+            self.devices.remove(device_id);
+        }
+        return result;
     }
 
     async fn get_device_vm_path(&self, id: &str) -> Option<String> {
