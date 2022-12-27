@@ -145,10 +145,6 @@ impl Rootfs for NydusRootfs {
         Ok(Some(self.rootfs.clone()))
     }
 
-    async fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(None)
-    }
-
     async fn cleanup(&self) -> Result<()> {
         // TODO: Clean up NydusRootfs after the container is killed
         warn!(sl!(), "Cleaning up NydusRootfs is still unimplemented.");

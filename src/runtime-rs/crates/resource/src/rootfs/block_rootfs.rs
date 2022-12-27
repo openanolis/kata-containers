@@ -26,6 +26,7 @@ pub(crate) struct BlockRootfs {
     device_id: String,
     mount: oci::Mount,
     storage: Option<agent::Storage>,
+    device_manager: Arc<RwLock<DeviceManager>>,
 }
 
 impl BlockRootfs {
@@ -97,6 +98,7 @@ impl BlockRootfs {
                 ..Default::default()
             },
             storage: Some(storage),
+            device_manager: d,
         })
     }
 }
@@ -115,11 +117,12 @@ impl Rootfs for BlockRootfs {
         Ok(self.storage.clone())
     }
 
-    async fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(Some(self.device_id.clone()))
-    }
     async fn cleanup(&self) -> Result<()> {
-        Ok(())
+        self.device_manager
+            .write()
+            .await
+            .try_remove_device(self.device_id.clone(), &Block)
+            .await
     }
 }
 

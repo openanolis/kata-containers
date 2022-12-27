@@ -65,6 +65,18 @@ impl DeviceManager {
         Err(anyhow!("invalid device class {:?}", class))
     }
 
+    pub async fn try_remove_device(&self, device_id: String, class: &DeviceType) -> Result<()> {
+        if let Some(dev_manager) = self.dev_managers.get(class) {
+            dev_manager
+                .write()
+                .await
+                .try_remove_device(&device_id, self.hypervisor.as_ref())
+                .await
+                .context("failed to remove device")?
+        }
+        Err(anyhow!("invalid device class {:?}", class))
+    }
+
     pub fn get_block_driver(&self) -> String {
         self.block_driver.clone()
     }

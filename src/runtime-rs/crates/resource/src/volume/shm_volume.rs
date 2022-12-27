@@ -104,10 +104,6 @@ impl Volume for ShmVolume {
         warn!(sl!(), "Cleaning up ShmVolume is still unimplemented.");
         Ok(())
     }
-
-    fn get_device_id(&self) -> Result<Option<String>> {
-        Ok(None)
-    }
 }
 
 pub(crate) fn is_shim_volume(m: &oci::Mount) -> bool {
