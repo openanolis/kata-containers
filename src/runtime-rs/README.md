@@ -81,6 +81,8 @@ Resources are classified into two types:
 - sandbox resources: network, share-fs
 - container resources: rootfs, volume, cgroup
 
+Also, a device manager used for the container devices and hypervisor devices management.
+
 [Here](../../docs/design/architecture_3.0/README.md#resource-manager) is a detailed description of the resources.
 
 ### hypervisor
