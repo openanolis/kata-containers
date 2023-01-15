@@ -13,6 +13,7 @@ use anyhow::{anyhow, Context, Result};
 use ini::Ini;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{Mutex, RwLock};
+
 pub type ArcBoxDevice = Arc<Mutex<Box<dyn Device>>>;
 const SYS_DEV_PREFIX: &str = "/sys/dev";
 

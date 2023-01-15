@@ -12,6 +12,7 @@ mod blk_dev_manager;
 pub mod device_manager;
 pub mod device_type;
 mod vfio_dev_manager;
+mod vhost_dev_manager;
 use agent::types::Device as AgentDevice;
 use anyhow::Result;
 
@@ -24,6 +25,7 @@ pub enum DeviceType {
     ShareFsMount,
     Vsock,
     HybridVsock,
+    Vhost,
     Undefined,
 }
 

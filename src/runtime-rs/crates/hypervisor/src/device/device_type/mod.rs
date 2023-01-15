@@ -5,6 +5,7 @@
 //
 
 mod block;
+pub mod vhost_user_device;
 use crate::Hypervisor as hypervisor;
 use async_trait::async_trait;
 pub use block::{BlockConfig, BlockDevice};

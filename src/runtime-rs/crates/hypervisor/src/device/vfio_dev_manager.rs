@@ -41,7 +41,7 @@ impl VfioDeviceManager {
 
     async fn _find_device(&self, bdf: Option<&String>) -> Option<Arc<Mutex<VfioDevice>>> {
         if bdf.is_some() {
-            return self._find_device_by_bdf(bdf).await;
+            self._find_device_by_bdf(bdf).await
         } else {
             None
         }
