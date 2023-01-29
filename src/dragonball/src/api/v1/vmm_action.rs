@@ -35,6 +35,8 @@ pub use crate::device_manager::virtio_net_dev_mgr::{
 #[cfg(feature = "virtio-vsock")]
 pub use crate::device_manager::vsock_dev_mgr::{VsockDeviceConfigInfo, VsockDeviceError};
 
+#[cfg(feature = "virtio-balloon")]
+pub use crate::device_manager::balloon_dev_mgr::{BalloonDeviceConfigInfo, BalloonDeviceError};
 #[cfg(feature = "hotplug")]
 pub use crate::vcpu::{VcpuResizeError, VcpuResizeInfo};
 
@@ -97,6 +99,15 @@ pub enum VmmActionError {
     /// The action `ResizeVcpu` Failed
     #[error("vcpu resize error : {0}")]
     ResizeVcpu(#[source] VcpuResizeError),
+
+    #[cfg(feature = "virtio-balloon")]
+    /// Balloon device related errors.
+    #[error("virtio-balloon device error: {0}")]
+    Balloon(#[source] BalloonDeviceError),
+
+    /// Cannot access address space.
+    #[error("Cannot access address space.")]
+    AddressSpaceNotInitialized,
 }
 
 /// This enum represents the public interface of the VMM. Each action contains various
@@ -172,6 +183,11 @@ pub enum VmmAction {
     #[cfg(feature = "hotplug")]
     /// Resize Vcpu number in the guest.
     ResizeVcpu(VcpuResizeInfo),
+
+    #[cfg(feature = "virtio-balloon")]
+    /// Add a new balloon device or update one that already exists using the `BalloonDeviceConfig`
+    /// as input.
+    InsertBalloonDevice(BalloonDeviceConfigInfo),
 }
 
 /// The enum represents the response sent by the VMM in case of success. The response is either
@@ -274,6 +290,10 @@ impl VmmService {
             }
             #[cfg(feature = "hotplug")]
             VmmAction::ResizeVcpu(vcpu_resize_cfg) => self.resize_vcpu(vmm, vcpu_resize_cfg),
+            #[cfg(feature = "virtio-balloon")]
+            VmmAction::InsertBalloonDevice(balloon_cfg) => {
+                self.add_balloon_device(vmm, event_mgr, balloon_cfg)
+            }
         };
 
         debug!("send vmm response: {:?}", response);
@@ -643,6 +663,39 @@ impl VmmService {
         })?;
 
         Ok(VmmData::Empty)
+    }
+
+    #[cfg(feature = "virtio-balloon")]
+    fn add_balloon_device(
+        &mut self,
+        vmm: &mut Vmm,
+        event_mgr: &mut EventManager,
+        config: BalloonDeviceConfigInfo,
+    ) -> VmmRequestResult {
+        let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
+
+        if config.size_mib != 0 {
+            info!("add_balloon_device: wait prealloc");
+            vm.stop_prealloc().map_err(VmmActionError::StartMicroVm)?;
+        }
+
+        let ctx = vm
+            .create_device_op_context(Some(event_mgr.epoll_manager()))
+            .map_err(|e| {
+                if let StartMicroVmError::MicroVMAlreadyRunning = e {
+                    VmmActionError::Balloon(BalloonDeviceError::UpdateNotAllowedPostBoot)
+                } else if let StartMicroVmError::UpcallServerNotReady = e {
+                    VmmActionError::UpcallServerNotReady
+                } else {
+                    VmmActionError::StartMicroVm(e)
+                }
+            })?;
+
+        vm.device_manager_mut()
+            .balloon_manager
+            .insert_device(ctx, config.into())
+            .map(|_| VmmData::Empty)
+            .map_err(VmmActionError::Balloon)
     }
 }
 
@@ -1441,6 +1494,46 @@ mod tests {
                     guest_cid: 3,
                     ..Default::default()
                 }),
+                InstanceState::Uninitialized,
+                &|result| {
+                    assert!(result.is_ok());
+                },
+            ),
+        ];
+
+        for t in tests.iter_mut() {
+            t.check_request();
+        }
+    }
+
+    #[cfg(feature = "virtio-balloon")]
+    #[test]
+    fn test_vmm_action_insert_balloon_device() {
+        skip_if_not_root!();
+
+        let tests = &mut [
+            // hotplug unready
+            TestData::new(
+                VmmAction::InsertBalloonDevice(BalloonDeviceConfigInfo::default()),
+                InstanceState::Running,
+                &|result| {
+                    assert!(matches!(
+                        result,
+                        Err(VmmActionError::StartMicroVm(
+                            StartMicroVmError::UpcallMissVsock
+                        ))
+                    ));
+                    let err_string = format!("{}", result.unwrap_err());
+                    let expected_err = String::from(
+                        "failed to boot the VM: \
+                        the upcall client needs a virtio-vsock device for communication",
+                    );
+                    assert_eq!(err_string, expected_err);
+                },
+            ),
+            // success
+            TestData::new(
+                VmmAction::InsertBalloonDevice(BalloonDeviceConfigInfo::default()),
                 InstanceState::Uninitialized,
                 &|result| {
                     assert!(result.is_ok());
