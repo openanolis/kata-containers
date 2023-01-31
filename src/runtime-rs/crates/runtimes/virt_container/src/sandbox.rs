@@ -21,6 +21,7 @@ use kata_types::config::{
     default::{DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT},
     TomlConfig,
 };
+use protocols::{image, image_runtime};
 use resource::{
     manager::ManagerArgs,
     network::{NetworkConfig, NetworkWithNetNsConfig},
@@ -278,6 +279,23 @@ impl Sandbox for VirtSandbox {
 
     async fn agent_sock(&self) -> Result<String> {
         self.agent.agent_sock().await
+    }
+
+    async fn pull_image(
+        &self,
+        req: image_runtime::PullImageRequest,
+    ) -> Result<image_runtime::PullImageResponse> {
+        let agent_req = image::PullImageRequest {
+            image: req.image,
+            container_id: req.container_id,
+            source_creds: req.source_creds,
+            ..Default::default()
+        };
+        let agent_resp = self.agent.pull_image(agent_req).await?;
+        Ok(image_runtime::PullImageResponse {
+            image_ref: agent_resp.image_ref,
+            ..Default::default()
+        })
     }
 
     async fn set_iptables(&self, is_ipv6: bool, data: Vec<u8>) -> Result<Vec<u8>> {

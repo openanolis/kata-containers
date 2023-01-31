@@ -16,6 +16,10 @@ pub mod health_ttrpc;
 #[cfg(feature = "async")]
 pub mod health_ttrpc_async;
 pub mod image;
+pub mod image_runtime;
+pub mod image_runtime_ttrpc;
+#[cfg(feature = "async")]
+pub mod image_runtime_ttrpc_async;
 pub mod image_ttrpc;
 #[cfg(feature = "async")]
 pub mod image_ttrpc_async;

@@ -319,6 +319,10 @@ impl RuntimeHandlerManager {
                     .await
                     .context("connect")?,
             )),
+            Request::PullImage(req) => {
+                let resp = sandbox.pull_image(req).await.context("pull image")?;
+                Ok(Response::PullImage(resp))
+            }
         }
     }
 }

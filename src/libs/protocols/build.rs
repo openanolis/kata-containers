@@ -163,6 +163,7 @@ fn real_main() -> Result<(), std::io::Error> {
                 "protos/agent.proto",
                 "protos/health.proto",
                 "protos/image.proto",
+                "protos/image_runtime.proto",
             ],
             true,
         )?;
@@ -170,6 +171,10 @@ fn real_main() -> Result<(), std::io::Error> {
         fs::rename("src/agent_ttrpc.rs", "src/agent_ttrpc_async.rs")?;
         fs::rename("src/health_ttrpc.rs", "src/health_ttrpc_async.rs")?;
         fs::rename("src/image_ttrpc.rs", "src/image_ttrpc_async.rs")?;
+        fs::rename(
+            "src/image_runtime_ttrpc.rs",
+            "src/image_runtime_ttrpc_async.rs",
+        )?;
     }
 
     codegen(
@@ -178,6 +183,7 @@ fn real_main() -> Result<(), std::io::Error> {
             "protos/agent.proto",
             "protos/health.proto",
             "protos/image.proto",
+            "protos/image_runtime.proto",
         ],
         false,
     )?;

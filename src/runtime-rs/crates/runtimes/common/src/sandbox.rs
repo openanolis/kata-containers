@@ -7,6 +7,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
+use protocols::image_runtime::{PullImageRequest, PullImageResponse};
+
 #[async_trait]
 pub trait Sandbox: Send + Sync {
     async fn start(&self, netns: Option<String>) -> Result<()>;
@@ -16,6 +18,9 @@ pub trait Sandbox: Send + Sync {
 
     // agent function
     async fn agent_sock(&self) -> Result<String>;
+
+    // image function
+    async fn pull_image(&self, req: PullImageRequest) -> Result<PullImageResponse>;
 
     // utils
     async fn set_iptables(&self, is_ipv6: bool, data: Vec<u8>) -> Result<Vec<u8>>;
