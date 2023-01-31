@@ -495,6 +495,7 @@ dependencies = [
  "oci",
  "persist",
  "protobuf 3.2.0",
+ "protocols",
  "serde_json",
  "slog",
  "slog-scope",
@@ -1507,6 +1508,7 @@ dependencies = [
 name = "kata-sys-util"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "byteorder",
  "cgroups-rs",
  "chrono",
@@ -2899,6 +2901,7 @@ dependencies = [
  "containerd-shim-protos",
  "logging",
  "persist",
+ "protocols",
  "runtimes",
  "shim-interface",
  "slog",
@@ -3694,6 +3697,7 @@ dependencies = [
  "oci",
  "persist",
  "protobuf 3.2.0",
+ "protocols",
  "resource",
  "serde",
  "serde_derive",
