@@ -59,60 +59,22 @@ impl RootFsResource {
         hypervisor: &dyn Hypervisor,
         sid: &str,
         cid: &str,
-        root: &oci::Root,
+        root_path: &str,
         bundle_path: &str,
         rootfs_mounts: &[Mount],
-    ) -> Result<Arc<dyn Rootfs>> {
+        is_image_offload: bool,
+    ) -> Result<Option<Arc<dyn Rootfs>>> {
         match rootfs_mounts {
-            // if rootfs_mounts is empty
             mounts_vec if mounts_vec.is_empty() => {
-                if let Some(share_fs) = share_fs {
-                    // share fs rootfs
-                    Ok(Arc::new(
-                        share_fs_rootfs::ShareFsRootfs::new(
-                            share_fs,
-                            cid,
-                            root.path.as_str(),
-                            None,
-                        )
-                        .await
-                        .context("new share fs rootfs")?,
-                    ))
-                } else {
-                    return Err(anyhow!("share fs is unavailable"));
-                }
+                // No rootfs_mounts when creating container from bundle or creating confidential containers.
+                self.handle_empty_rootfs(share_fs, cid, root_path, is_image_offload)
+                    .await
             }
             mounts_vec if is_single_layer_rootfs(mounts_vec) => {
                 // Safe as single_layer_rootfs must have one layer
                 let layer = &mounts_vec[0];
-                let rootfs: Arc<dyn Rootfs> = if let Some(share_fs) = share_fs {
-                    // nydus rootfs
-                    if layer.fs_type == NYDUS_ROOTFS_TYPE {
-                        Arc::new(
-                            nydus_rootfs::NydusRootfs::new(share_fs, hypervisor, sid, cid, layer)
-                                .await
-                                .context("new nydus rootfs")?,
-                        )
-                    } else {
-                        // share fs rootfs
-                        Arc::new(
-                            share_fs_rootfs::ShareFsRootfs::new(
-                                share_fs,
-                                cid,
-                                bundle_path,
-                                Some(layer),
-                            )
-                            .await
-                            .context("new share fs rootfs")?,
-                        )
-                    }
-                } else {
-                    return Err(anyhow!("unsupported rootfs {:?}", &layer));
-                };
-
-                let mut inner = self.inner.write().await;
-                inner.rootfs.push(Arc::clone(&rootfs));
-                Ok(rootfs)
+                self.handle_single_layer_rootfs(share_fs, hypervisor, sid, cid, bundle_path, layer)
+                    .await
             }
             _ => {
                 return Err(anyhow!(
@@ -133,6 +95,66 @@ impl RootFsResource {
                 Arc::strong_count(r)
             );
         }
+    }
+
+    async fn handle_empty_rootfs(
+        &self,
+        share_fs: &Option<Arc<dyn ShareFs>>,
+        cid: &str,
+        root_path: &str,
+        is_image_offload: bool,
+    ) -> Result<Option<Arc<dyn Rootfs>>> {
+        // In condfidential computing, there is no image information on the host,
+        // so there is no Rootfs.
+        if is_image_offload {
+            return Ok(None);
+        }
+
+        if let Some(share_fs) = share_fs {
+            // sharefs rootfs
+            let rootfs = Arc::new(
+                share_fs_rootfs::ShareFsRootfs::new(share_fs, cid, root_path, None)
+                    .await
+                    .context("new share fs rootfs")?,
+            );
+            Ok(Some(rootfs))
+        } else {
+            Err(anyhow!("share fs is unavailable"))
+        }
+    }
+
+    async fn handle_single_layer_rootfs(
+        &self,
+        share_fs: &Option<Arc<dyn ShareFs>>,
+        hypervisor: &dyn Hypervisor,
+        sid: &str,
+        cid: &str,
+        bundle_path: &str,
+        layer: &Mount,
+    ) -> Result<Option<Arc<dyn Rootfs>>> {
+        let rootfs: Arc<dyn Rootfs> = if let Some(share_fs) = share_fs {
+            if layer.fs_type == NYDUS_ROOTFS_TYPE {
+                // nydus rootfs
+                Arc::new(
+                    nydus_rootfs::NydusRootfs::new(share_fs, hypervisor, sid, cid, layer)
+                        .await
+                        .context("new nydus rootfs")?,
+                )
+            } else {
+                // share fs rootfs
+                Arc::new(
+                    share_fs_rootfs::ShareFsRootfs::new(share_fs, cid, bundle_path, Some(layer))
+                        .await
+                        .context("new share fs rootfs")?,
+                )
+            }
+        } else {
+            return Err(anyhow!("unsupported rootfs {:?}", &layer));
+        };
+
+        let mut inner = self.inner.write().await;
+        inner.rootfs.push(Arc::clone(&rootfs));
+        Ok(Some(rootfs))
     }
 }
 
