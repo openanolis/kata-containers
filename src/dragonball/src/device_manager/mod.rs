@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 
 use std::io;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use arc_swap::ArcSwap;
 use dbs_address_space::AddressSpace;
@@ -45,9 +45,10 @@ use dbs_upcall::{
 use dbs_virtio_devices::vsock::backend::VsockInnerConnector;
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
+use crate::api::v1::InstanceInfo;
 use crate::error::StartMicroVmError;
 use crate::resource_manager::ResourceManager;
-use crate::vm::{KernelConfigInfo, Vm};
+use crate::vm::{KernelConfigInfo, Vm, VmConfigInfo};
 use crate::IoManagerCached;
 
 /// Virtual machine console device manager.
@@ -264,6 +265,8 @@ pub struct DeviceOpContext {
     upcall_client: Option<Arc<UpcallClient<DevMgrService>>>,
     #[cfg(feature = "dbs-virtio-devices")]
     virtio_devices: Vec<Arc<DbsMmioV2Device>>,
+    vm_config: Option<VmConfigInfo>,
+    shared_info: Arc<RwLock<InstanceInfo>>,
 }
 
 impl DeviceOpContext {
@@ -273,6 +276,8 @@ impl DeviceOpContext {
         vm_as: Option<GuestAddressSpaceImpl>,
         address_space: Option<AddressSpace>,
         is_hotplug: bool,
+        vm_config: Option<VmConfigInfo>,
+        shared_info: Arc<RwLock<InstanceInfo>>,
     ) -> Self {
         let irq_manager = device_mgr.irq_manager.clone();
         let res_manager = device_mgr.res_manager.clone();
@@ -298,11 +303,21 @@ impl DeviceOpContext {
             upcall_client: None,
             #[cfg(feature = "dbs-virtio-devices")]
             virtio_devices: Vec::new(),
+            vm_config,
+            shared_info,
         }
     }
 
     pub(crate) fn create_boot_ctx(vm: &Vm, epoll_mgr: Option<EpollManager>) -> Self {
-        Self::new(epoll_mgr, vm.device_manager(), None, None, false)
+        Self::new(
+            epoll_mgr,
+            vm.device_manager(),
+            None,
+            None,
+            false,
+            Some(vm.vm_config().clone()),
+            vm.shared_info().clone(),
+        )
     }
 
     pub(crate) fn get_vm_as(&self) -> Result<GuestAddressSpaceImpl> {
@@ -402,6 +417,8 @@ impl DeviceOpContext {
             Some(vm_as),
             vm.vm_address_space().cloned(),
             true,
+            Some(vm.vm_config().clone()),
+            vm.shared_info().clone(),
         );
         ctx.upcall_client = vm.upcall_client().clone();
         ctx
@@ -479,7 +496,7 @@ pub struct DeviceManager {
     res_manager: Arc<ResourceManager>,
     vm_fd: Arc<VmFd>,
     pub(crate) logger: slog::Logger,
-
+    pub(crate) shared_info: Arc<RwLock<InstanceInfo>>,
     pub(crate) con_manager: ConsoleManager,
     pub(crate) legacy_manager: Option<LegacyDeviceManager>,
     #[cfg(target_arch = "aarch64")]
@@ -512,6 +529,7 @@ impl DeviceManager {
         res_manager: Arc<ResourceManager>,
         epoll_manager: EpollManager,
         logger: &slog::Logger,
+        shared_info: Arc<RwLock<InstanceInfo>>,
     ) -> Self {
         DeviceManager {
             io_manager: Arc::new(ArcSwap::new(Arc::new(IoManager::new()))),
@@ -520,6 +538,7 @@ impl DeviceManager {
             res_manager,
             vm_fd,
             logger: logger.new(slog::o!()),
+            shared_info,
 
             con_manager: ConsoleManager::new(epoll_manager, logger),
             legacy_manager: None,
@@ -662,9 +681,9 @@ impl DeviceManager {
         vm_as: GuestAddressSpaceImpl,
         epoll_mgr: EpollManager,
         kernel_config: &mut KernelConfigInfo,
-        com1_sock_path: Option<String>,
         dmesg_fifo: Option<Box<dyn io::Write + Send>>,
         address_space: Option<&AddressSpace>,
+        vm_config: &VmConfigInfo,
     ) -> std::result::Result<(), StartMicroVmError> {
         let mut ctx = DeviceOpContext::new(
             Some(epoll_mgr),
@@ -672,7 +691,11 @@ impl DeviceManager {
             Some(vm_as),
             address_space.cloned(),
             false,
+            Some(vm_config.clone()),
+            self.shared_info.clone(),
         );
+
+        let com1_sock_path = vm_config.serial_path.clone();
 
         self.create_legacy_devices(&mut ctx)?;
         self.init_legacy_devices(dmesg_fifo, com1_sock_path, &mut ctx)?;
@@ -736,6 +759,8 @@ impl DeviceManager {
             Some(vm_as),
             address_space.cloned(),
             true,
+            None,
+            self.shared_info.clone(),
         );
 
         #[cfg(feature = "virtio-blk")]
@@ -1065,6 +1090,10 @@ mod tests {
             let epoll_manager = EpollManager::default();
             let res_manager = Arc::new(ResourceManager::new(None));
             let logger = slog_scope::logger().new(slog::o!());
+            let shared_info = Arc::new(RwLock::new(InstanceInfo::new(
+                String::from("dragonball"),
+                String::from("1"),
+            )));
 
             DeviceManager {
                 vm_fd: Arc::clone(&vm_fd),
@@ -1091,6 +1120,7 @@ mod tests {
                 mmio_device_info: HashMap::new(),
 
                 logger,
+                shared_info,
             }
         }
     }
@@ -1130,7 +1160,7 @@ mod tests {
             },
             vpmu_feature: 0,
         };
-        vm.set_vm_config(vm_config);
+        vm.set_vm_config(vm_config.clone());
         vm.init_guest_memory().unwrap();
         vm.setup_interrupt_controller().unwrap();
         let vm_as = vm.vm_as().cloned().unwrap();
@@ -1156,8 +1186,8 @@ mod tests {
             event_mgr.epoll_manager(),
             &mut cmdline,
             None,
-            None,
             address_space.as_ref(),
+            &vm_config,
         )
         .unwrap();
         let guard = mgr.io_manager.load();
@@ -1181,6 +1211,8 @@ mod tests {
             Some(vm.vm_as().unwrap().clone()),
             vm.vm_address_space().cloned(),
             true,
+            Some(vm.vm_config().clone()),
+            vm.shared_info().clone(),
         );
         let guest_addr = GuestAddress(0x200000000000);
 
