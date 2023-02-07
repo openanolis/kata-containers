@@ -40,6 +40,9 @@ pub use crate::device_manager::balloon_dev_mgr::{BalloonDeviceConfigInfo, Balloo
 #[cfg(feature = "hotplug")]
 pub use crate::vcpu::{VcpuResizeError, VcpuResizeInfo};
 
+#[cfg(feature = "virtio-mem")]
+pub use crate::device_manager::mem_dev_mgr::{MemDeviceConfigInfo, MemDeviceError};
+
 use super::*;
 
 /// Wrapper for all errors associated with VMM actions.
@@ -108,6 +111,11 @@ pub enum VmmActionError {
     /// Cannot access address space.
     #[error("Cannot access address space.")]
     AddressSpaceNotInitialized,
+
+    #[cfg(feature = "virtio-mem")]
+    /// Mem device related errors.
+    #[error("virtio-mem device error: {0}")]
+    Mem(#[source] MemDeviceError),
 }
 
 /// This enum represents the public interface of the VMM. Each action contains various
@@ -188,6 +196,10 @@ pub enum VmmAction {
     /// Add a new balloon device or update one that already exists using the `BalloonDeviceConfig`
     /// as input.
     InsertBalloonDevice(BalloonDeviceConfigInfo),
+
+    #[cfg(feature = "virtio-mem")]
+    /// Add a new mem device or update one that already exists using the `MemDeviceConfig` as input.
+    InsertMemDevice(MemDeviceConfigInfo),
 }
 
 /// The enum represents the response sent by the VMM in case of success. The response is either
@@ -294,6 +306,8 @@ impl VmmService {
             VmmAction::InsertBalloonDevice(balloon_cfg) => {
                 self.add_balloon_device(vmm, event_mgr, balloon_cfg)
             }
+            #[cfg(feature = "virtio-mem")]
+            VmmAction::InsertMemDevice(mem_cfg) => self.add_mem_device(vmm, event_mgr, mem_cfg),
         };
 
         debug!("send vmm response: {:?}", response);
@@ -696,6 +710,34 @@ impl VmmService {
             .insert_device(ctx, config.into())
             .map(|_| VmmData::Empty)
             .map_err(VmmActionError::Balloon)
+    }
+
+    #[cfg(feature = "virtio-mem")]
+    fn add_mem_device(
+        &mut self,
+        vmm: &mut Vmm,
+        event_mgr: &mut EventManager,
+        config: MemDeviceConfigInfo,
+    ) -> VmmRequestResult {
+        let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
+
+        let ctx = vm
+            .create_device_op_context(Some(event_mgr.epoll_manager()))
+            .map_err(|e| {
+                if let StartMicroVmError::MicroVMAlreadyRunning = e {
+                    VmmActionError::Mem(MemDeviceError::UpdateNotAllowedPostBoot)
+                } else if let StartMicroVmError::UpcallServerNotReady = e {
+                    VmmActionError::UpcallServerNotReady
+                } else {
+                    VmmActionError::StartMicroVm(e)
+                }
+            })?;
+
+        vm.device_manager_mut()
+            .mem_manager
+            .insert_device(ctx, config.into())
+            .map(|_| VmmData::Empty)
+            .map_err(VmmActionError::Mem)
     }
 }
 
