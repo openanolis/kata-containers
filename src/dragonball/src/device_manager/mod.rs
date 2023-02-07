@@ -95,6 +95,12 @@ pub mod balloon_dev_mgr;
 #[cfg(feature = "virtio-balloon")]
 use self::balloon_dev_mgr::BalloonDeviceMgr;
 
+#[cfg(feature = "virtio-mem")]
+/// Device manager for virtio-mem devices.
+pub mod mem_dev_mgr;
+#[cfg(feature = "virtio-mem")]
+use self::mem_dev_mgr::MemDeviceMgr;
+
 macro_rules! info(
     ($l:expr, $($args:tt)+) => {
         slog::info!($l, $($args)+; slog::o!("subsystem" => "device_manager"))
@@ -494,6 +500,9 @@ pub struct DeviceManager {
 
     #[cfg(feature = "virtio-balloon")]
     pub(crate) balloon_manager: BalloonDeviceMgr,
+
+    #[cfg(feature = "virtio-mem")]
+    pub(crate) mem_manager: MemDeviceMgr,
 }
 
 impl DeviceManager {
@@ -526,6 +535,8 @@ impl DeviceManager {
             fs_manager: Arc::new(Mutex::new(FsDeviceMgr::default())),
             #[cfg(feature = "virtio-balloon")]
             balloon_manager: BalloonDeviceMgr::default(),
+            #[cfg(feature = "virtio-mem")]
+            mem_manager: MemDeviceMgr::default(),
         }
     }
 
@@ -1074,6 +1085,8 @@ mod tests {
                 vsock_manager: VsockDeviceMgr::default(),
                 #[cfg(feature = "virtio-balloon")]
                 balloon_manager: BalloonDeviceMgr::default(),
+                #[cfg(feature = "virtio-mem")]
+                mem_manager: MemDeviceMgr::default(),
                 #[cfg(target_arch = "aarch64")]
                 mmio_device_info: HashMap::new(),
 
