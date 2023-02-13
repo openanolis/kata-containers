@@ -112,7 +112,7 @@ impl Vcpu {
             .map_err(VcpuError::REGSConfiguration)?;
         }
 
-        self.mpidr = regs::read_mpidr(&self.fd).map_err(VcpuError::REGSConfiguration)?;
+        self.mpidr = regs::read_mpidr(&self.fd).map_err(VcpuError::REGSConfiguration)? as u64;
 
         Ok(())
     }
