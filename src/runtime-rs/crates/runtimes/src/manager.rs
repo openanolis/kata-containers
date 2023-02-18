@@ -12,7 +12,7 @@ use crate::{shim_mgmt::server::MgmtServer, static_resource::StaticResourceManage
 use common::{
     message::Message,
     types::{Request, Response},
-    RuntimeHandler, RuntimeInstance, Sandbox,
+    RuntimeHandler, Sandbox,
 };
 use hypervisor::Param;
 use kata_types::{
@@ -36,7 +36,7 @@ use wasm_container::WasmContainer;
 struct RuntimeHandlerManagerInner {
     id: String,
     msg_sender: Sender<Message>,
-    runtime_instance: Option<Arc<RuntimeInstance>>,
+    runtime_handler: Option<Arc<dyn RuntimeHandler>>,
 }
 
 impl RuntimeHandlerManagerInner {
@@ -44,7 +44,7 @@ impl RuntimeHandlerManagerInner {
         Ok(Self {
             id: id.to_string(),
             msg_sender,
-            runtime_instance: None,
+            runtime_handler: None,
         })
     }
 
@@ -55,35 +55,31 @@ impl RuntimeHandlerManagerInner {
         config: Arc<TomlConfig>,
     ) -> Result<()> {
         info!(sl!(), "new runtime handler {}", &config.runtime.name);
-        let runtime_handler = match config.runtime.name.as_str() {
+        let runtime_handler: Arc<dyn RuntimeHandler> = match config.runtime.name.as_str() {
             #[cfg(feature = "linux")]
-            name if name == LinuxContainer::name() => LinuxContainer::new_handler(),
+            name if name == LinuxContainer::name() => Arc::new(LinuxContainer::new().await?),
             #[cfg(feature = "wasm")]
-            name if name == WasmContainer::name() => WasmContainer::new_handler(),
+            name if name == WasmContainer::name() => Arc::new(WasmContainer::new().await?),
             #[cfg(feature = "virt")]
             name if name == VirtContainer::name() || name.is_empty() => {
-                VirtContainer::new_handler()
+                Arc::new(VirtContainer::new(&self.id, self.msg_sender.clone(), config).await?)
             }
             _ => return Err(anyhow!("Unsupported runtime: {}", &config.runtime.name)),
         };
-        let runtime_instance = runtime_handler
-            .new_instance(&self.id, self.msg_sender.clone(), config)
-            .await
-            .context("new runtime instance")?;
 
         // start sandbox
-        runtime_instance
-            .sandbox
+        runtime_handler
+            .get_sandbox()
             .start(netns, dns)
             .await
             .context("start sandbox")?;
-        self.runtime_instance = Some(Arc::new(runtime_instance));
+        self.runtime_handler = Some(runtime_handler);
         Ok(())
     }
 
     async fn try_init(&mut self, spec: &oci::Spec, options: &Option<Vec<u8>>) -> Result<()> {
-        // return if runtime instance has init
-        if self.runtime_instance.is_some() {
+        // return if runtime handler has init
+        if self.runtime_handler.is_some() {
             return Ok(());
         }
 
@@ -125,14 +121,13 @@ impl RuntimeHandlerManagerInner {
             .await
             .context("init runtime handler")?;
 
+        let handler = self.get_runtime_handler().context("get runtime handler")?;
+
         // the sandbox creation can reach here only once and the sandbox is created
         // so we can safely create the shim management socket right now
         // the unwrap here is safe because the runtime handler is correctly created
-        let shim_mgmt_svr = MgmtServer::new(
-            &self.id,
-            self.runtime_instance.as_ref().unwrap().sandbox.clone(),
-        )
-        .context(ERR_NO_SHIM_SERVER)?;
+        let shim_mgmt_svr =
+            MgmtServer::new(&self.id, handler.get_sandbox()).context(ERR_NO_SHIM_SERVER)?;
 
         tokio::task::spawn(Arc::new(shim_mgmt_svr).run());
         info!(sl!(), "shim management http server starts");
@@ -140,8 +135,8 @@ impl RuntimeHandlerManagerInner {
         Ok(())
     }
 
-    fn get_runtime_instance(&self) -> Option<Arc<RuntimeInstance>> {
-        self.runtime_instance.clone()
+    fn get_runtime_handler(&self) -> Option<Arc<dyn RuntimeHandler>> {
+        self.runtime_handler.clone()
     }
 }
 
@@ -197,14 +192,14 @@ impl RuntimeHandlerManager {
         Ok(())
     }
 
-    async fn get_runtime_instance(&self) -> Result<Arc<RuntimeInstance>> {
+    async fn get_runtime_handler(&self) -> Result<Arc<dyn RuntimeHandler>> {
         let inner = self.inner.read().await;
         inner
-            .get_runtime_instance()
+            .get_runtime_handler()
             .ok_or_else(|| anyhow!("runtime not ready"))
     }
 
-    async fn try_init_runtime_instance(
+    async fn try_init_runtime_handler(
         &self,
         spec: &oci::Spec,
         options: &Option<Vec<u8>>,
@@ -223,16 +218,16 @@ impl RuntimeHandlerManager {
             );
             let spec = oci::Spec::load(&bundler_path).context("load spec")?;
 
-            self.try_init_runtime_instance(&spec, &container_config.options)
+            self.try_init_runtime_handler(&spec, &container_config.options)
                 .await
-                .context("try init runtime instance")?;
-            let instance = self
-                .get_runtime_instance()
+                .context("try init runtime handler")?;
+            let handler = self
+                .get_runtime_handler()
                 .await
-                .context("get runtime instance")?;
+                .context("get runtime handler")?;
 
-            let shim_pid = instance
-                .container_manager
+            let shim_pid = handler
+                .get_container_manager()
                 .create_container(container_config, spec)
                 .await
                 .context("create container")?;
@@ -244,12 +239,12 @@ impl RuntimeHandlerManager {
     }
 
     pub async fn handler_request(&self, req: Request) -> Result<Response> {
-        let instance = self
-            .get_runtime_instance()
+        let handler = self
+            .get_runtime_handler()
             .await
-            .context("get runtime instance")?;
-        let sandbox = instance.sandbox.clone();
-        let cm = instance.container_manager.clone();
+            .context("get runtime handler")?;
+        let sandbox = handler.get_sandbox();
+        let cm = handler.get_container_manager();
 
         match req {
             Request::CreateContainer(req) => Err(anyhow!("Unreachable request {:?}", req)),

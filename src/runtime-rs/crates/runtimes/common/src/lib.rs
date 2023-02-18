@@ -9,7 +9,7 @@ pub use container_manager::ContainerManager;
 pub mod error;
 pub mod message;
 mod runtime_handler;
-pub use runtime_handler::{RuntimeHandler, RuntimeInstance};
+pub use runtime_handler::RuntimeHandler;
 mod sandbox;
 pub use sandbox::Sandbox;
 pub mod types;

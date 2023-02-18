@@ -5,18 +5,9 @@
 //
 use std::sync::Arc;
 
+use crate::{ContainerManager, Sandbox};
 use anyhow::Result;
 use async_trait::async_trait;
-use kata_types::config::TomlConfig;
-use tokio::sync::mpsc::Sender;
-
-use crate::{message::Message, ContainerManager, Sandbox};
-
-#[derive(Clone)]
-pub struct RuntimeInstance {
-    pub sandbox: Arc<dyn Sandbox>,
-    pub container_manager: Arc<dyn ContainerManager>,
-}
 
 #[async_trait]
 pub trait RuntimeHandler: Send + Sync {
@@ -28,16 +19,11 @@ pub trait RuntimeHandler: Send + Sync {
     where
         Self: Sized;
 
-    fn new_handler() -> Arc<dyn RuntimeHandler>
-    where
-        Self: Sized;
+    fn get_sandbox(&self) -> Arc<dyn Sandbox>;
 
-    async fn new_instance(
-        &self,
-        sid: &str,
-        msg_sender: Sender<Message>,
-        config: Arc<TomlConfig>,
-    ) -> Result<RuntimeInstance>;
+    fn get_container_manager(&self) -> Arc<dyn ContainerManager>;
+
+    async fn update_sandbox_resource(&self) -> Result<()>;
 
     fn cleanup(&self, id: &str) -> Result<()>;
 }

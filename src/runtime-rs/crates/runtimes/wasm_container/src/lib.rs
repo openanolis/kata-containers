@@ -7,10 +7,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use common::{message::Message, RuntimeHandler, RuntimeInstance};
-use kata_types::config::TomlConfig;
-use tokio::sync::mpsc::Sender;
+use common::{ContainerManager, RuntimeHandler, Sandbox};
 pub struct WasmContainer {}
+
+impl WasmContainer {
+    pub async fn new() -> Result<Self> {
+        Ok(WasmContainer {})
+    }
+}
 
 #[async_trait]
 impl RuntimeHandler for WasmContainer {
@@ -22,16 +26,15 @@ impl RuntimeHandler for WasmContainer {
         "wasm_container".to_string()
     }
 
-    fn new_handler() -> Arc<dyn RuntimeHandler> {
-        Arc::new(WasmContainer {})
+    fn get_sandbox(&self) -> Arc<dyn Sandbox> {
+        todo!()
     }
 
-    async fn new_instance(
-        &self,
-        _sid: &str,
-        _msg_sender: Sender<Message>,
-        _config: Arc<TomlConfig>,
-    ) -> Result<RuntimeInstance> {
+    fn get_container_manager(&self) -> Arc<dyn ContainerManager> {
+        todo!()
+    }
+
+    async fn update_sandbox_resource(&self) -> Result<()> {
         todo!()
     }
 

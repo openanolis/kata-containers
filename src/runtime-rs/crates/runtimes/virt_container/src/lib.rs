@@ -19,7 +19,8 @@ use std::sync::Arc;
 use agent::{kata::KataAgent, AGENT_KATA};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use common::{message::Message, RuntimeHandler, RuntimeInstance};
+use common::{message::Message, RuntimeHandler};
+use common::{ContainerManager, Sandbox};
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
 use hypervisor::{qemu::Qemu, HYPERVISOR_QEMU};
 use kata_types::config::{
@@ -35,7 +36,46 @@ use resource::ResourceManager;
 use sandbox::VIRTCONTAINER;
 use tokio::sync::mpsc::Sender;
 
-pub struct VirtContainer {}
+pub struct VirtContainer {
+    pub sandbox: Arc<dyn Sandbox>,
+    pub container_manager: Arc<dyn ContainerManager>,
+}
+
+impl VirtContainer {
+    pub async fn new(
+        sid: &str,
+        msg_sender: Sender<Message>,
+        config: Arc<TomlConfig>,
+    ) -> Result<Self> {
+        let hypervisor = new_hypervisor(&config).await.context("new hypervisor")?;
+
+        // get uds from hypervisor and get config from toml_config
+        let agent = new_agent(&config).context("new agent")?;
+        let resource_manager = Arc::new(ResourceManager::new(
+            sid,
+            agent.clone(),
+            hypervisor.clone(),
+            config,
+        )?);
+        let pid = std::process::id();
+
+        let sandbox = sandbox::VirtSandbox::new(
+            sid,
+            msg_sender,
+            agent.clone(),
+            hypervisor,
+            resource_manager.clone(),
+        )
+        .await
+        .context("new virt sandbox")?;
+        let container_manager =
+            container_manager::VirtContainerManager::new(sid, pid, agent, resource_manager);
+        Ok(VirtContainer {
+            sandbox: Arc::new(sandbox),
+            container_manager: Arc::new(container_manager),
+        })
+    }
+}
 
 #[async_trait]
 impl RuntimeHandler for VirtContainer {
@@ -60,43 +100,16 @@ impl RuntimeHandler for VirtContainer {
         VIRTCONTAINER.to_string()
     }
 
-    fn new_handler() -> Arc<dyn RuntimeHandler> {
-        Arc::new(VirtContainer {})
+    fn get_sandbox(&self) -> Arc<dyn Sandbox> {
+        self.sandbox.clone()
     }
 
-    async fn new_instance(
-        &self,
-        sid: &str,
-        msg_sender: Sender<Message>,
-        config: Arc<TomlConfig>,
-    ) -> Result<RuntimeInstance> {
-        let hypervisor = new_hypervisor(&config).await.context("new hypervisor")?;
+    fn get_container_manager(&self) -> Arc<dyn ContainerManager> {
+        self.container_manager.clone()
+    }
 
-        // get uds from hypervisor and get config from toml_config
-        let agent = new_agent(&config).context("new agent")?;
-        let resource_manager = Arc::new(ResourceManager::new(
-            sid,
-            agent.clone(),
-            hypervisor.clone(),
-            config,
-        )?);
-        let pid = std::process::id();
-
-        let sandbox = sandbox::VirtSandbox::new(
-            sid,
-            msg_sender,
-            agent.clone(),
-            hypervisor,
-            resource_manager.clone(),
-        )
-        .await
-        .context("new virt sandbox")?;
-        let container_manager =
-            container_manager::VirtContainerManager::new(sid, pid, agent, resource_manager);
-        Ok(RuntimeInstance {
-            sandbox: Arc::new(sandbox),
-            container_manager: Arc::new(container_manager),
-        })
+    async fn update_sandbox_resource(&self) -> Result<()> {
+        todo!()
     }
 
     fn cleanup(&self, _id: &str) -> Result<()> {
