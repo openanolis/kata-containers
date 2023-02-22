@@ -609,6 +609,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbs-acpi"
+version = "0.1.0"
+dependencies = [
+ "vm-memory",
+]
+
+[[package]]
 name = "dbs-address-space"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -821,6 +828,7 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "bytes 1.4.0",
+ "dbs-acpi",
  "dbs-address-space",
  "dbs-allocator",
  "dbs-arch 0.2.2",
