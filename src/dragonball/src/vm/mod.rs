@@ -206,7 +206,7 @@ impl Vm {
         let vm_fd = match api_shared_info
             .as_ref()
             .read()
-            .unwrap()
+            .expect("failed to get instance state, because shared info is poisoned lock")
             .confidential_vm_type
         {
             None => Arc::new(kvm.create_vm()?),

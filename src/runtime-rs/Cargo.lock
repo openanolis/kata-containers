@@ -634,6 +634,19 @@ dependencies = [
 [[package]]
 name = "dbs-arch"
 version = "0.2.2"
+dependencies = [
+ "kvm-bindings",
+ "kvm-ioctls",
+ "libc",
+ "memoffset",
+ "thiserror",
+ "vm-memory",
+ "vmm-sys-util 0.11.1",
+]
+
+[[package]]
+name = "dbs-arch"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78a2180d71dcfb9a89a8597308ac9f4f8f56ce0bc44119f7fbd9a0bf1a480d72"
 dependencies = [
@@ -652,7 +665,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a74a8c05a1674d3032e610b4f201c7440c345559bad3dfe6b455ce195785108"
 dependencies = [
- "dbs-arch",
+ "dbs-arch 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "kvm-bindings",
  "kvm-ioctls",
  "lazy_static",
@@ -677,7 +690,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1eb2c5bb9f8f123ace33b1b2e8d53dd2d87331ee770ad1f82e56c3382c6bed6d"
 dependencies = [
- "dbs-arch",
+ "dbs-arch 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbs-device",
  "kvm-bindings",
  "kvm-ioctls",
@@ -696,6 +709,15 @@ dependencies = [
  "log",
  "serde",
  "vm-superio",
+ "vmm-sys-util 0.11.1",
+]
+
+[[package]]
+name = "dbs-tdx"
+version = "0.1.0"
+dependencies = [
+ "kvm-bindings",
+ "thiserror",
  "vmm-sys-util 0.11.1",
 ]
 
@@ -801,11 +823,12 @@ dependencies = [
  "bytes 1.4.0",
  "dbs-address-space",
  "dbs-allocator",
- "dbs-arch",
+ "dbs-arch 0.2.2",
  "dbs-boot",
  "dbs-device",
  "dbs-interrupt",
  "dbs-legacy-devices",
+ "dbs-tdx",
  "dbs-upcall",
  "dbs-utils",
  "dbs-virtio-devices",

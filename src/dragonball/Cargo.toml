@@ -14,9 +14,10 @@ arc-swap = "1.5.0"
 bytes = "1.1.0"
 dbs-address-space = "0.2.0"
 dbs-allocator = "0.1.0"
-dbs-arch = "0.2.0"
+dbs-arch = { path = "/home/lvshuang.wc/lvshuang_mnt/dragonball-sandbox/fork/new/dragonball-sandbox/crates/dbs-arch" }
 dbs-boot = "0.3.0"
 dbs-device = "0.2.0"
+dbs-tdx = { path = "/home/lvshuang.wc/lvshuang_mnt/dragonball-sandbox/fork/new/dragonball-sandbox/crates/dbs-tdx" }
 dbs-interrupt = { version = "0.2.0", features = ["kvm-irq"] }
 dbs-legacy-devices = "0.1.0"
 dbs-upcall = { version = "0.2.0", optional = true }
@@ -47,6 +48,7 @@ test-utils = { path = "../libs/test-utils" }
 
 [features]
 acpi = []
+tdx = []
 atomic-guest-memory = [ "vm-memory/backend-atomic" ]
 hotplug = ["virtio-vsock"]
 virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]

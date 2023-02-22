@@ -11,6 +11,8 @@
 
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtIoError;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_tdx::tdx_ioctls::TdxIoctlError;
 
 use crate::{address_space_manager, device_manager, resource_manager, vcpu, vm};
 
@@ -185,6 +187,15 @@ pub enum StartMicroVmError {
     /// Virtio-fs errors.
     #[error("virtio-fs errors: {0}")]
     FsDeviceError(#[source] device_manager::fs_dev_mgr::FsDeviceError),
+
+    /// TDX ioctl related error.
+     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+     #[error("TDX ioctl related error.")]
+     TdxIoctlError(#[source] TdxIoctlError),
+
+    /// TDX not supported
+    #[error("Dragonball without TDX support.")]
+    TdxError,
 }
 
 /// Errors associated with starting the instance.
