@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use kata_types::capabilities::Capabilities;
+use kata_types::capabilities::{Capabilities, CapabilityBits};
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
 use tokio::sync::RwLock;
 use tracing::instrument;
@@ -167,6 +167,21 @@ impl Hypervisor for Dragonball {
     async fn get_hypervisor_metrics(&self) -> Result<String> {
         let inner = self.inner.read().await;
         inner.get_hypervisor_metrics().await
+    }
+
+    async fn set_capabilities(&self, flag: CapabilityBits) {
+        let mut inner = self.inner.write().await;
+        inner.set_capabilities(flag)
+    }
+
+    async fn set_guest_memory_block_size(&self, size: u32) {
+        let mut inner = self.inner.write().await;
+        inner.set_guest_memory_block_size(size);
+    }
+
+    async fn guest_memory_block_size(&self) -> u32 {
+        let inner = self.inner.read().await;
+        inner.get_guest_memory_block_size()
     }
 }
 
