@@ -7,7 +7,8 @@
 use std::sync::Arc;
 
 use agent::{
-    self, kata::KataAgent, types::KernelModule, Agent, GetIPTablesRequest, SetIPTablesRequest,
+    self, kata::KataAgent, types::KernelModule, Agent, GetGuestDetailsRequest, GetIPTablesRequest,
+    SetIPTablesRequest,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -17,9 +18,12 @@ use common::{
 };
 use containerd_shim_protos::events::task::TaskOOM;
 use hypervisor::{dragonball::Dragonball, Hypervisor, HYPERVISOR_DRAGONBALL};
-use kata_types::config::{
-    default::{DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT},
-    TomlConfig,
+use kata_types::{
+    capabilities::CapabilityBits,
+    config::{
+        default::{DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT},
+        TomlConfig,
+    },
 };
 use resource::{
     manager::ManagerArgs,
@@ -117,6 +121,38 @@ impl VirtSandbox {
 
         Ok(resource_configs)
     }
+
+    async fn get_guest_details(&self) -> Result<()> {
+        let guest_details = self
+            .agent
+            .get_guest_details(GetGuestDetailsRequest {
+                mem_block_size: true,
+                mem_hotplug_probe: true,
+            })
+            .await
+            .context("failed to get guest details")?;
+        // set memory block size
+        self.hypervisor
+            .set_guest_memory_block_size(guest_details.mem_block_size_bytes as u32)
+            .await;
+
+        // set memory hotplug probe
+        if guest_details.support_mem_hotplug_probe {
+            self.hypervisor
+                .set_capabilities(CapabilityBits::GuestMemoryHotplugProbe)
+                .await;
+        }
+        info!(
+            sl!(),
+            "memory block size is {}, memory probe support {}",
+            self.hypervisor.guest_memory_block_size().await,
+            self.hypervisor
+                .capabilities()
+                .await?
+                .is_mem_hotplug_probe_supported()
+        );
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -191,6 +227,12 @@ impl Sandbox for VirtSandbox {
             .context("create sandbox")?;
 
         inner.state = SandboxState::Running;
+
+        // get and store guest details
+        self.get_guest_details()
+            .await
+            .context("failed to get guest details")?;
+
         let agent = self.agent.clone();
         let sender = self.msg_sender.clone();
         info!(sl!(), "oom watcher start");
