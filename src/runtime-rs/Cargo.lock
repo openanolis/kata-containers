@@ -724,7 +724,9 @@ name = "dbs-tdx"
 version = "0.1.0"
 dependencies = [
  "kvm-bindings",
+ "log",
  "thiserror",
+ "vm-memory",
  "vmm-sys-util 0.11.1",
 ]
 

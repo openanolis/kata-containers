@@ -23,7 +23,7 @@ dbs-interrupt = { version = "0.2.0", features = ["kvm-irq"] }
 dbs-legacy-devices = "0.1.0"
 dbs-upcall = { version = "0.2.0", optional = true }
 dbs-utils = "0.2.0"
-dbs-virtio-devices = { version = "0.2.0", optional = true, features = ["virtio-mmio"] }
+dbs-virtio-devices = { path = "/home/lvshuang.wc/lvshuang_mnt/dragonball-sandbox/fork/new/dragonball-sandbox/crates/dbs-virtio-devices" , optional = true, features = ["virtio-mmio"] }
 kvm-bindings = "0.6.0"
 kvm-ioctls = "0.12.0"
 lazy_static = "1.2"
