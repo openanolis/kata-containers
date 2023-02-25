@@ -20,6 +20,7 @@ use kata_types::capabilities::{Capabilities, CapabilityBits};
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
 use tokio::sync::RwLock;
 
+use crate::MemoryConfig;
 use crate::{device::Device, Hypervisor, VcpuThreadIds};
 
 pub struct Dragonball {
@@ -149,6 +150,15 @@ impl Hypervisor for Dragonball {
     async fn guest_memory_block_size(&self) -> u32 {
         let inner = self.inner.read().await;
         inner.get_guest_memory_block_size()
+    }
+
+    async fn resize_memory(
+        &self,
+        req_mem_mb: u32,
+        curr_mem_mb: u32,
+    ) -> Result<(u32, MemoryConfig)> {
+        let inner = self.inner.read().await;
+        inner.resize_memory(req_mem_mb, curr_mem_mb)
     }
 }
 

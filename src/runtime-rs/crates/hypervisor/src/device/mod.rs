@@ -5,7 +5,9 @@
 //
 
 mod block;
+mod memory;
 pub use block::BlockConfig;
+pub use memory::MemoryConfig;
 mod network;
 pub use network::{Address, NetworkConfig};
 mod share_fs_device;

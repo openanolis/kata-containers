@@ -16,9 +16,10 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use dragonball::{
     api::v1::{
         BlockDeviceConfigInfo, BootSourceConfig, FsDeviceConfigInfo, FsMountConfigInfo,
-        InstanceInfo, InstanceState, VirtioNetDeviceConfigInfo, VmmAction, VmmActionError, VmmData,
-        VmmRequest, VmmResponse, VmmService, VsockDeviceConfigInfo,
+        InstanceInfo, InstanceState, MemDeviceConfigInfo, VirtioNetDeviceConfigInfo, VmmAction,
+        VmmActionError, VmmData, VmmRequest, VmmResponse, VmmService, VsockDeviceConfigInfo,
     },
+    device_manager::balloon_dev_mgr::BalloonDeviceConfigInfo,
     vm::VmConfigInfo,
     Vmm,
 };
@@ -228,6 +229,22 @@ impl VmmInstance {
                     op, cfg.fstype, cfg.mountpoint, cfg
                 )
             })?;
+        Ok(())
+    }
+
+    pub fn insert_mem_device(&self, mem_config: MemDeviceConfigInfo) -> Result<()> {
+        self.handle_request(Request::Sync(VmmAction::InsertMemDevice(
+            mem_config.clone(),
+        )))
+        .with_context(|| format!("Failed to insert memory device {:?}", mem_config))?;
+        Ok(())
+    }
+
+    pub fn insert_balloon_device(&self, balloon_config: BalloonDeviceConfigInfo) -> Result<()> {
+        self.handle_request(Request::Sync(VmmAction::InsertBalloonDevice(
+            balloon_config.clone(),
+        )))
+        .with_context(|| format!("Failed to insert balloon device {:?}", balloon_config))?;
         Ok(())
     }
 

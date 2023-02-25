@@ -6,13 +6,14 @@
 
 use super::vmm_instance::VmmInstance;
 use crate::{
-    device::Device, hypervisor_persist::HypervisorState, kernel_param::KernelParams, VmmState,
-    DEV_HUGEPAGES, HUGETLBFS, HYPERVISOR_DRAGONBALL, SHMEM, VM_ROOTFS_DRIVER_BLK,
+    device::Device, hypervisor_persist::HypervisorState, kernel_param::KernelParams, MemoryConfig,
+    VmmState, DEV_HUGEPAGES, HUGETLBFS, HYPERVISOR_DRAGONBALL, SHMEM, VM_ROOTFS_DRIVER_BLK,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use dragonball::{
-    api::v1::{BlockDeviceConfigInfo, BootSourceConfig},
+    api::v1::{BlockDeviceConfigInfo, BootSourceConfig, MemDeviceConfigInfo},
+    device_manager::balloon_dev_mgr::BalloonDeviceConfigInfo,
     vm::VmConfigInfo,
 };
 use kata_sys_util::mount;
@@ -348,6 +349,51 @@ impl DragonballInner {
 
     pub(crate) fn get_guest_memory_block_size(&self) -> u32 {
         self.guest_memory_block_size_mb
+    }
+
+    // curr_mem_m size = default + hotplug
+    pub(crate) fn resize_memory(
+        &self,
+        req_mem_mb: u32,
+        curr_mem_mb: u32,
+    ) -> Result<(u32, MemoryConfig)> {
+        if req_mem_mb > curr_mem_mb {
+            let add_mem_mb = req_mem_mb - curr_mem_mb;
+            if self.config.memory_info.enable_virtio_mem {
+                let mem_config = MemDeviceConfigInfo {
+                    mem_id: format!("mem{}", curr_mem_mb),
+                    size_mib: add_mem_mb as u64,
+                    capacity_mib: add_mem_mb as u64,
+                    multi_region: false,
+                    host_numa_node_id: None,
+                    guest_numa_node_id: None,
+                    use_shared_irq: None,
+                    use_generic_irq: None,
+                };
+                self.vmm_instance
+                    .insert_mem_device(mem_config)
+                    .context("failed to insert memory device")?;
+            }
+        } else if req_mem_mb < curr_mem_mb {
+            let balloon_config = BalloonDeviceConfigInfo {
+                balloon_id: format!("mem{}", curr_mem_mb),
+                size_mib: (curr_mem_mb - req_mem_mb) as u64,
+                use_shared_irq: None,
+                use_generic_irq: None,
+                f_deflate_on_oom: false,
+                f_reporting: false,
+            };
+            self.vmm_instance
+                .insert_balloon_device(balloon_config)
+                .context("failed to insert balloon device")?;
+        }
+
+        return Ok((
+            req_mem_mb,
+            MemoryConfig {
+                ..Default::default()
+            },
+        ));
     }
 }
 
