@@ -15,6 +15,8 @@ use dbs_device::device_manager::Error as IoManagerError;
 #[cfg(target_arch = "aarch64")]
 use dbs_legacy_devices::RTCDevice;
 use dbs_legacy_devices::SerialDevice;
+#[cfg(target_arch = "x86_64")]
+use dbs_legacy_devices::Cmos;
 use vmm_sys_util::eventfd::EventFd;
 
 // The I8042 Data Port (IO Port 0x60) is used for reading data that was received from a I8042 device or from the I8042 controller itself and writing data to a I8042 device or to the I8042 controller itself.
@@ -48,6 +50,10 @@ pub struct LegacyDeviceManager {
     pub(crate) _rtc_device: Arc<Mutex<RTCDevice>>,
     #[cfg(target_arch = "aarch64")]
     _rtc_eventfd: EventFd,
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) cmos_device: Option<Arc<Mutex<Cmos>>>,
+    #[cfg(target_arch = "x86_64")]
+    _cmos_eventfd: Option<EventFd>,
     pub(crate) com1_device: Arc<Mutex<SerialDevice>>,
     _com1_eventfd: EventFd,
     pub(crate) com2_device: Arc<Mutex<SerialDevice>>,
@@ -83,7 +89,7 @@ pub(crate) mod x86_64 {
 
     impl LegacyDeviceManager {
         /// Create a LegacyDeviceManager instance handling legacy devices (uart, i8042).
-        pub fn create_manager(bus: &mut IoManager, vm_fd: Option<Arc<VmFd>>) -> Result<Self> {
+        pub fn create_manager(bus: &mut IoManager, vm_fd: Option<Arc<VmFd>>, cmos_params: Option<(u64, u64)>) -> Result<Self> {
             let (com1_device, com1_eventfd) =
                 Self::create_com_device(bus, vm_fd.as_ref(), COM1_IRQ, COM1_PORT1)?;
             let (com2_device, com2_eventfd) =
@@ -94,19 +100,46 @@ pub(crate) mod x86_64 {
                 EventFdTrigger::new(exit_evt.try_clone().map_err(Error::EventFd)?),
                 Arc::new(I8042DeviceMetrics::default()),
             )));
-            let resources = [Resource::PioAddressRange {
+            let i8042_resources = [Resource::PioAddressRange {
                 // 0x60 and 0x64 are the io ports that i8042 devices used.
                 // We register pio address range from 0x60 - 0x64 with base I8042_DATA_PORT for i8042 to use.
                 base: I8042_DATA_PORT,
                 size: 0x5,
             }];
-            bus.register_device_io(i8042_device, &resources)
+            bus.register_device_io(i8042_device, &i8042_resources)
                 .map_err(Error::BusError)?;
+
+            let (cmos_eventfd, cmos_device) = match cmos_params {
+            Some(params) => {
+                let cmos_eventfd = EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?;
+                let cmos_device = Arc::new(Mutex::new(Cmos::new(
+                    params.0,
+                    params.1,
+                    cmos_eventfd.try_clone().unwrap(),
+                )));
+                let cmos_resources = [Resource::PioAddressRange {
+                    base: 0x70,
+                    size: 0x2,
+                }];
+                bus.register_device_io(cmos_device.clone(), &cmos_resources)
+                    .map_err(Error::BusError)?;
+                (Some(cmos_eventfd), Some(cmos_device))
+            }
+            None => (None, None),
+        };
+
+        if let Some(fd) = vm_fd {
+            if let Some(eventfd) = cmos_eventfd.as_ref() {
+                fd.register_irqfd(eventfd, 1).map_err(Error::IrqManager)?;
+            }
+        }
 
             Ok(LegacyDeviceManager {
                 i8042_reset_eventfd: exit_evt,
                 com1_device,
                 _com1_eventfd: com1_eventfd,
+                cmos_device,
+                _cmos_eventfd: cmos_eventfd,
                 com2_device,
                 _com2_eventfd: com2_eventfd,
             })
@@ -143,6 +176,13 @@ pub(crate) mod x86_64 {
 
             Ok((device, eventfd))
         }
+
+        /// Get the cmos device
+        #[cfg(target_arch = "x86_64")]
+        pub fn get_coms(&self) -> Option<Arc<Mutex<Cmos>>> {
+            self.cmos_device.clone()
+        }
+
     }
 }
 
@@ -235,12 +275,16 @@ pub(crate) mod aarch64 {
 mod tests {
     #[cfg(target_arch = "x86_64")]
     use super::*;
+    use dbs_device::device_manager::IoManager;
 
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_create_legacy_device_manager() {
         let mut bus = dbs_device::device_manager::IoManager::new();
-        let mgr = LegacyDeviceManager::create_manager(&mut bus, None).unwrap();
+        let mgr = LegacyDeviceManager::create_manager(&mut bus, None, None).unwrap();
         let _exit_fd = mgr.get_reset_eventfd().unwrap();
+
+        let mut bus = IoManager::new();
+        let mgr = LegacyDeviceManager::create_manager(&mut bus, None, Some((1 << 30, 0))).unwrap();
     }
 }

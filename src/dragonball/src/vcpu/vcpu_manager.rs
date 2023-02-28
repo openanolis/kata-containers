@@ -1088,6 +1088,8 @@ mod tests {
     use dbs_utils::epoll_manager::EpollManager;
     #[cfg(feature = "hotplug")]
     use dbs_virtio_devices::vsock::backend::VsockInnerBackend;
+    #[cfg(feature = "dbs-upcall")]
+    use dbs_upcall::*;
     use seccompiler::BpfProgram;
     use test_utils::skip_if_not_root;
     use vmm_sys_util::eventfd::EventFd;
@@ -1381,7 +1383,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "hotplug")]
+    #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
     fn test_vcpu_manager_resize_cpu() {
         skip_if_not_root!();
         let vm = get_vm();
