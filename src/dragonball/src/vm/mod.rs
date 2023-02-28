@@ -172,7 +172,7 @@ pub struct Vm {
     address_space: AddressSpaceMgr,
     device_manager: DeviceManager,
     dmesg_fifo: Option<Box<dyn io::Write + Send>>,
-    kernel_config: Option<KernelConfigInfo>,
+    pub kernel_config: Option<KernelConfigInfo>,
     logger: slog::Logger,
     reset_eventfd: Option<EventFd>,
     resource_manager: Arc<ResourceManager>,
@@ -592,7 +592,7 @@ impl Vm {
             .map_err(StartMicroVmError::AddressManagerError)?;
         address_space_param.set_kvm_vm_fd(self.vm_fd.clone());
         self.address_space
-            .create_address_space(&self.resource_manager, &numa_regions, address_space_param)
+            .create_address_space(&self.resource_manager, &numa_regions, address_space_param, self.is_tdx_enabled())
             .map_err(StartMicroVmError::AddressManagerError)?;
 
         info!(self.logger, "VM: initializing guest memory done");
@@ -674,6 +674,7 @@ impl Vm {
     fn load_kernel(
         &mut self,
         vm_memory: &GuestMemoryImpl,
+        kernel_offset: Option<GuestAddress>,
     ) -> std::result::Result<KernelLoaderResult, StartMicroVmError> {
         // This is the easy way out of consuming the value of the kernel_cmdline.
         let kernel_config = self
@@ -685,7 +686,7 @@ impl Vm {
         #[cfg(target_arch = "x86_64")]
         return linux_loader::loader::elf::Elf::load(
             vm_memory,
-            None,
+            kernel_offset,
             kernel_config.kernel_file_mut(),
             Some(high_mem_addr),
         )
@@ -694,7 +695,11 @@ impl Vm {
         #[cfg(target_arch = "aarch64")]
         return linux_loader::loader::pe::PE::load(
             vm_memory,
-            Some(GuestAddress(dbs_boot::get_kernel_start())),
+            if kernel_offset.is_none() {
+                Some(GuestAddress(arch::get_kernel_start()))
+            } else {
+                kernel_offset
+            },
             kernel_config.kernel_file_mut(),
             Some(high_mem_addr),
         )
@@ -1081,4 +1086,187 @@ pub mod tests {
             r => panic!("unexpected exit reason: {:?}", r),
         }
     }
+
+
+    // this test case need specific resources and is recommended to run
+    // via dbuvm docker image
+    #[test]
+    #[cfg(feature = "test-resources")]
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    fn test_load_payload_and_cmdline() {
+        let kernel_path = "/test_resources/linux-loader/test_elf.bin";
+        let kernel_path_buf = PathBuf::from(kernel_path);
+        if !kernel_path_buf.exists() {
+            println!("Test resource file not found: {}", kernel_path);
+            assert!(false);
+        }
+        let mem_size_mib = 16;
+        let vm_config = VmConfigInfo {
+            vcpu_count,
+            max_vcpu_count: 1,
+            cpu_pm: "off".to_string(),
+            mem_type: "shmem".to_string(),
+            mem_file_path: "".to_string(),
+            mem_size_mib: 10,
+            serial_path: None,
+            cpu_topology: CpuTopology {
+                threads_per_core: 1,
+                cores_per_die: 1,
+                dies_per_socket: 1,
+                sockets: 1,
+            },
+            vpmu_feature: 0,
+        };
+        let mut vm = create_vm_instance();
+        vm.set_vm_config(vm_config);
+        assert!(vm.init_guest_memory().is_ok());
+        let cmd_line = Cmdline::new(64);
+        // no kernel config
+        let vm_memory = vm
+            .address_space
+            .vm_as
+            .clone()
+            .unwrap()
+            .memory()
+            .into_inner();
+        let res = vm.load_payload(0x10000, (mem_size_mib as u64) << 20, &vm_memory);
+        if let Err(StartMicrovmError::MissingKernelConfig) = res {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+        // success
+        vm.set_kernel_config(KernelConfigInfo::new(
+            None,
+            File::open(kernel_path).unwrap(),
+            None,
+            cmd_line,
+            "".to_owned(),
+            None,
+            String::from(kernel_path),
+            None,
+        ));
+        let res = vm.load_payload(0x10000, (mem_size_mib as u64) << 20, &vm_memory);
+        assert!(res.is_ok());
+        // success to load cmdline
+        let res = vm.load_cmdline(0x0, &vm_memory);
+        assert!(res.is_ok());
+    }
+    // this test case need specific resources and is recommended to run
+    // via dbuvm docker image
+    #[test]
+    #[cfg(feature = "test-resources")]
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    fn test_load_tdshim() {
+        // prepare resource
+        use crate::api::v1::ConfidentialVmType;
+        let kernel_path = "/test_resources/linux-loader/test_elf.bin";
+        let kernel_path_buf = PathBuf::from(kernel_path);
+        if !kernel_path_buf.exists() {
+            println!("Test resource file not found: {}", kernel_path);
+            assert!(false);
+        }
+        let tdshim_path = "/test_resources/img/x86_64/tdx/tdshim.bin";
+        let tdshim_path_buf = PathBuf::from(tdshim_path);
+        if !tdshim_path_buf.exists() {
+            println!("Test resource file not found: {}", tdshim_path);
+            assert!(false);
+        }
+        let cmd_line = Cmdline::new(64);
+        let vm_config = VmConfigInfo {
+            vcpu_count,
+            max_vcpu_count: 1,
+            cpu_pm: "off".to_string(),
+            mem_type: "shmem".to_string(),
+            mem_file_path: "".to_string(),
+            mem_size_mib: 10,
+            serial_path: None,
+            cpu_topology: CpuTopology {
+                threads_per_core: 1,
+                cores_per_die: 1,
+                dies_per_socket: 1,
+                sockets: 1,
+            },
+            vpmu_feature: 0,
+        };
+        let mut vm = create_vm_instance();
+        // change vm type to tdx after create_vm_instance to avoid hardware not support error
+        // reset vm type to tdx
+        vm.shared_info
+            .write()
+            .expect("Failed to start microVM because shared info couldn't be written due to poisoned lock")
+            .confidential_vm_type = Some(ConfidentialVmType::TDX);
+        vm.set_vm_config(vm_config);
+        assert!(vm.init_guest_memory().is_ok());
+        let vm_memory = vm
+            .address_space
+            .vm_as
+            .clone()
+            .unwrap()
+            .memory()
+            .into_inner();
+        vm.set_kernel_config(KernelConfigInfo::new(
+            Some(File::open(tdshim_path).unwrap()),
+            File::open(kernel_path).unwrap(),
+            None,
+            cmd_line,
+            "".to_owned(),
+            Some(String::from(tdshim_path)),
+            String::from(kernel_path),
+            None,
+        ));
+        let sections = vm.parse_tdvf_sections().unwrap();
+        let res = vm.load_tdshim(&vm_memory, &sections);
+        assert!(res.is_ok());
+    }
+    #[test]
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    fn test_generate_hob() {
+        let vcpu_count = 1;
+        let max_vcpu_count = 3;
+        let vm_config = VmConfigInfo {
+            vcpu_count,
+            max_vcpu_count: 1,
+            cpu_pm: "off".to_string(),
+            mem_type: "shmem".to_string(),
+            mem_file_path: "".to_string(),
+            mem_size_mib: 10,
+            serial_path: None,
+            cpu_topology: CpuTopology {
+                threads_per_core: 1,
+                cores_per_die: 1,
+                dies_per_socket: 1,
+                sockets: 1,
+            },
+            vpmu_feature: 0,
+        };
+        let mut vm = create_vm_instance();
+        vm.set_vm_config(vm_config);
+        assert!(vm.init_guest_memory().is_ok());
+        // prepare params
+        let hob_address: u64 = 0x0;
+        let vm_memory = vm
+            .address_space
+            .vm_as
+            .clone()
+            .unwrap()
+            .memory()
+            .into_inner();
+        let address_space = vm.vm_address_space().cloned().unwrap();
+        let payload_info = dbs_tdx::td_shim::hob::PayloadInfo {
+            image_type: dbs_tdx::td_shim::hob::PayloadImageType::RawVmLinux,
+            entry_point: 0x0,
+        };
+        let acpi_tables = dbs_acpi::acpi::create_acpi_tables_tdx(max_vcpu_count, vcpu_count);
+        // generate hob list
+        let res = vm.generate_hob_list(
+            hob_address,
+            vm_memory.deref(),
+            address_space,
+            payload_info,
+            &acpi_tables,
+        );
+        assert!(res.is_ok());
+    }
+
 }

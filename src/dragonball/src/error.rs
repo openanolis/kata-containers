@@ -76,6 +76,31 @@ pub enum Error {
     ConfidentialVmType,
 }
 
+/// Errors associated with loading data follow tdshim metadata
+#[derive(Debug, thiserror::Error)]
+pub enum LoadTdDataError {
+    /// Failed to get hob address
+    #[error("failed to get hob address from tdshim metadata")]
+    HobOffset,
+    /// Failed to get payload address
+    #[error("failed to get payload address from tdshim metadata")]
+    PayloadOffset,
+    /// Failed to get payload param address
+    #[error("failed to get payload params address from tdshim metadata")]
+    PayloadParamsOffset,
+    /// Failed to parse tdshim data
+    #[error("failed to parse tdshim data: {0}")]
+    ParseTdshim(#[source] dbs_tdx::td_shim::metadata::TdvfError),
+    /// Failed to read tdshim data
+    #[error("failed to read tdshim data: {0}")]
+    ReadTdshim(#[source] std::io::Error),
+    /// Failed to load data to guest memory
+    #[error("failed to load data to guest memory: {0}")]
+    LoadData(#[source] vm_memory::GuestMemoryError),
+    /// Failed to load payload
+    #[error("failed to load tdshim data")]
+    LoadPayload,
+}
 /// Errors associated with starting the instance.
 #[derive(Debug, thiserror::Error)]
 pub enum StartMicroVmError {
@@ -196,6 +221,15 @@ pub enum StartMicroVmError {
     /// TDX not supported
     #[error("Dragonball without TDX support.")]
     TdxError,
+
+    /// Cannot load td data
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[error("cannot load td data following tdshim metadata: {0}")]
+    TdDataLoader(#[source] self::LoadTdDataError),
+
+    /// Cannot access guest address space manager.
+    #[error("cannot access guest address space manager: {0}")]
+    GuestMemory(#[source] address_space_manager::AddressManagerError),
 }
 
 /// Errors associated with starting the instance.

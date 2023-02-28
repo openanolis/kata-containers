@@ -10,7 +10,7 @@ pub struct KernelConfigInfo {
     /// The descriptor to the initrd file, if there is one
     initrd_file: Option<File>,
     /// The commandline for guest kernel.
-    cmdline: linux_loader::cmdline::Cmdline,
+    pub cmdline: linux_loader::cmdline::Cmdline,
     /// The descriptor to the tdshim file.
     pub tdshim_file: Option<File>,
     /// Tdshim image path

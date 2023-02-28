@@ -27,6 +27,7 @@ use dbs_address_space::{
     AddressSpaceRegionType, NumaNode, NumaNodeInfo, MPOL_MF_MOVE, MPOL_PREFERRED,
 };
 use dbs_allocator::Constraint;
+use dbs_tdx::td_shim::{TD_SHIM_SIZE, TD_SHIM_START};
 use kvm_bindings::kvm_userspace_memory_region;
 use kvm_ioctls::VmFd;
 use log::{debug, error, info, warn};
@@ -212,9 +213,10 @@ impl<'a> AddressSpaceMgrBuilder<'a> {
         self,
         res_mgr: &ResourceManager,
         numa_region_infos: &[NumaRegionInfo],
+        tdx_enabled: bool,
     ) -> Result<AddressSpaceMgr> {
         let mut mgr = AddressSpaceMgr::default();
-        mgr.create_address_space(res_mgr, numa_region_infos, self)?;
+        mgr.create_address_space(res_mgr, numa_region_infos, self, tdx_enabled)?;
         Ok(mgr)
     }
 
@@ -232,7 +234,8 @@ impl<'a> AddressSpaceMgrBuilder<'a> {
 /// Struct to manage virtual machine's physical address space.
 pub struct AddressSpaceMgr {
     address_space: Option<AddressSpace>,
-    vm_as: Option<GuestAddressSpaceImpl>,
+    /// Guest memory address space
+    pub vm_as: Option<GuestAddressSpaceImpl>,
     base_to_slot: Arc<Mutex<HashMap<u64, u32>>>,
     prealloc_handlers: Vec<thread::JoinHandle<()>>,
     prealloc_exit: Arc<AtomicBool>,
@@ -264,6 +267,7 @@ impl AddressSpaceMgr {
         res_mgr: &ResourceManager,
         numa_region_infos: &[NumaRegionInfo],
         mut param: AddressSpaceMgrBuilder,
+        tdx_enabled: bool,
     ) -> Result<()> {
         let mut regions = Vec::new();
         let mut start_addr = dbs_boot::layout::GUEST_MEM_START;
@@ -346,7 +350,32 @@ impl AddressSpaceMgr {
             dbs_boot::layout::GUEST_MEM_START,
             *dbs_boot::layout::GUEST_MEM_END,
         );
+
+        if tdx_enabled {
+            let region = Arc::new(
+                AddressSpaceRegion::create_memory_region(
+                    GuestAddress(TD_SHIM_START),
+                    TD_SHIM_SIZE,
+                    None,
+                    param.mem_type,
+                    param.mem_file,
+                    false,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    false,
+                )
+                .map_err(AddressManagerError::CreateAddressSpaceRegion)?,
+            );
+            regions.push(region);
+            info!(
+                "create_address_space new region for td_shim guest addr 0x{:x}-0x{:x} size {}",
+                TD_SHIM_START,
+                TD_SHIM_START + TD_SHIM_SIZE,
+                TD_SHIM_SIZE
+            );
+        }
+
         self.address_space = Some(AddressSpace::from_regions(regions, layout));
+
 
         Ok(())
     }
@@ -715,7 +744,7 @@ mod tests {
             vcpu_ids: vec![1, 2],
         }];
         let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-        let as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         let vm_as = as_mgr.get_vm_as().unwrap();
         let guard = vm_as.memory();
         let gmem = guard.deref();
@@ -762,7 +791,7 @@ mod tests {
             vcpu_ids: vec![1, 2],
         }];
         let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-        let as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         let vm_as = as_mgr.get_vm_as().unwrap();
         let guard = vm_as.memory();
         let gmem = guard.deref();
@@ -782,7 +811,7 @@ mod tests {
                 vcpu_ids: vec![1, 2],
             }];
             let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-            let _as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+            let _as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         }
         let file = TempFile::new().unwrap().into_file();
         let fd = file.as_raw_fd();
@@ -806,7 +835,7 @@ mod tests {
             vcpu_ids: vec![1, 2],
         }];
         let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-        let as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         assert_eq!(as_mgr.get_layout().unwrap(), layout);
     }
 
@@ -822,7 +851,7 @@ mod tests {
             vcpu_ids: cpu_vec.clone(),
         }];
         let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-        let as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         let mut numa_node = NumaNode::new();
         numa_node.add_info(&NumaNodeInfo {
             base: GuestAddress(GUEST_MEM_START),
@@ -846,7 +875,7 @@ mod tests {
         }];
         let mut builder = AddressSpaceMgrBuilder::new("hugeshmem", "").unwrap();
         builder.toggle_prealloc(true);
-        let mut as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let mut as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         as_mgr.wait_prealloc(false).unwrap();
     }
 
@@ -889,7 +918,7 @@ mod tests {
             vcpu_ids: vec![1, 2],
         }];
         let builder = AddressSpaceMgrBuilder::new("shmem", "").unwrap();
-        let as_mgr = builder.build(&res_mgr, &numa_region_infos).unwrap();
+        let as_mgr = builder.build(&res_mgr, &numa_region_infos, false).unwrap();
         let mmap_reg = MmapRegion::new(8).unwrap();
 
         assert!(as_mgr.configure_numa(&mmap_reg, u32::MAX).is_err());
