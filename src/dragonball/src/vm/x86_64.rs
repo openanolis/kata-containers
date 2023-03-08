@@ -7,44 +7,44 @@
 // found in the THIRD-PARTY file.
 
 use std::convert::TryInto;
+#[cfg(feature = "tdx")]
+use std::io::{Seek, SeekFrom};
 use std::mem;
 use std::ops::Deref;
 #[cfg(feature = "tdx")]
 use std::os::unix::io::AsRawFd;
-#[cfg(feature = "tdx")]
-use std::io::{Seek, SeekFrom};
 
+#[cfg(feature = "tdx")]
+use dbs_acpi::acpi::create_acpi_tables_tdx;
 use dbs_address_space::AddressSpace;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_address_space::AddressSpaceRegionType;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
-use dbs_utils::epoll_manager::EpollManager;
-use dbs_utils::time::TimestampUs;
 #[cfg(feature = "tdx")]
-use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
+use dbs_tdx::td_shim::hob::{PayloadImageType, PayloadInfo};
 #[cfg(feature = "tdx")]
 use dbs_tdx::td_shim::metadata::{TdvfSection, TdvfSectionType};
 #[cfg(feature = "tdx")]
-use dbs_tdx::td_shim::hob::{PayloadInfo, PayloadImageType};
-#[cfg(feature = "tdx")]
 use dbs_tdx::td_shim::TD_SHIM_START;
 #[cfg(feature = "tdx")]
-use dbs_acpi::acpi::create_acpi_tables_tdx;
-#[cfg(feature = "tdx")]
-use vm_memory::ByteValued;
-use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
+use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
+use dbs_utils::epoll_manager::EpollManager;
+use dbs_utils::time::TimestampUs;
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
-use kvm_bindings::{KVM_CAP_SPLIT_IRQCHIP, kvm_enable_cap};
+use kvm_bindings::{kvm_enable_cap, KVM_CAP_SPLIT_IRQCHIP};
+use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
 use linux_loader::cmdline::Cmdline;
 use slog::info;
+#[cfg(feature = "tdx")]
+use vm_memory::ByteValued;
 use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
 
-use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
 #[cfg(feature = "tdx")]
 use crate::address_space_manager::AddressManagerError;
-use crate::error::{Error, Result, StartMicroVmError};
+use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
 #[cfg(feature = "tdx")]
 use crate::error::LoadTdDataError;
+use crate::error::{Error, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
 use crate::vm::{Vm, VmError};
 
@@ -235,7 +235,10 @@ impl Vm {
             info!(self.logger, "VM: enable CPU disable_idle_exits capability");
         }
 
-        info!(self.logger, "VM: checking if it is confidential microvm ...");
+        info!(
+            self.logger,
+            "VM: checking if it is confidential microvm ..."
+        );
 
         if self.is_tdx_enabled() {
             info!(self.logger, "Intel Trusted Domain microvm");
@@ -245,16 +248,16 @@ impl Vm {
             return Err(StartMicroVmError::TdxError);
         } else {
             info!(self.logger, "None-confidential microvm");
-        
-        let vm_memory = vm_as.memory();
-        let kernel_loader_result = self.load_kernel(vm_memory.deref(), None)?;
-        self.vcpu_manager()
-            .map_err(StartMicroVmError::Vcpu)?
-            .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
-            .map_err(StartMicroVmError::Vcpu)?;
 
-        info!(self.logger, "VM: initializing microvm done");
-        Ok(())
+            let vm_memory = vm_as.memory();
+            let kernel_loader_result = self.load_kernel(vm_memory.deref(), None)?;
+            self.vcpu_manager()
+                .map_err(StartMicroVmError::Vcpu)?
+                .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
+                .map_err(StartMicroVmError::Vcpu)?;
+
+            info!(self.logger, "VM: initializing microvm done");
+            Ok(())
         }
     }
 
@@ -434,7 +437,7 @@ impl Vm {
             .map_err(StartMicroVmError::Vcpu)?;
 
         let acpi_tables = create_acpi_tables_tdx(max_vcpu_count, boot_vcpu_count);
-        
+
         let address_space =
             self.vm_address_space()
                 .cloned()
@@ -442,7 +445,6 @@ impl Vm {
                     AddressManagerError::GuestMemoryNotInitialized,
                 ))?;
 
-        
         // generate hob list
         self.generate_hob_list(
             hob_offset,
@@ -466,7 +468,6 @@ impl Vm {
                 section.attributes == 1,
             )?;
         }
-
 
         self.finalize_tdx()?;
         info!(self.logger, "VM: initializing tdx microvm done");
@@ -567,9 +568,9 @@ impl Vm {
         ))
     }
 
-       /// load bzImage as tdshim payload
+    /// load bzImage as tdshim payload
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-       pub fn load_bzimage_payload(
+    pub fn load_bzimage_payload(
         &mut self,
         payload_offset: u64,
         _payload_size: u64,
@@ -579,13 +580,13 @@ impl Vm {
             .kernel_config
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
- 
+
         let payload_file = kernel_config.kernel_file_mut();
- 
+
         let payload_size = payload_file.seek(SeekFrom::End(0)).unwrap();
- 
+
         payload_file.seek(SeekFrom::Start(0x1f1)).unwrap();
- 
+
         let mut payload_header = linux_loader::bootparam::setup_header::default();
         payload_header
             .as_bytes()
@@ -595,13 +596,13 @@ impl Vm {
                 std::mem::size_of::<linux_loader::bootparam::setup_header>(),
             )
             .unwrap();
- 
+
         if payload_header.header != 0x5372_6448 {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::LoadPayload,
             ));
         }
- 
+
         if (payload_header.version < 0x0200) || ((payload_header.loadflags & 0x1) == 0x0) {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::LoadPayload,
@@ -615,7 +616,7 @@ impl Vm {
                 payload_size as usize,
             )
             .unwrap();
- 
+
         // Create the payload info that will be inserted into
         // the HOB.
         let payload_info = PayloadInfo {
@@ -624,7 +625,6 @@ impl Vm {
         };
         Ok(payload_info)
     }
- 
 
     /// load vmlinux as tdshim payload
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
@@ -641,11 +641,13 @@ impl Vm {
         // TD. Make sure that the kernel does not overflow this range.
         #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if kernel_loader_result.kernel_end > (payload_offset + payload_size) {
-            info!(self.logger, "kernel_end: 0x{:x}, payload_offset:0x{:x}, payload_size:0x{:x}",
-            kernel_loader_result.kernel_end,
-            payload_offset,
-            payload_size,
-        );
+            info!(
+                self.logger,
+                "kernel_end: 0x{:x}, payload_offset:0x{:x}, payload_size:0x{:x}",
+                kernel_loader_result.kernel_end,
+                payload_offset,
+                payload_size,
+            );
             Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::LoadPayload,
             ))
@@ -669,51 +671,51 @@ impl Vm {
             .ok_or(StartMicroVmError::MissingKernelConfig)?
             .cmdline;
         linux_loader::loader::load_cmdline(vm_memory, GuestAddress(cmdline_offset), cmdline)
-        .map_err(StartMicroVmError::LoadCommandline)?;
-    Ok(())
-}
-/// generate hob list fot tdshim
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-pub fn generate_hob_list(
-    &self,
-    hob_offset: u64,
-    vm_memory: &GuestMemoryImpl,
-    address_space: AddressSpace,
-    payload_info: PayloadInfo,
-    acpi_tables: &[dbs_acpi::sdt::Sdt],
-) -> std::result::Result<(), vm_memory::GuestMemoryError> {
-    let mut hob = dbs_tdx::td_shim::hob::TdHob::start(hob_offset);
-    // add memory resource
-    let mut memory_regions: Vec<(bool, u64, u64)> = Vec::new();
-    address_space
-        .walk_regions(|region| {
-            match region.region_type() {
-                AddressSpaceRegionType::DefaultMemory => {
-                    memory_regions.push((true, region.start_addr().0, region.len()));
-                }
-                AddressSpaceRegionType::Firmware => {
-                    memory_regions.push((false, region.start_addr().0, region.len()));
-                }
-                _ => {}
-            }
-            Ok(())
-        })
-        .unwrap();
-    for (is_ram, start, size) in memory_regions {
-        hob.add_memory_resource(vm_memory, start, size, is_ram)?;
+            .map_err(StartMicroVmError::LoadCommandline)?;
+        Ok(())
     }
-    // add mmio resource
-    hob.add_mmio_resource(
-        vm_memory,
-        layout::MMIO_LOW_START,
-        TD_SHIM_START - layout::MMIO_LOW_START,
-    )?;
-    // add payload info
-    hob.add_payload(vm_memory, payload_info)?;
-    // add acpi tables
-    for acpi_table in acpi_tables {
-        hob.add_acpi_table(vm_memory, acpi_table.as_slice())?;
+    /// generate hob list fot tdshim
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    pub fn generate_hob_list(
+        &self,
+        hob_offset: u64,
+        vm_memory: &GuestMemoryImpl,
+        address_space: AddressSpace,
+        payload_info: PayloadInfo,
+        acpi_tables: &[dbs_acpi::sdt::Sdt],
+    ) -> std::result::Result<(), vm_memory::GuestMemoryError> {
+        let mut hob = dbs_tdx::td_shim::hob::TdHob::start(hob_offset);
+        // add memory resource
+        let mut memory_regions: Vec<(bool, u64, u64)> = Vec::new();
+        address_space
+            .walk_regions(|region| {
+                match region.region_type() {
+                    AddressSpaceRegionType::DefaultMemory => {
+                        memory_regions.push((true, region.start_addr().0, region.len()));
+                    }
+                    AddressSpaceRegionType::Firmware => {
+                        memory_regions.push((false, region.start_addr().0, region.len()));
+                    }
+                    _ => {}
+                }
+                Ok(())
+            })
+            .unwrap();
+        for (is_ram, start, size) in memory_regions {
+            hob.add_memory_resource(vm_memory, start, size, is_ram)?;
+        }
+        // add mmio resource
+        hob.add_mmio_resource(
+            vm_memory,
+            layout::MMIO_LOW_START,
+            TD_SHIM_START - layout::MMIO_LOW_START,
+        )?;
+        // add payload info
+        hob.add_payload(vm_memory, payload_info)?;
+        // add acpi tables
+        for acpi_table in acpi_tables {
+            hob.add_acpi_table(vm_memory, acpi_table.as_slice())?;
+        }
+        hob.finish(vm_memory)
     }
-    hob.finish(vm_memory)
-}
 }

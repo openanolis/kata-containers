@@ -420,7 +420,7 @@ impl FsDeviceMgr {
                 Box::new(handler),
                 epoll_mgr,
                 limiter,
-                ctx.is_tdx_enabled()
+                ctx.is_tdx_enabled(),
             )
             .map_err(FsDeviceError::CreateFsDevice)?,
         );

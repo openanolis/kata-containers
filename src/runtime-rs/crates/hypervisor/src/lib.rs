@@ -18,9 +18,6 @@ pub use kernel_param::Param;
 mod protection;
 mod utils;
 
-
-#[cfg(feature = "cloud-hypervisor")]
-pub mod ch;
 pub mod dragonball;
 pub mod qemu;
 use anyhow::Result;

@@ -7,23 +7,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 #![allow(dead_code)]
-use std::os::unix::io::{FromRawFd, RawFd};
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{FromRawFd, RawFd};
 
-use kvm_bindings::KVM_API_VERSION;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-use kvm_bindings::CpuId;
-use kvm_ioctls::{Cap, Kvm, VmFd};
+use dbs_arch::cpuid::cpu_leaf::leaf_0x4000_0001::eax::*;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_tdx::tdx_ioctls::tdx_get_caps;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-use dbs_arch::cpuid::cpu_leaf::leaf_0x4000_0001::eax::*;
+use kvm_bindings::CpuId;
+use kvm_bindings::KVM_API_VERSION;
+use kvm_ioctls::{Cap, Kvm, VmFd};
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use vmm_sys_util::errno;
 
 use crate::error::{Error as VmError, Result};
-
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required
@@ -252,25 +251,25 @@ impl KvmContext {
         Ok(cpuid)
     }
 
-        /// Disable PV Features not supported by TDX
-        pub fn tdx_pv_fix_cpuid(
-            &self,
-            cpuid: &mut CpuId,
-        ) -> std::result::Result<(), kvm_ioctls::Error> {
-            for entry in cpuid.as_mut_slice().iter_mut() {
-                if entry.function == 0x4000_0001 {
-                    entry.eax &= !(1 << KVM_FEATURE_CLOCKSOURCE_BITINDEX
-                        | 1 << KVM_FEATURE_CLOCKSOURCE2_BITINDEX
-                        | 1 << KVM_FEATURE_ASYNC_PF_BITINDEX
-                        | 1 << KVM_FEATURE_STEAL_TIME_BITINDEX
-                        | 1 << KVM_FEATURE_ASYNC_PF_VMEXIT_BITINDEX
-                        | 1 << KVM_FEATURE_CLOCKSOURCE_STABLE_BITINDEX);
-                }
+    /// Disable PV Features not supported by TDX
+    pub fn tdx_pv_fix_cpuid(
+        &self,
+        cpuid: &mut CpuId,
+    ) -> std::result::Result<(), kvm_ioctls::Error> {
+        for entry in cpuid.as_mut_slice().iter_mut() {
+            if entry.function == 0x4000_0001 {
+                entry.eax &= !(1 << KVM_FEATURE_CLOCKSOURCE_BITINDEX
+                    | 1 << KVM_FEATURE_CLOCKSOURCE2_BITINDEX
+                    | 1 << KVM_FEATURE_ASYNC_PF_BITINDEX
+                    | 1 << KVM_FEATURE_STEAL_TIME_BITINDEX
+                    | 1 << KVM_FEATURE_ASYNC_PF_VMEXIT_BITINDEX
+                    | 1 << KVM_FEATURE_CLOCKSOURCE_STABLE_BITINDEX);
             }
-            Ok(())
         }
+        Ok(())
+    }
 
-            /// Fix CpuId recording tdx capabilities.
+    /// Fix CpuId recording tdx capabilities.
     pub fn tdx_caps_fix_cpuid(
         &self,
         cpuid: &mut CpuId,
@@ -303,7 +302,6 @@ impl KvmContext {
         Ok(())
     }
 }
-    
 
 #[cfg(test)]
 mod tests {
@@ -341,9 +339,19 @@ mod tests {
         let c = KvmContext::new(None).unwrap();
 
         let _ = c
-            .supported_cpuid(kvm_bindings::KVM_MAX_CPUID_ENTRIES, #[cfg(feature = "tdx")] false)
+            .supported_cpuid(
+                kvm_bindings::KVM_MAX_CPUID_ENTRIES,
+                #[cfg(feature = "tdx")]
+                false,
+            )
             .expect("failed to get supported CPUID");
-        assert!(c.supported_cpuid(0, #[cfg(feature = "tdx")] false).is_err());
+        assert!(c
+            .supported_cpuid(
+                0,
+                #[cfg(feature = "tdx")]
+                false
+            )
+            .is_err());
     }
 
     #[test]

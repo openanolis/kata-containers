@@ -16,8 +16,8 @@ use common::{
     Sandbox,
 };
 use containerd_shim_protos::events::task::TaskOOM;
-use hypervisor::{Hypervisor, HYPERVISOR_DRAGONBALL};
 use hypervisor::dragonball::Dragonball;
+use hypervisor::{Hypervisor, HYPERVISOR_DRAGONBALL};
 use kata_types::config::{
     default::{DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT},
     TomlConfig,

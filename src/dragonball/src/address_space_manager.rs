@@ -376,7 +376,6 @@ impl AddressSpaceMgr {
 
         self.address_space = Some(AddressSpace::from_regions(regions, layout));
 
-
         Ok(())
     }
 

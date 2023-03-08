@@ -66,7 +66,7 @@ pub enum BootSourceConfigError {
     /// The tdshim file is unexpected.
     #[error("the tdshim file is only expected for TDX instances")]
     UnexpectedTdshimPath,
-    
+
     /// The tdshim file is expected.
     #[error("the tdshim file is expected for TDX instances")]
     MissingTdshimPath,

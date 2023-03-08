@@ -996,6 +996,10 @@ impl Hypervisor {
 
     /// Adjust configuration for confidential computing.
     pub fn adjust_confidential_computing(&mut self) -> Result<()> {
+        if !self.security_info.confidential_guest {
+            return Ok(());
+        }
+
         // Confidential guest do not support hotplugging vCPUs.
         if self.cpu_info.default_maxvcpus != self.cpu_info.default_vcpus as u32 {
             warn!(sl!(), "Confidential guest do not support hotplugging vCPUs. Setting default_maxvcpus to default_vcpus: {}", self.cpu_info.default_vcpus);

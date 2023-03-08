@@ -12,11 +12,11 @@ use std::io;
 use std::sync::{Arc, Mutex};
 
 use dbs_device::device_manager::Error as IoManagerError;
+#[cfg(target_arch = "x86_64")]
+use dbs_legacy_devices::Cmos;
 #[cfg(target_arch = "aarch64")]
 use dbs_legacy_devices::RTCDevice;
 use dbs_legacy_devices::SerialDevice;
-#[cfg(target_arch = "x86_64")]
-use dbs_legacy_devices::Cmos;
 use vmm_sys_util::eventfd::EventFd;
 
 // The I8042 Data Port (IO Port 0x60) is used for reading data that was received from a I8042 device or from the I8042 controller itself and writing data to a I8042 device or to the I8042 controller itself.
@@ -89,7 +89,11 @@ pub(crate) mod x86_64 {
 
     impl LegacyDeviceManager {
         /// Create a LegacyDeviceManager instance handling legacy devices (uart, i8042).
-        pub fn create_manager(bus: &mut IoManager, vm_fd: Option<Arc<VmFd>>, cmos_params: Option<(u64, u64)>) -> Result<Self> {
+        pub fn create_manager(
+            bus: &mut IoManager,
+            vm_fd: Option<Arc<VmFd>>,
+            cmos_params: Option<(u64, u64)>,
+        ) -> Result<Self> {
             let (com1_device, com1_eventfd) =
                 Self::create_com_device(bus, vm_fd.as_ref(), COM1_IRQ, COM1_PORT1)?;
             let (com2_device, com2_eventfd) =
@@ -110,29 +114,29 @@ pub(crate) mod x86_64 {
                 .map_err(Error::BusError)?;
 
             let (cmos_eventfd, cmos_device) = match cmos_params {
-            Some(params) => {
-                let cmos_eventfd = EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?;
-                let cmos_device = Arc::new(Mutex::new(Cmos::new(
-                    params.0,
-                    params.1,
-                    cmos_eventfd.try_clone().unwrap(),
-                )));
-                let cmos_resources = [Resource::PioAddressRange {
-                    base: 0x70,
-                    size: 0x2,
-                }];
-                bus.register_device_io(cmos_device.clone(), &cmos_resources)
-                    .map_err(Error::BusError)?;
-                (Some(cmos_eventfd), Some(cmos_device))
-            }
-            None => (None, None),
-        };
+                Some(params) => {
+                    let cmos_eventfd = EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?;
+                    let cmos_device = Arc::new(Mutex::new(Cmos::new(
+                        params.0,
+                        params.1,
+                        cmos_eventfd.try_clone().unwrap(),
+                    )));
+                    let cmos_resources = [Resource::PioAddressRange {
+                        base: 0x70,
+                        size: 0x2,
+                    }];
+                    bus.register_device_io(cmos_device.clone(), &cmos_resources)
+                        .map_err(Error::BusError)?;
+                    (Some(cmos_eventfd), Some(cmos_device))
+                }
+                None => (None, None),
+            };
 
-        if let Some(fd) = vm_fd {
-            if let Some(eventfd) = cmos_eventfd.as_ref() {
-                fd.register_irqfd(eventfd, 1).map_err(Error::IrqManager)?;
+            if let Some(fd) = vm_fd {
+                if let Some(eventfd) = cmos_eventfd.as_ref() {
+                    fd.register_irqfd(eventfd, 1).map_err(Error::IrqManager)?;
+                }
             }
-        }
 
             Ok(LegacyDeviceManager {
                 i8042_reset_eventfd: exit_evt,
@@ -182,7 +186,6 @@ pub(crate) mod x86_64 {
         pub fn get_coms(&self) -> Option<Arc<Mutex<Cmos>>> {
             self.cmos_device.clone()
         }
-
     }
 }
 

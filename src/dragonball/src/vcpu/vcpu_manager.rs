@@ -15,19 +15,19 @@ use std::sync::mpsc::{channel, Receiver, RecvError, RecvTimeoutError, Sender};
 use std::sync::{Arc, Barrier, Mutex, RwLock};
 use std::time::Duration;
 
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_tdx::tdx_ioctls::{tdx_init_vcpu, TdxIoctlError};
 #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
 use dbs_upcall::{DevMgrService, UpcallClient};
 use dbs_utils::epoll_manager::{EpollManager, EventOps, EventSet, Events, MutEventSubscriber};
 use dbs_utils::time::TimestampUs;
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-use dbs_tdx::tdx_ioctls::{tdx_init_vcpu, TdxIoctlError};
 use kvm_ioctls::{Cap, VcpuFd, VmFd};
 use log::{debug, error, info};
 use seccompiler::{apply_filter, BpfProgram, Error as SecError};
 use vm_memory::GuestAddress;
 use vmm_sys_util::eventfd::EventFd;
-#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
-use dbs_interrupt::ioapic::IoapicDevice;
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
 use crate::api::v1::InstanceInfo;
@@ -125,7 +125,6 @@ pub enum VcpuManagerError {
     /// Kvm Ioctl Error
     #[error("failure in issuing KVM ioctl command: {0}")]
     Kvm(#[source] kvm_ioctls::Error),
-
 
     /// Tdx init vcpu error
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
@@ -278,7 +277,8 @@ impl VcpuManager {
 
         #[cfg(target_arch = "x86_64")]
         let supported_cpuid = kvm_context
-            .supported_cpuid(kvm_bindings::KVM_MAX_CPUID_ENTRIES,
+            .supported_cpuid(
+                kvm_bindings::KVM_MAX_CPUID_ENTRIES,
                 #[cfg(feature = "tdx")]
                 is_tdx_enable,
             )
@@ -1102,11 +1102,11 @@ mod tests {
     use std::os::unix::io::AsRawFd;
     use std::sync::{Arc, RwLock};
 
+    #[cfg(feature = "dbs-upcall")]
+    use dbs_upcall::*;
     use dbs_utils::epoll_manager::EpollManager;
     #[cfg(feature = "hotplug")]
     use dbs_virtio_devices::vsock::backend::VsockInnerBackend;
-    #[cfg(feature = "dbs-upcall")]
-    use dbs_upcall::*;
     use seccompiler::BpfProgram;
     use test_utils::skip_if_not_root;
     use vmm_sys_util::eventfd::EventFd;

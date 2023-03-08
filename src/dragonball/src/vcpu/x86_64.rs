@@ -11,14 +11,14 @@ use std::sync::Arc;
 
 use dbs_arch::cpuid::{process_cpuid, VmSpec};
 use dbs_arch::gdt::gdt_entry;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
 use dbs_utils::time::TimestampUs;
 use kvm_bindings::CpuId;
 use kvm_ioctls::{VcpuFd, VmFd};
 use log::error;
 use vm_memory::{Address, GuestAddress, GuestAddressSpace};
 use vmm_sys_util::eventfd::EventFd;
-#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
-use dbs_interrupt::ioapic::IoapicDevice;
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
 use crate::metric::{IncMetric, METRICS};

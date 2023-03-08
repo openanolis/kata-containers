@@ -9,14 +9,14 @@
 
 //! Error codes for the virtual machine monitor subsystem.
 
-#[cfg(feature = "dbs-virtio-devices")]
-use dbs_virtio_devices::Error as VirtIoError;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_tdx::tdx_ioctls::TdxIoctlError;
+#[cfg(feature = "dbs-virtio-devices")]
+use dbs_virtio_devices::Error as VirtIoError;
 
-use crate::{address_space_manager, device_manager, resource_manager, vcpu, vm};
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 use crate::device_manager::ioapic_dev_mgr::IoapicDeviceMgrError;
+use crate::{address_space_manager, device_manager, resource_manager, vcpu, vm};
 
 /// Shorthand result type for internal VMM commands.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -216,9 +216,9 @@ pub enum StartMicroVmError {
     FsDeviceError(#[source] device_manager::fs_dev_mgr::FsDeviceError),
 
     /// TDX ioctl related error.
-     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-     #[error("TDX ioctl related error.")]
-     TdxIoctlError(#[source] TdxIoctlError),
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[error("TDX ioctl related error.")]
+    TdxIoctlError(#[source] TdxIoctlError),
 
     /// TDX not supported
     #[error("Dragonball without TDX support.")]
@@ -232,7 +232,6 @@ pub enum StartMicroVmError {
     /// Cannot access guest address space manager.
     #[error("cannot access guest address space manager: {0}")]
     GuestMemory(#[source] address_space_manager::AddressManagerError),
-
 
     /// Ioapic Device Errors
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]

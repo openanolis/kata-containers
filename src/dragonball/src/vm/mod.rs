@@ -130,8 +130,6 @@ pub struct VmConfigInfo {
     /// userspace iopaic enabled or not
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
     pub userspace_ioapic_enabled: bool,
-
-
 }
 
 impl Default for VmConfigInfo {
@@ -483,7 +481,6 @@ impl Vm {
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
 
-
         info!(self.logger, "VM: create devices");
         let vm_as =
             self.address_space
@@ -595,7 +592,12 @@ impl Vm {
             .map_err(StartMicroVmError::AddressManagerError)?;
         address_space_param.set_kvm_vm_fd(self.vm_fd.clone());
         self.address_space
-            .create_address_space(&self.resource_manager, &numa_regions, address_space_param, self.is_tdx_enabled())
+            .create_address_space(
+                &self.resource_manager,
+                &numa_regions,
+                address_space_param,
+                self.is_tdx_enabled(),
+            )
             .map_err(StartMicroVmError::AddressManagerError)?;
 
         info!(self.logger, "VM: initializing guest memory done");
@@ -1101,7 +1103,6 @@ pub mod tests {
         }
     }
 
-
     // this test case need specific resources and is recommended to run
     // via dbuvm docker image
     #[test]
@@ -1283,5 +1284,4 @@ pub mod tests {
         );
         assert!(res.is_ok());
     }
-
 }

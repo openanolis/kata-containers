@@ -56,7 +56,7 @@ impl DeviceVirtioRegionHandler {
             file_offset,
             region.flags(),
             region.prot(),
-            false
+            false,
         ));
 
         self.address_space.insert_region(as_region).map_err(|e| {

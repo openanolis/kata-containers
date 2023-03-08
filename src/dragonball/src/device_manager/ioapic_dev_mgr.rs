@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use crate::device_manager::DeviceOpContext;
 
-use dbs_interrupt::ioapic::{Error as IoapicDeviceError, IoapicDevice};
 use dbs_device::device_manager::IoManagerContext;
+use dbs_interrupt::ioapic::{Error as IoapicDeviceError, IoapicDevice};
 /// Error type for Ioapic device manager
 
 #[derive(Debug, thiserror::Error)]

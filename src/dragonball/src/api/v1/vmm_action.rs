@@ -277,8 +277,8 @@ impl VmmService {
         boot_source_config: BootSourceConfig,
     ) -> VmmRequestResult {
         use super::BootSourceConfigError::{
-            InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath,
-            UpdateNotAllowedPostBoot, InvalidTdshimPath, MissingTdshimPath, UnexpectedTdshimPath
+            InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath, InvalidTdshimPath,
+            MissingTdshimPath, UnexpectedTdshimPath, UpdateNotAllowedPostBoot,
         };
         use super::VmmActionError::BootSource;
 
@@ -319,7 +319,13 @@ impl VmmService {
             .insert_str(boot_args)
             .map_err(|e| BootSource(InvalidKernelCommandLine(e)))?;
 
-        let kernel_config = KernelConfigInfo::new(kernel_file, initrd_file, cmdline, tdshim_file, boot_source_config.tdshim_image_path.clone());
+        let kernel_config = KernelConfigInfo::new(
+            kernel_file,
+            initrd_file,
+            cmdline,
+            tdshim_file,
+            boot_source_config.tdshim_image_path.clone(),
+        );
         vm.set_kernel_config(kernel_config);
 
         Ok(VmmData::Empty)
@@ -431,7 +437,7 @@ impl VmmService {
         {
             config.userspace_ioapic_enabled = machine_config.userspace_ioapic_enabled;
         }
-        
+
         vm.set_vm_config(config.clone());
         self.machine_config = config;
 

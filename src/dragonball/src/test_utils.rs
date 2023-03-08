@@ -23,7 +23,7 @@ pub mod tests {
             None,
             cmd_line,
             None,
-            None
+            None,
         ));
 
         let vm_config = VmConfigInfo {

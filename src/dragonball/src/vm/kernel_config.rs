@@ -82,7 +82,13 @@ mod tests {
         let initrd = TempFile::new().unwrap();
         let mut cmdline = linux_loader::cmdline::Cmdline::new(1024);
         cmdline.insert_str("ro").unwrap();
-        let mut info = KernelConfigInfo::new(kernel.into_file(), Some(initrd.into_file()), cmdline, None, None);
+        let mut info = KernelConfigInfo::new(
+            kernel.into_file(),
+            Some(initrd.into_file()),
+            cmdline,
+            None,
+            None,
+        );
 
         assert_eq!(info.cmdline.as_cstring().unwrap().as_bytes(), b"ro");
         assert!(info.initrd_file_mut().is_some());

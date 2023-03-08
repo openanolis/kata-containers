@@ -368,26 +368,26 @@ impl ResourceManager {
         Ok(())
     }
 
-        /// Allocate a platform MMIO address range and returns the allocated base address.
-        pub fn allocate_platform_mmio_address(&self, constraint: &Constraint) -> Option<u64> {
-            // Safe to unwrap() because we don't expect poisoned lock here.
-            let mut platform_mmio_pool = self.platform_mmio_pool.lock().unwrap();
-            let key = platform_mmio_pool.allocate(constraint);
-            key.map(|v| v.min)
+    /// Allocate a platform MMIO address range and returns the allocated base address.
+    pub fn allocate_platform_mmio_address(&self, constraint: &Constraint) -> Option<u64> {
+        // Safe to unwrap() because we don't expect poisoned lock here.
+        let mut platform_mmio_pool = self.platform_mmio_pool.lock().unwrap();
+        let key = platform_mmio_pool.allocate(constraint);
+        key.map(|v| v.min)
+    }
+
+    /// Free platform MMIO address range `[base, base + size - 1]`
+    pub fn free_platform_mmio_address(&self, base: u64, size: u64) {
+        if base.checked_add(size).is_none() {
+            panic!(
+                "invalid base/size pair when freeing platform mmio address:(0x{:X}/0x{:X})",
+                base, size
+            );
         }
-    
-        /// Free platform MMIO address range `[base, base + size - 1]`
-        pub fn free_platform_mmio_address(&self, base: u64, size: u64) {
-            if base.checked_add(size).is_none() {
-                panic!(
-                    "invalid base/size pair when freeing platform mmio address:(0x{:X}/0x{:X})",
-                    base, size
-                );
-            }
-            let key = Range::new(base, base + size - 1);
-            // Safe to unwrap() because we don't expect poisoned lock here.
-            self.platform_mmio_pool.lock().unwrap().free(&key);
-        }
+        let key = Range::new(base, base + size - 1);
+        // Safe to unwrap() because we don't expect poisoned lock here.
+        self.platform_mmio_pool.lock().unwrap().free(&key);
+    }
 
     /// Allocate guest memory address range and returns the allocated base memory address.
     pub fn allocate_mem_address(&self, constraint: &Constraint) -> Option<u64> {
@@ -572,7 +572,7 @@ impl ResourceManager {
                             }
                         }
                     }
-                },
+                }
                 ResourceConstraint::PlatformMmioAddress { range, align, size } => {
                     let mut constraint = Constraint::new(*size).align(*align);
                     if let Some(r) = range {
@@ -587,7 +587,7 @@ impl ResourceManager {
                             } else {
                                 return Err(ResourceError::NoAvailResource);
                             }
-                        },
+                        }
                     }
                 }
             };

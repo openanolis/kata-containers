@@ -309,7 +309,6 @@ pub struct Vcpu {
     #[cfg(target_arch = "aarch64")]
     pub(crate) mpidr: u64,
 
-
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
     pub(crate) interrupt_controller: Option<Arc<IoapicDevice>>,
 }
@@ -850,8 +849,11 @@ pub mod tests {
         let vcpu_fd = Arc::new(vm.create_vcpu(0).unwrap());
         let io_manager = IoManagerCached::new(Arc::new(ArcSwap::new(Arc::new(IoManager::new()))));
         let supported_cpuid = kvm_context
-            .supported_cpuid(kvm_bindings::KVM_MAX_CPUID_ENTRIES,
-                #[cfg(feature = "tdx")] false)
+            .supported_cpuid(
+                kvm_bindings::KVM_MAX_CPUID_ENTRIES,
+                #[cfg(feature = "tdx")]
+                false,
+            )
             .unwrap();
         let reset_event_fd = EventFd::new(libc::EFD_NONBLOCK).unwrap();
         let vcpu_state_event = EventFd::new(libc::EFD_NONBLOCK).unwrap();
@@ -868,7 +870,7 @@ pub mod tests {
             tx,
             time_stamp,
             false,
-            None
+            None,
         )
         .unwrap();
 

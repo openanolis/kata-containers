@@ -17,8 +17,6 @@ ctlpath = "@DBCTLPATH@"
 kernel = "@KERNELPATH_DB@"
 image = "@IMAGEPATH@"
 
-<<<<<<< HEAD
-=======
 # rootfs filesystem type:
 #   - ext4 (default)
 #   - xfs
@@ -38,9 +36,19 @@ rootfs_type=@DEFROOTFSTYPE@
 #   - Memory Hotplug
 #
 # Default false
-# confidential_guest = true
+confidential_guest = true
 
->>>>>>> 5ec0a06ca... CC: runtime-rs support tdx
+# Path to the firmware.
+# If you want Dragonball to use a specific firmware, set its path below.
+# This is option is only used when confidential_guest is enabled.
+#
+# For more information about firmwared that can be used with specific TEEs,
+# please, refer to:
+# * Intel TDX:
+#   - td-shim: https://github.com/confidential-containers/td-shim
+#
+firmware = "@TDSHIMFIRMWAREPATH@"
+
 # List of valid annotation names for the hypervisor
 # Each member of the list is a regular expression, which is the base name
 # of the annotation, e.g. "path" for io.katacontainers.config.hypervisor.path"
@@ -69,17 +77,12 @@ valid_hypervisor_paths = @DBVALIDHYPERVISORPATHS@
 # container and look for 'default-kernel-parameters' log entries.
 kernel_params = "@KERNELPARAMS@"
 
-# Path to the firmware.
-# If you want that DB uses the default firmware leave this option empty
-firmware = "@FIRMWAREPATH@"
-
 # Default number of vCPUs per SB/VM:
 # unspecified or 0                --> will be set to 1
 # < 0                             --> will be set to the actual number of physical cores
 # > 0 <= number of physical cores --> will be set to the specified number
 # > number of physical cores      --> will be set to the actual number of physical cores
 default_vcpus = @DEFVCPUS@
-
 
 # Default maximum number of vCPUs per SB/VM:
 # unspecified or == 0             --> will be set to the actual number of physical cores or to the maximum number
@@ -311,31 +314,4 @@ experimental=@DEFAULTEXPFEATURES@
 # enable_pprof = true
 
 static_resource_mgmt=@DEFSTATICRESOURCEMGMT_DB@
-
-# WARNING: All the options in the following section have not been implemented yet.
-# This section was added as a placeholder. DO NOT USE IT!
-[image]
-# Container image service.
-#
-# Offload the CRI image management service to the Kata agent.
-# (default: false)
-service_offload = @DEFSERVICEOFFLOAD@
-
-# Container image decryption keys provisioning.
-# Applies only if service_offload is true.
-# Keys can be provisioned locally (e.g. through a special command or
-# a local file) or remotely (usually after the guest is remotely attested).
-# The provision setting is a complete URL that lets the Kata agent decide
-# which method to use in order to fetch the keys.
-#
-# Keys can be stored in a local file, in a measured and attested initrd:
-#provision=data:///local/key/file
-#
-# Keys could be fetched through a special command or binary from the
-# initrd (guest) image, e.g. a firmware call:
-#provision=file:///path/to/bin/fetcher/in/guest
-#
-# Keys can be remotely provisioned. The Kata agent fetches them from e.g.
-# a HTTPS URL:
-#provision=https://my-key-broker.foo/tenant/<tenant-id>
 

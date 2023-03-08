@@ -80,7 +80,6 @@ pub mod virtio_net_dev_mgr;
 #[cfg(feature = "virtio-net")]
 use self::virtio_net_dev_mgr::VirtioNetDeviceMgr;
 
-
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 pub mod ioapic_dev_mgr;
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
@@ -291,12 +290,19 @@ impl DeviceOpContext {
             upcall_client: None,
             #[cfg(feature = "dbs-virtio-devices")]
             virtio_devices: Vec::new(),
-            shared_info
+            shared_info,
         }
     }
 
     pub(crate) fn create_boot_ctx(vm: &Vm, epoll_mgr: Option<EpollManager>) -> Self {
-        Self::new(epoll_mgr, vm.device_manager(), None, None, false, vm.shared_info().clone())
+        Self::new(
+            epoll_mgr,
+            vm.device_manager(),
+            None,
+            None,
+            false,
+            vm.shared_info().clone(),
+        )
     }
 
     pub(crate) fn get_vm_as(&self) -> Result<GuestAddressSpaceImpl> {
@@ -311,12 +317,12 @@ impl DeviceOpContext {
     }
 
     pub(crate) fn is_tdx_enabled(&self) -> bool {
-    self.shared_info
-    .as_ref()
-    .read()
-    .expect("failed to get instance state, because shared info is poisoned lock")
-    .is_tdx_enabled()
-}
+        self.shared_info
+            .as_ref()
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_tdx_enabled()
+    }
 
     #[allow(unused_variables)]
     fn generate_kernel_boot_args(&mut self, kernel_config: &mut KernelConfigInfo) -> Result<()> {
@@ -404,7 +410,7 @@ impl DeviceOpContext {
             Some(vm_as),
             vm.vm_address_space().cloned(),
             true,
-            vm.shared_info().clone()
+            vm.shared_info().clone(),
         );
         ctx.upcall_client = vm.upcall_client().clone();
         ctx
@@ -616,7 +622,8 @@ impl DeviceManager {
             {
                 let cmos_params: Option<(u64, u64)> = if self.is_tdx_enabled() {
                     let memory_size_byte = (vm_config.mem_size_mib as u64) << 20;
-                    let memory_below_4g = std::cmp::min(dbs_boot::layout::MMIO_LOW_START, memory_size_byte);
+                    let memory_below_4g =
+                        std::cmp::min(dbs_boot::layout::MMIO_LOW_START, memory_size_byte);
                     let memory_above_4g: u64 = memory_size_byte - memory_below_4g;
                     Some((memory_below_4g, memory_above_4g))
                 } else {
@@ -739,7 +746,6 @@ impl DeviceManager {
         #[cfg(not(all(target_arch = "x86_64", feature = "userspace-ioapic")))]
         self.create_interrupt_manager()
             .map_err(StartMicroVmError::DeviceManager)?;
-
 
         self.create_legacy_devices(&mut ctx, vm_config)?;
         self.init_legacy_devices(dmesg_fifo, com1_sock_path, &mut ctx)?;
@@ -1185,7 +1191,6 @@ mod tests {
             },
             vpmu_feature: 0,
             userspace_ioapic_enabled: false,
-            
         };
         vm.set_vm_config(vm_config.clone());
         vm.init_guest_memory().unwrap();
