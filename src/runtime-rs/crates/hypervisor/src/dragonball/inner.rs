@@ -6,13 +6,16 @@
 
 use super::vmm_instance::VmmInstance;
 use crate::{
-    device::Device, hypervisor_persist::HypervisorState, kernel_param::KernelParams, VmmState,
-    DEV_HUGEPAGES, HUGETLBFS, HYPERVISOR_DRAGONBALL, SHMEM, VM_ROOTFS_DRIVER_BLK,
+    device::Device,
+    hypervisor_persist::HypervisorState,
+    kernel_param::KernelParams,
+    protection::{self, GuestProtectionType},
+    VmmState, DEV_HUGEPAGES, HUGETLBFS, HYPERVISOR_DRAGONBALL, SHMEM, VM_ROOTFS_DRIVER_BLK,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use dragonball::{
-    api::v1::{BlockDeviceConfigInfo, BootSourceConfig},
+    api::v1::{BlockDeviceConfigInfo, BootSourceConfig, ConfidentialVmType},
     vm::VmConfigInfo,
 };
 use kata_sys_util::mount;
@@ -75,6 +78,7 @@ impl DragonballInner {
                 | CapabilityBits::BlockDeviceHotplugSupport
                 | CapabilityBits::FsSharingSupport,
         );
+
         DragonballInner {
             id: "".to_string(),
             vm_path: "".to_string(),
@@ -94,6 +98,12 @@ impl DragonballInner {
     pub(crate) async fn cold_start_vm(&mut self, timeout: i32) -> Result<()> {
         info!(sl!(), "start sandbox cold");
 
+        let confidential_vm_type = self
+            .enable_protection()
+            .context("check enable protection")?;
+        self.vmm_instance
+            .set_confidential_vm_type(confidential_vm_type);
+
         self.set_vm_base_config().context("set vm base config")?;
 
         // get rootfs driver
@@ -109,11 +119,13 @@ impl DragonballInner {
 
         // set boot source
         let kernel_path = self.config.boot_info.kernel.clone();
+        let firmware_path = self.config.boot_info.firmware.clone();
         self.set_boot_source(
             &kernel_path,
             &kernel_params
                 .to_string()
                 .context("kernel params to string")?,
+            &firmware_path,
         )
         .context("set_boot_source")?;
 
@@ -185,6 +197,27 @@ impl DragonballInner {
             .ok();
     }
 
+    fn enable_protection(&mut self) -> Result<Option<ConfidentialVmType>> {
+        if !self.config.security_info.confidential_guest {
+            return Ok(None);
+        }
+
+        match protection::available_guest_protection()? {
+            GuestProtectionType::TdxPtotection => {
+                info!(sl!(), "running in tdx protection");
+
+                // tdshim(firmware) is needed when running in tdx for dragonball
+                if self.config.boot_info.firmware.is_empty() {
+                    return Err(anyhow!(
+                        "tdshim(firmware) could not be empty when running in tdx for dragonball"
+                    ));
+                }
+                Ok(Some(ConfidentialVmType::TDX))
+            }
+            _ => todo!(),
+        }
+    }
+
     fn set_vm_base_config(&mut self) -> Result<()> {
         let serial_path = [&self.run_dir, "console.sock"].join("/");
         let (mem_type, mem_file_path) = if self.config.memory_info.enable_hugepages {
@@ -192,6 +225,18 @@ impl DragonballInner {
         } else {
             (String::from(SHMEM), String::from(""))
         };
+
+        let mut userspace_ioapic = false;
+        if self
+            .vmm_instance
+            .get_shared_info()
+            .read()
+            .unwrap()
+            .is_tdx_enabled()
+        {
+            userspace_ioapic = true;
+        }
+
         let vm_config = VmConfigInfo {
             serial_path: Some(serial_path),
             mem_size_mib: self.config.memory_info.default_memory as usize,
@@ -199,6 +244,7 @@ impl DragonballInner {
             max_vcpu_count: self.config.cpu_info.default_maxvcpus as u8,
             mem_type,
             mem_file_path,
+            userspace_ioapic,
             ..Default::default()
         };
         info!(sl!(), "vm config: {:?}", vm_config);
@@ -236,10 +282,18 @@ impl DragonballInner {
         Ok(abs_path)
     }
 
-    fn set_boot_source(&mut self, kernel_path: &str, kernel_params: &str) -> Result<()> {
+    fn set_boot_source(
+        &mut self,
+        kernel_path: &str,
+        kernel_params: &str,
+        firmware_path: &str,
+    ) -> Result<()> {
         info!(
             sl!(),
-            "kernel path {} kernel params {}", kernel_path, kernel_params
+            "kernel path {} kernel params {} firmware-path {}",
+            kernel_path,
+            kernel_params,
+            firmware_path
         );
 
         let mut boot_cfg = BootSourceConfig {
@@ -251,6 +305,10 @@ impl DragonballInner {
 
         if !kernel_params.is_empty() {
             boot_cfg.boot_args = Some(kernel_params.to_string());
+        }
+
+        if !firmware_path.is_empty() {
+            boot_cfg.firmware_path = Some(firmware_path.to_string())
         }
 
         self.vmm_instance

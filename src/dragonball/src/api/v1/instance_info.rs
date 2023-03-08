@@ -65,7 +65,7 @@ pub struct InstanceInfo {
     pub tids: Vec<(u8, u32)>,
     /// Last instance downtime
     pub last_instance_downtime: u64,
-    /// confidential vm type
+    /// Confidential vm type
     pub confidential_vm_type: Option<ConfidentialVmType>,
 }
 

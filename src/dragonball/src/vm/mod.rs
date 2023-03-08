@@ -156,8 +156,6 @@ impl Default for VmConfigInfo {
         }
     }
 }
-
-/// Struct to manage resources and control states of an virtual machine instance.
 ///
 /// An `Vm` instance holds a resources assigned to a virtual machine instance, such as CPU, memory,
 /// devices etc. When an `Vm` instance gets deconstructed, all resources assigned should be
@@ -921,6 +919,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
 
@@ -948,6 +947,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config);
@@ -988,6 +988,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
 
@@ -1061,6 +1062,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
 

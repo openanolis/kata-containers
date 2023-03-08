@@ -4,7 +4,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::collections::HashSet;
+use anyhow::{Context, Result};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+    io::{BufRead, BufReader},
+};
+
+pub const PROC_CPUINFO: &str = "/proc/cpuinfo";
 
 pub fn get_child_threads(pid: u32) -> HashSet<u32> {
     let mut result = HashSet::new();
@@ -24,4 +31,34 @@ pub fn get_child_threads(pid: u32) -> HashSet<u32> {
         }
     }
     result
+}
+
+// scan the `flags` sections in given cpuinfo_path, return a hashmap <flag, is_exist>
+pub(crate) fn get_cpu_flags(cpuinfo_path: &str) -> Result<HashMap<String, bool>> {
+    let f = File::open(cpuinfo_path).context("open cpuinfo file")?;
+    let reader = BufReader::new(f);
+
+    let mut flags_lines = vec![];
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            if line.contains("flags") {
+                flags_lines.push(line);
+            }
+        }
+    }
+
+    let mut flags_hash = HashMap::new();
+    for flags_line in flags_lines {
+        // expected format: ["flags", ":", ...] or ["flags:", ...]
+        let flags: Vec<&str> = flags_line.split_whitespace().collect();
+        if flags.len() < 2 {
+            continue;
+        }
+
+        for flag in flags {
+            flags_hash.entry(flag.to_string()).or_insert(true);
+        }
+    }
+
+    Ok(flags_hash)
 }
