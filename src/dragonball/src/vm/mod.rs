@@ -131,6 +131,9 @@ pub struct VmConfigInfo {
 
     /// sock path
     pub serial_path: Option<String>,
+
+    /// Userspace ioapic
+    pub userspace_ioapic: bool,
 }
 
 impl Default for VmConfigInfo {
@@ -150,6 +153,7 @@ impl Default for VmConfigInfo {
             mem_file_path: String::from(""),
             mem_size_mib: 128,
             serial_path: None,
+            userspace_ioapic: false,
         }
     }
 }

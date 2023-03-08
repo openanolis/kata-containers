@@ -17,9 +17,9 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use dragonball::{
     api::v1::{
-        BlockDeviceConfigInfo, BootSourceConfig, FsDeviceConfigInfo, FsMountConfigInfo,
-        InstanceInfo, InstanceState, VirtioNetDeviceConfigInfo, VmmAction, VmmActionError, VmmData,
-        VmmRequest, VmmResponse, VmmService, VsockDeviceConfigInfo,
+        BlockDeviceConfigInfo, BootSourceConfig, ConfidentialVmType, FsDeviceConfigInfo,
+        FsMountConfigInfo, InstanceInfo, InstanceState, VirtioNetDeviceConfigInfo, VmmAction,
+        VmmActionError, VmmData, VmmRequest, VmmResponse, VmmService, VsockDeviceConfigInfo,
     },
     vm::VmConfigInfo,
     Vmm,
@@ -75,6 +75,11 @@ impl VmmInstance {
     fn set_instance_id(&mut self, id: &str) {
         let share_info_lock = self.vmm_shared_info.clone();
         share_info_lock.write().unwrap().id = String::from(id);
+    }
+
+    pub fn set_confidential_vm_type(&mut self, confidential_vm_type: Option<ConfidentialVmType>) {
+        let shared_info_lock = self.vmm_shared_info.clone();
+        shared_info_lock.write().unwrap().confidential_vm_type = confidential_vm_type;
     }
 
     pub fn get_vcpu_tids(&self) -> Vec<(u8, u32)> {

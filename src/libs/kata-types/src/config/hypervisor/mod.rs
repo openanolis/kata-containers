@@ -999,6 +999,21 @@ impl Hypervisor {
     pub fn validate_jailer_path<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         validate_path_pattern(&self.valid_jailer_paths, path)
     }
+
+    /// Adjust configuration for confidential computing.
+    pub fn adjust_confidential_computing(&mut self) -> Result<()> {
+        if !self.security_info.confidential_guest {
+            return Ok(())
+        }
+
+        // Confidential guest do not support hotplugging vCPUs.
+        if self.cpu_info.default_maxvcpus != self.cpu_info.default_vcpus as u32 {
+            warn!(sl!(), "Confidential guest do not support hotplugging vCPUs. Setting default_maxvcpus to default_vcpus: {}", self.cpu_info.default_vcpus);
+            self.cpu_info.default_maxvcpus = self.cpu_info.default_vcpus as u32;
+        }
+
+        Ok(())
+    }
 }
 
 impl ConfigOps for Hypervisor {

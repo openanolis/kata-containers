@@ -10,24 +10,26 @@ extern crate slog;
 logging::logger_with_subsystem!(sl, "hypervisor");
 
 pub mod device;
-pub mod hypervisor_persist;
 pub use device::*;
-pub mod dragonball;
+pub mod hypervisor_persist;
+use hypervisor_persist::HypervisorState;
 mod kernel_param;
-pub mod qemu;
 pub use kernel_param::Param;
+mod protection;
 mod utils;
-use std::collections::HashMap;
 
 #[cfg(feature = "cloud-hypervisor")]
 pub mod ch;
+pub mod dragonball;
+pub mod qemu;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use hypervisor_persist::HypervisorState;
+
+use std::collections::HashMap;
+
 use kata_types::capabilities::Capabilities;
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
-
 pub use kata_types::config::hypervisor::HYPERVISOR_NAME_CH;
 
 // Config which driver to use as vm root dev

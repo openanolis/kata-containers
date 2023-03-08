@@ -27,6 +27,8 @@ pub struct BootSourceConfig {
     /// Path of the initrd, if there is one.
     /// ps. rootfs is set in BlockDeviceConfigInfo
     pub initrd_path: Option<String>,
+    /// Path of the firmware, if there is one.
+    pub firmware_path: Option<String>,
     /// The boot arguments to pass to the kernel.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_args: Option<String>,

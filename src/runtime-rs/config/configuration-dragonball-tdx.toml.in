@@ -36,7 +36,18 @@ rootfs_type=@DEFROOTFSTYPE@
 #   - Memory Hotplug
 #
 # Default false
-# confidential_guest = true
+confidential_guest = true
+
+# Path to the firmware.
+# If you want Dragonball to use a specific firmware, set its path below.
+# This is option is only used when confidential_guest is enabled.
+#
+# For more information about firmwared that can be used with specific TEEs,
+# please, refer to:
+# * Intel TDX:
+#   - td-shim: https://github.com/confidential-containers/td-shim
+#
+firmware = "@TDSHIMFIRMWAREPATH@"
 
 # List of valid annotation names for the hypervisor
 # Each member of the list is a regular expression, which is the base name
@@ -66,17 +77,12 @@ valid_hypervisor_paths = @DBVALIDHYPERVISORPATHS@
 # container and look for 'default-kernel-parameters' log entries.
 kernel_params = "@KERNELPARAMS@"
 
-# Path to the firmware.
-# If you want that DB uses the default firmware leave this option empty
-firmware = "@FIRMWAREPATH@"
-
 # Default number of vCPUs per SB/VM:
 # unspecified or 0                --> will be set to 1
 # < 0                             --> will be set to the actual number of physical cores
 # > 0 <= number of physical cores --> will be set to the specified number
 # > number of physical cores      --> will be set to the actual number of physical cores
 default_vcpus = @DEFVCPUS@
-
 
 # Default maximum number of vCPUs per SB/VM:
 # unspecified or == 0             --> will be set to the actual number of physical cores or to the maximum number

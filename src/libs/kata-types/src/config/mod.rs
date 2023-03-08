@@ -170,6 +170,15 @@ impl TomlConfig {
         Ok(())
     }
 
+    /// Adjust configuration if Confidential Computing is enabled.
+    pub fn adjust_confidential_computing(&mut self) -> Result<()> {
+        if let Some(hv_cfg) = self.hypervisor.get_mut(&self.runtime.hypervisor_name) {
+            hv_cfg.adjust_confidential_computing()?;
+        }
+
+        Ok(())
+    }
+
     /// Get agent-specfic kernel parameters for further Hypervisor config revision
     pub fn get_agent_kernel_params(&self) -> Result<HashMap<String, String>> {
         let mut kv = HashMap::new();

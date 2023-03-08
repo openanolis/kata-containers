@@ -362,6 +362,7 @@ fn load_config(spec: &oci::Spec, option: &Option<Vec<u8>>) -> Result<TomlConfig>
         TomlConfig::load_from_file(&config_path).context("load toml config")?;
     annotation.update_config_by_annotation(&mut toml_config)?;
     update_agent_kernel_params(&mut toml_config)?;
+    toml_config.adjust_confidential_computing()?;
 
     // validate configuration and return the error
     toml_config.validate()?;
