@@ -427,6 +427,11 @@ impl VmmService {
         // - Some(path), legacy_manager will create_socket_console on that path.
         config.serial_path = machine_config.serial_path;
 
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        {
+            config.userspace_ioapic_enabled = machine_config.userspace_ioapic_enabled;
+        }
+        
         vm.set_vm_config(config.clone());
         self.machine_config = config;
 

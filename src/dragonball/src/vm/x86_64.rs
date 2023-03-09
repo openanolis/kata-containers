@@ -29,6 +29,8 @@ use dbs_tdx::td_shim::TD_SHIM_START;
 #[cfg(feature = "tdx")]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
 use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use kvm_bindings::{KVM_CAP_SPLIT_IRQCHIP, kvm_enable_cap};
 use linux_loader::cmdline::Cmdline;
 use slog::info;
 use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
@@ -191,9 +193,28 @@ impl Vm {
         self.init_tss()?;
         // For x86_64 we need to create the interrupt controller before calling `KVM_CREATE_VCPUS`
         // while on aarch64 we need to do it the other way around.
-        self.setup_interrupt_controller()?;
-        self.create_pit()?;
-        self.init_devices(epoll_mgr)?;
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        {
+            if self.vm_config.userspace_ioapic_enabled {
+                self.setup_split_irqchips()?;
+                self.device_manager.set_userspace_ioapic_enabled(true);
+                self.init_devices(epoll_mgr)?;
+                let interrupt_controller = self.device_manager.ioapic_manager.get_device().unwrap();
+                self.vcpu_manager()
+                    .map_err(StartMicroVmError::Vcpu)?
+                    .set_interrupt_controller(interrupt_controller);
+            } else {
+                self.setup_interrupt_controller()?;
+                self.create_pit()?;
+                self.init_devices(epoll_mgr)?;
+            }
+        }
+        #[cfg(not(all(target_arch = "x86_64", feature = "userspace-ioapic")))]
+        {
+            self.setup_interrupt_controller()?;
+            self.create_pit()?;
+            self.init_devices(epoll_mgr)?;
+        }
 
         let reset_event_fd = self.device_manager.get_reset_eventfd().unwrap();
         self.vcpu_manager()
@@ -213,7 +234,7 @@ impl Vm {
             #[cfg(feature = "tdx")]
             return self.init_tdx_microvm(vm_as);
             #[cfg(not(feature = "tdx"))]
-            return Err(StartMicrovmError::TdxError);
+            return Err(StartMicroVmError::TdxError);
         } else {
             info!(self.logger, "None-confidential microvm");
         
@@ -291,6 +312,20 @@ impl Vm {
         // correct amount of memory from our pointer, and we verify the return result.
         self.vm_fd
             .create_pit2(pit_config)
+            .map_err(|e| StartMicroVmError::ConfigureVm(VmError::VmSetup(e)))
+    }
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    /// Creates spilt irq chips
+    pub(crate) fn setup_split_irqchips(&mut self) -> std::result::Result<(), StartMicroVmError> {
+        let mut cap = kvm_enable_cap {
+            cap: KVM_CAP_SPLIT_IRQCHIP,
+            ..Default::default()
+        };
+        //cap.args[0] = NUM_IOAPIC_PINS as u64;
+        cap.args[0] = 24u64;
+        self.vm_fd
+            .enable_cap(&cap)
             .map_err(|e| StartMicroVmError::ConfigureVm(VmError::VmSetup(e)))
     }
 
@@ -432,6 +467,7 @@ impl Vm {
 
 impl Vm {
     /// Parse tdshim metadata
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn parse_tdvf_sections(
         &mut self,
     ) -> std::result::Result<Vec<TdvfSection>, StartMicroVmError> {
@@ -445,7 +481,9 @@ impl Vm {
             .map_err(LoadTdDataError::ParseTdshim)
             .map_err(StartMicroVmError::TdDataLoader)
     }
+
     /// Load data in tdshim image to memory
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn load_tdshim(
         &mut self,
         vm_memory: &GuestMemoryImpl,
@@ -464,6 +502,7 @@ impl Vm {
         for section in sections {
             info!(self.logger, "TDVF Section: {:x?}", section);
             match section.r#type {
+                #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
                 TdvfSectionType::Bfv | TdvfSectionType::Cfv => {
                     tdshim_file
                         .seek(SeekFrom::Start(section.data_offset as u64))
@@ -491,14 +530,20 @@ impl Vm {
                 _ => {}
             }
         }
+
+        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if hob_offset.is_none() {
             return Err(StartMicroVmError::TdDataLoader(LoadTdDataError::HobOffset));
         }
+
+        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if payload_offset.is_none() || payload_size.is_none() {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadOffset,
             ));
         }
+
+        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if cmdline_offset.is_none() {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadParamsOffset,
@@ -512,7 +557,9 @@ impl Vm {
             cmdline_offset.unwrap(),
         ))
     }
+
     /// load vmlinux as tdshim payload
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn load_payload(
         &mut self,
         payload_offset: u64,
@@ -524,6 +571,7 @@ impl Vm {
             self.load_kernel(vm_memory.deref(), Some(GuestAddress(payload_offset)))?;
         // Kernel should be loaded into the payload section, Otherwise data won't be accepted by
         // TD. Make sure that the kernel does not overflow this range.
+        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if kernel_loader_result.kernel_end > (payload_offset + payload_size) {
             Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::LoadPayload,
@@ -552,6 +600,7 @@ impl Vm {
     Ok(())
 }
 /// generate hob list fot tdshim
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 pub fn generate_hob_list(
     &self,
     hob_offset: u64,

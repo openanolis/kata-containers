@@ -272,11 +272,16 @@ dependencies = [
 name = "dbs-interrupt"
 version = "0.2.2"
 dependencies = [
+ "byteorder",
  "dbs-arch",
  "dbs-device",
+ "downcast-rs",
  "kvm-bindings",
  "kvm-ioctls",
  "libc",
+ "log",
+ "thiserror",
+ "vm-memory",
  "vmm-sys-util 0.11.1",
 ]
 
@@ -393,6 +398,12 @@ dependencies = [
  "redox_users",
  "winapi",
 ]
+
+[[package]]
+name = "downcast-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc55e97c7c363aa76468b2151f7b26fc28c3e6f43d0713dbfed05d6f7eea46a2"
 
 [[package]]
 name = "dragonball"

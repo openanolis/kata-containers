@@ -17,6 +17,8 @@ use kvm_ioctls::{VcpuFd, VmFd};
 use log::error;
 use vm_memory::{Address, GuestAddress, GuestAddressSpace};
 use vmm_sys_util::eventfd::EventFd;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
 use crate::metric::{IncMetric, METRICS};
@@ -52,6 +54,8 @@ impl Vcpu {
         vcpu_state_sender: Sender<VcpuStateEvent>,
         create_ts: TimestampUs,
         support_immediate_exit: bool,
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        interrupt_controller: Option<Arc<IoapicDevice>>,
     ) -> Result<Self> {
         let (event_sender, event_receiver) = channel();
         let (response_sender, response_receiver) = channel();
@@ -70,6 +74,8 @@ impl Vcpu {
             exit_evt,
             support_immediate_exit,
             cpuid,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            interrupt_controller,
         })
     }
 

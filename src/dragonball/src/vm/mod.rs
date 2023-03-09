@@ -126,6 +126,12 @@ pub struct VmConfigInfo {
 
     /// sock path
     pub serial_path: Option<String>,
+
+    /// userspace iopaic enabled or not
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub userspace_ioapic_enabled: bool,
+
+
 }
 
 impl Default for VmConfigInfo {
@@ -145,6 +151,8 @@ impl Default for VmConfigInfo {
             mem_file_path: String::from(""),
             mem_size_mib: 128,
             serial_path: None,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         }
     }
 }
@@ -476,10 +484,6 @@ impl Vm {
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
 
-        info!(self.logger, "VM: create interrupt manager");
-        self.device_manager
-            .create_interrupt_manager()
-            .map_err(StartMicroVmError::DeviceManager)?;
 
         info!(self.logger, "VM: create devices");
         let vm_as =
@@ -742,6 +746,9 @@ impl Vm {
                 AddressManagerError::GuestMemoryNotInitialized,
             ))?;
 
+        // TODO create interrupt_contriller here
+        // create userspace-ioapic
+        // init vcpu manager & device manager with ioapic
         self.init_vcpu_manager(vm_as.clone(), vcpu_seccomp_filter)
             .map_err(StartMicroVmError::Vcpu)?;
         self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
@@ -914,6 +921,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
 
         let mut vm = create_vm_instance();
@@ -940,6 +948,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config);
         assert!(vm.init_guest_memory().is_ok());
@@ -979,6 +988,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
 
         vm.set_vm_config(vm_config);
@@ -1051,6 +1061,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
 
         vm.set_vm_config(vm_config);
@@ -1239,6 +1250,7 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
         let mut vm = create_vm_instance();
         vm.set_vm_config(vm_config);
