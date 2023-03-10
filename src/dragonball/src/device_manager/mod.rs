@@ -404,6 +404,7 @@ impl DeviceOpContext {
             Some(vm_as),
             vm.vm_address_space().cloned(),
             true,
+            vm.shared_info().clone()
         );
         ctx.upcall_client = vm.upcall_client().clone();
         ctx

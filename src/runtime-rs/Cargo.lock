@@ -618,10 +618,9 @@ dependencies = [
 [[package]]
 name = "dbs-address-space"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bcc37dc0b8ffae1c5911d13ae630dc7a9020fa0de0edd178d6ab71daf56c8fc"
 dependencies = [
  "arc-swap",
+ "lazy_static",
  "libc",
  "nix 0.23.2",
  "thiserror",
@@ -632,8 +631,6 @@ dependencies = [
 [[package]]
 name = "dbs-allocator"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "543711b94b4bc1437d2ebb45f856452e96a45a67ab39f8dcf8c887c2a3701004"
 dependencies = [
  "thiserror",
 ]
@@ -641,21 +638,6 @@ dependencies = [
 [[package]]
 name = "dbs-arch"
 version = "0.2.2"
-dependencies = [
- "kvm-bindings",
- "kvm-ioctls",
- "libc",
- "memoffset",
- "thiserror",
- "vm-memory",
- "vmm-sys-util 0.11.1",
-]
-
-[[package]]
-name = "dbs-arch"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78a2180d71dcfb9a89a8597308ac9f4f8f56ce0bc44119f7fbd9a0bf1a480d72"
 dependencies = [
  "kvm-bindings",
  "kvm-ioctls",
@@ -669,10 +651,8 @@ dependencies = [
 [[package]]
 name = "dbs-boot"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a74a8c05a1674d3032e610b4f201c7440c345559bad3dfe6b455ce195785108"
 dependencies = [
- "dbs-arch 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dbs-arch",
  "kvm-bindings",
  "kvm-ioctls",
  "lazy_static",
@@ -685,8 +665,6 @@ dependencies = [
 [[package]]
 name = "dbs-device"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14ecea44b4bc861c0c2ccb51868bea781286dc70e40ae46b54d4511e690a654a"
 dependencies = [
  "thiserror",
 ]
@@ -694,25 +672,27 @@ dependencies = [
 [[package]]
 name = "dbs-interrupt"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eb2c5bb9f8f123ace33b1b2e8d53dd2d87331ee770ad1f82e56c3382c6bed6d"
 dependencies = [
- "dbs-arch 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder",
+ "dbs-arch",
  "dbs-device",
+ "downcast-rs",
  "kvm-bindings",
  "kvm-ioctls",
  "libc",
+ "log",
+ "thiserror",
+ "vm-memory",
  "vmm-sys-util 0.11.1",
 ]
 
 [[package]]
 name = "dbs-legacy-devices"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4d089ac1c4d186c8133be59de09462e9793f7add10017c5b040318a3a7f431f"
 dependencies = [
  "dbs-device",
  "dbs-utils",
+ "libc",
  "log",
  "serde",
  "vm-superio",
@@ -723,6 +703,7 @@ dependencies = [
 name = "dbs-tdx"
 version = "0.1.0"
 dependencies = [
+ "dbs-boot",
  "kvm-bindings",
  "log",
  "thiserror",
@@ -733,8 +714,6 @@ dependencies = [
 [[package]]
 name = "dbs-upcall"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "699e62afa444ae4b00d474fd91bc37785ba050acdfbe179731c81898e32efc3f"
 dependencies = [
  "anyhow",
  "dbs-utils",
@@ -747,8 +726,6 @@ dependencies = [
 [[package]]
 name = "dbs-utils"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cb6ff873451b76e22789af7fbe1d0478c42c717f817e66908be7a3a2288068c"
 dependencies = [
  "anyhow",
  "event-manager",
@@ -763,8 +740,6 @@ dependencies = [
 [[package]]
 name = "dbs-virtio-devices"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88e5c6c48b766afb95851b04b6b193871a59d0b2a3ed19990d4f8f651ae5c668"
 dependencies = [
  "byteorder",
  "caps",
@@ -825,6 +800,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "downcast-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc55e97c7c363aa76468b2151f7b26fc28c3e6f43d0713dbfed05d6f7eea46a2"
+
+[[package]]
 name = "dragonball"
 version = "0.1.0"
 dependencies = [
@@ -833,7 +814,7 @@ dependencies = [
  "dbs-acpi",
  "dbs-address-space",
  "dbs-allocator",
- "dbs-arch 0.2.2",
+ "dbs-arch",
  "dbs-boot",
  "dbs-device",
  "dbs-interrupt",

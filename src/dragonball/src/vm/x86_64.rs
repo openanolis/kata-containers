@@ -28,6 +28,8 @@ use dbs_tdx::td_shim::hob::{PayloadInfo, PayloadImageType};
 use dbs_tdx::td_shim::TD_SHIM_START;
 #[cfg(feature = "tdx")]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
+#[cfg(feature = "tdx")]
+use vm_memory::ByteValued;
 use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 use kvm_bindings::{KVM_CAP_SPLIT_IRQCHIP, kvm_enable_cap};
@@ -415,7 +417,8 @@ impl Vm {
         let (hob_offset, payload_offset, payload_size, cmdline_offset) =
             self.load_tdshim(vm_memory.deref(), &sections)?;
         // load payload info to memory
-        let payload_info = self.load_payload(payload_offset, payload_size, vm_memory.deref())?;
+        let payload_info =
+            self.load_bzimage_payload(payload_offset, payload_size, vm_memory.deref())?;
         self.load_cmdline(cmdline_offset, vm_memory.deref())?;
 
         // init vcpus
@@ -558,9 +561,68 @@ impl Vm {
         ))
     }
 
+       /// load bzImage as tdshim payload
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+       pub fn load_bzimage_payload(
+        &mut self,
+        payload_offset: u64,
+        _payload_size: u64,
+        vm_memory: &GuestMemoryImpl,
+    ) -> std::result::Result<PayloadInfo, StartMicroVmError> {
+        let kernel_config = self
+            .kernel_config
+            .as_mut()
+            .ok_or(StartMicroVmError::MissingKernelConfig)?;
+ 
+        let payload_file = kernel_config.kernel_file_mut();
+ 
+        let payload_size = payload_file.seek(SeekFrom::End(0)).unwrap();
+ 
+        payload_file.seek(SeekFrom::Start(0x1f1)).unwrap();
+ 
+        let mut payload_header = linux_loader::bootparam::setup_header::default();
+        payload_header
+            .as_bytes()
+            .read_from(
+                0,
+                payload_file,
+                std::mem::size_of::<linux_loader::bootparam::setup_header>(),
+            )
+            .unwrap();
+ 
+        if payload_header.header != 0x5372_6448 {
+            return Err(StartMicroVmError::TdDataLoader(
+                LoadTdDataError::LoadPayload,
+            ));
+        }
+ 
+        if (payload_header.version < 0x0200) || ((payload_header.loadflags & 0x1) == 0x0) {
+            return Err(StartMicroVmError::TdDataLoader(
+                LoadTdDataError::LoadPayload,
+            ));
+        }
+        payload_file.seek(SeekFrom::Start(0)).unwrap();
+        vm_memory
+            .read_from(
+                GuestAddress(payload_offset),
+                payload_file,
+                payload_size as usize,
+            )
+            .unwrap();
+ 
+        // Create the payload info that will be inserted into
+        // the HOB.
+        let payload_info = PayloadInfo {
+            image_type: PayloadImageType::BzImage,
+            entry_point: payload_offset,
+        };
+        Ok(payload_info)
+    }
+ 
+
     /// load vmlinux as tdshim payload
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-    pub fn load_payload(
+    pub fn load_vmlinux_payload(
         &mut self,
         payload_offset: u64,
         payload_size: u64,
@@ -573,6 +635,11 @@ impl Vm {
         // TD. Make sure that the kernel does not overflow this range.
         #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
         if kernel_loader_result.kernel_end > (payload_offset + payload_size) {
+            info!(self.logger, "kernel_end: 0x{:x}, payload_offset:0x{:x}, payload_size:0x{:x}",
+            kernel_loader_result.kernel_end,
+            payload_offset,
+            payload_size,
+        );
             Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::LoadPayload,
             ))

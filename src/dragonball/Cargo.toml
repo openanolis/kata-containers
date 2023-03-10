@@ -58,3 +58,4 @@ virtio-net = ["dbs-virtio-devices/virtio-net", "virtio-queue"]
 # virtio-fs only work on atomic-guest-memory
 virtio-fs = ["dbs-virtio-devices/virtio-fs", "virtio-queue", "atomic-guest-memory"]
 userspace-ioapic = ["dbs-interrupt/kvm-userspace-ioapic"]
+dbs-upcall = []
