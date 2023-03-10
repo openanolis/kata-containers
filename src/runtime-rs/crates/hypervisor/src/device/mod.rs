@@ -11,6 +11,7 @@ use self::device_type::GenericConfig;
 mod blk_dev_manager;
 pub mod device_manager;
 pub mod device_type;
+mod vfio_dev_manager;
 use agent::types::Device as AgentDevice;
 use anyhow::Result;
 

@@ -6,9 +6,12 @@
 
 use std::{fs, path::Path, process::Command};
 
+use super::{Device, DeviceArgument, GenericConfig, GenericDevice};
+use crate::device_type::hypervisor;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use anyhow::anyhow;
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 
 fn override_driver(bdf: &str, driver: &str) -> Result<()> {
     let driver_override = format!("/sys/bus/pci/devices/{}/driver_override", bdf);
@@ -53,6 +56,60 @@ pub struct VfioConfig {
 
     /// Bus Mode, PCI or MMIO
     pub mode: VfioBusMode,
+}
+
+// VfioDevice is a vfio device meant to be passed to the hypervisor
+// to be used by the Virtual Machine.
+pub struct VfioDevice {
+    _drive: VfioConfig,
+    _base: GenericDevice,
+}
+
+#[async_trait]
+impl Device for VfioDevice {
+    async fn attach(&mut self, _h: &dyn hypervisor, _da: DeviceArgument) -> Result<()> {
+        todo!()
+    }
+
+    async fn detach(&mut self, _h: &dyn hypervisor) -> Result<()> {
+        todo!()
+    }
+
+    async fn device_id(&self) -> &str {
+        todo!()
+    }
+
+    async fn set_device_info(&mut self, _device_info: GenericConfig) -> Result<()> {
+        todo!()
+    }
+
+    async fn get_device_info(&self) -> Result<GenericConfig> {
+        todo!()
+    }
+
+    async fn get_major_minor(&self) -> (i64, i64) {
+        todo!()
+    }
+
+    async fn get_host_path(&self) -> &str {
+        todo!()
+    }
+
+    async fn get_bdf(&self) -> Option<&String> {
+        todo!()
+    }
+
+    async fn get_attach_count(&self) -> u64 {
+        todo!()
+    }
+
+    async fn increase_attach_count(&mut self) -> Result<bool> {
+        todo!()
+    }
+
+    async fn decrease_attach_count(&mut self) -> Result<bool> {
+        todo!()
+    }
 }
 
 /// binds the device to vfio driver after unbinding from host.
