@@ -244,6 +244,7 @@ impl DragonballInner {
             max_vcpu_count: self.config.cpu_info.default_maxvcpus as u8,
             mem_type,
             mem_file_path,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic,
             ..Default::default()
         };

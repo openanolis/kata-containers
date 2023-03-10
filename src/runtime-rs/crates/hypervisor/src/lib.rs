@@ -18,6 +18,11 @@ pub use kernel_param::Param;
 mod protection;
 mod utils;
 
+
+#[cfg(feature = "cloud-hypervisor")]
+pub mod ch;
+pub mod dragonball;
+pub mod qemu;
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -25,6 +30,7 @@ use std::collections::HashMap;
 
 use kata_types::capabilities::Capabilities;
 use kata_types::config::hypervisor::Hypervisor as HypervisorConfig;
+
 // Config which driver to use as vm root dev
 const VM_ROOTFS_DRIVER_BLK: &str = "virtio-blk";
 const VM_ROOTFS_DRIVER_PMEM: &str = "virtio-pmem";
