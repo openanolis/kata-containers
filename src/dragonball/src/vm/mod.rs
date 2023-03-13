@@ -178,6 +178,7 @@ pub struct Vm {
     address_space: AddressSpaceMgr,
     device_manager: DeviceManager,
     dmesg_fifo: Option<Box<dyn io::Write + Send>>,
+    /// kernel config for the current VM
     pub kernel_config: Option<KernelConfigInfo>,
     logger: slog::Logger,
     reset_eventfd: Option<EventFd>,

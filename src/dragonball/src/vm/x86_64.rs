@@ -14,7 +14,9 @@ use std::os::unix::io::AsRawFd;
 #[cfg(feature = "tdx")]
 use std::io::{Seek, SeekFrom};
 
-use dbs_address_space::{AddressSpace, AddressSpaceRegionType};
+use dbs_address_space::AddressSpace;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_address_space::AddressSpaceRegionType;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
 use dbs_utils::epoll_manager::EpollManager;
 use dbs_utils::time::TimestampUs;
@@ -37,8 +39,12 @@ use linux_loader::cmdline::Cmdline;
 use slog::info;
 use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
 
-use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl, AddressManagerError};
-use crate::error::{Error, Result, StartMicroVmError, LoadTdDataError};
+use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
+#[cfg(feature = "tdx")]
+use crate::address_space_manager::AddressManagerError;
+use crate::error::{Error, Result, StartMicroVmError};
+#[cfg(feature = "tdx")]
+use crate::error::LoadTdDataError;
 use crate::event_manager::EventManager;
 use crate::vm::{Vm, VmError};
 

@@ -226,17 +226,6 @@ impl DragonballInner {
             (String::from(SHMEM), String::from(""))
         };
 
-        let mut userspace_ioapic = false;
-        if self
-            .vmm_instance
-            .get_shared_info()
-            .read()
-            .unwrap()
-            .is_tdx_enabled()
-        {
-            userspace_ioapic = true;
-        }
-
         let vm_config = VmConfigInfo {
             serial_path: Some(serial_path),
             mem_size_mib: self.config.memory_info.default_memory as usize,
@@ -244,10 +233,23 @@ impl DragonballInner {
             max_vcpu_count: self.config.cpu_info.default_maxvcpus as u8,
             mem_type,
             mem_file_path,
-            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
-            userspace_ioapic,
             ..Default::default()
         };
+
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        {
+            let mut userspace_ioapic = false;
+            if self
+                .vmm_instance
+                .get_shared_info()
+                .read()
+                .unwrap()
+                .is_tdx_enabled()
+            {
+                userspace_ioapic = true;
+            }
+            vm_config.userspace_ioapic_enabled = userspace_ioapic;
+        }
         info!(sl!(), "vm config: {:?}", vm_config);
 
         self.vmm_instance
