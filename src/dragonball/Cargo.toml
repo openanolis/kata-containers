@@ -49,7 +49,7 @@ test-utils = { path = "../libs/test-utils" }
 
 [features]
 acpi = []
-tdx = []
+tdx = ["acpi", "userspace-ioapic"]
 atomic-guest-memory = [ "vm-memory/backend-atomic" ]
 hotplug = ["virtio-vsock"]
 virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]
