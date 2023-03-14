@@ -226,7 +226,7 @@ impl DragonballInner {
             (String::from(SHMEM), String::from(""))
         };
 
-        let vm_config = VmConfigInfo {
+        let mut vm_config = VmConfigInfo {
             serial_path: Some(serial_path),
             mem_size_mib: self.config.memory_info.default_memory as usize,
             vcpu_count: self.config.cpu_info.default_vcpus as u8,
