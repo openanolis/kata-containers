@@ -277,7 +277,7 @@ impl VmmService {
         boot_source_config: BootSourceConfig,
     ) -> VmmRequestResult {
         use super::BootSourceConfigError::{
-            InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath, InvalidFirmwarePath,
+            InvalidFirmwarePath, InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath,
             MissingFirmwarePath, UnexpectedFirmwarePath, UpdateNotAllowedPostBoot,
         };
         use super::VmmActionError::BootSource;

@@ -750,9 +750,12 @@ impl Vm {
         // TODO create interrupt_contriller here
         // create userspace-ioapic
         // init vcpu manager & device manager with ioapic
+        info!(self.logger, "VM: Init guest memory Done");
         self.init_vcpu_manager(vm_as.clone(), vcpu_seccomp_filter)
             .map_err(StartMicroVmError::Vcpu)?;
+        info!(self.logger, "VM: Init vcpu manager Done");
         self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
+        info!(self.logger, "VM: Init microvm Done");
         self.init_configure_system(&vm_as)?;
         #[cfg(feature = "dbs-upcall")]
         self.init_upcall()?;

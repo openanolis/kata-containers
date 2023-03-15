@@ -213,10 +213,10 @@ impl<'a> AddressSpaceMgrBuilder<'a> {
         self,
         res_mgr: &ResourceManager,
         numa_region_infos: &[NumaRegionInfo],
-        tdx_enabled: bool,
+        has_firmware: bool,
     ) -> Result<AddressSpaceMgr> {
         let mut mgr = AddressSpaceMgr::default();
-        mgr.create_address_space(res_mgr, numa_region_infos, self, tdx_enabled)?;
+        mgr.create_address_space(res_mgr, numa_region_infos, self, has_firmware)?;
         Ok(mgr)
     }
 
@@ -267,7 +267,7 @@ impl AddressSpaceMgr {
         res_mgr: &ResourceManager,
         numa_region_infos: &[NumaRegionInfo],
         mut param: AddressSpaceMgrBuilder,
-        tdx_enabled: bool,
+        has_firmware: bool,
     ) -> Result<()> {
         let mut regions = Vec::new();
         let mut start_addr = dbs_boot::layout::GUEST_MEM_START;
@@ -317,17 +317,42 @@ impl AddressSpaceMgr {
             }
         }
 
+        if has_firmware {
+            let mut region = AddressSpaceRegion::create_memory_region(
+                GuestAddress(TD_SHIM_START),
+                TD_SHIM_SIZE,
+                None,
+                param.mem_type,
+                param.mem_file,
+                false,
+                libc::PROT_READ | libc::PROT_WRITE,
+                false,
+            )
+            .map_err(AddressManagerError::CreateAddressSpaceRegion)?;
+            // TODO:  add support create:memory_region with type
+            region.ty = AddressSpaceRegionType::Firmware;
+            regions.push(Arc::new(region));
+            info!(
+                "create_address_space new region for td_shim guest addr 0x{:x}-0x{:x} size {}",
+                TD_SHIM_START,
+                TD_SHIM_START + TD_SHIM_SIZE,
+                TD_SHIM_SIZE
+            );
+        }
+
         // Create GuestMemory object
         let mut vm_memory = GuestMemoryMmap::new();
         for reg in regions.iter() {
-            // Allocate used guest memory addresses.
-            // These addresses are statically allocated, resource allocation/update should not fail.
-            let constraint = Constraint::new(reg.len())
-                .min(reg.start_addr().raw_value())
-                .max(reg.last_addr().raw_value());
-            let _key = res_mgr
-                .allocate_mem_address(&constraint)
-                .ok_or(AddressManagerError::NoAvailableMemAddress)?;
+            if reg.region_type() != AddressSpaceRegionType::Firmware {
+                // Allocate used guest memory addresses.
+                // These addresses are statically allocated, resource allocation/update should not fail.
+                let constraint = Constraint::new(reg.len())
+                    .min(reg.start_addr().raw_value())
+                    .max(reg.last_addr().raw_value());
+                let _key = res_mgr
+                    .allocate_mem_address(&constraint)
+                    .ok_or(AddressManagerError::NoAvailableMemAddress)?;
+            }
             let mmap_reg = self.create_mmap_region(reg.clone())?;
 
             vm_memory = vm_memory
@@ -350,29 +375,6 @@ impl AddressSpaceMgr {
             dbs_boot::layout::GUEST_MEM_START,
             *dbs_boot::layout::GUEST_MEM_END,
         );
-
-        if tdx_enabled {
-            let region = Arc::new(
-                AddressSpaceRegion::create_memory_region(
-                    GuestAddress(TD_SHIM_START),
-                    TD_SHIM_SIZE,
-                    None,
-                    param.mem_type,
-                    param.mem_file,
-                    false,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    false,
-                )
-                .map_err(AddressManagerError::CreateAddressSpaceRegion)?,
-            );
-            regions.push(region);
-            info!(
-                "create_address_space new region for td_shim guest addr 0x{:x}-0x{:x} size {}",
-                TD_SHIM_START,
-                TD_SHIM_START + TD_SHIM_SIZE,
-                TD_SHIM_SIZE
-            );
-        }
 
         self.address_space = Some(AddressSpace::from_regions(regions, layout));
 
