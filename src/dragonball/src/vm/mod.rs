@@ -1172,7 +1172,7 @@ pub mod tests {
     #[test]
     #[cfg(feature = "test-resources")]
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-    fn test_load_tdshim() {
+    fn test_load_firmware() {
         // prepare resource
         use crate::api::v1::ConfidentialVmType;
         let kernel_path = "/test_resources/linux-loader/test_elf.bin";
@@ -1181,10 +1181,10 @@ pub mod tests {
             println!("Test resource file not found: {}", kernel_path);
             assert!(false);
         }
-        let tdshim_path = "/test_resources/img/x86_64/tdx/tdshim.bin";
-        let tdshim_path_buf = PathBuf::from(tdshim_path);
-        if !tdshim_path_buf.exists() {
-            println!("Test resource file not found: {}", tdshim_path);
+        let firmware_path = "/test_resources/img/x86_64/tdx/tdshim.bin";
+        let firmware_path_buf = PathBuf::from(firmware_path);
+        if !firmware_path_buf.exists() {
+            println!("Test resource file not found: {}", firmware_path);
             assert!(false);
         }
         let cmd_line = Cmdline::new(64);
@@ -1221,17 +1221,17 @@ pub mod tests {
             .memory()
             .into_inner();
         vm.set_kernel_config(KernelConfigInfo::new(
-            Some(File::open(tdshim_path).unwrap()),
+            Some(File::open(firmware_path).unwrap()),
             File::open(kernel_path).unwrap(),
             None,
             cmd_line,
             "".to_owned(),
-            Some(String::from(tdshim_path)),
+            Some(String::from(firmware_path)),
             String::from(kernel_path),
             None,
         ));
         let sections = vm.parse_tdvf_sections().unwrap();
-        let res = vm.load_tdshim(&vm_memory, &sections);
+        let res = vm.load_firmware(&vm_memory, &sections);
         assert!(res.is_ok());
     }
     #[test]

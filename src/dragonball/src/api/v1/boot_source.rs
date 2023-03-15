@@ -32,8 +32,6 @@ pub struct BootSourceConfig {
     /// The boot arguments to pass to the kernel.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_args: Option<String>,
-    /// Path of the tdshim image.
-    pub tdshim_image_path: Option<String>,
 }
 
 /// Errors associated with actions on `BootSourceConfig`.
@@ -57,17 +55,17 @@ pub enum BootSourceConfigError {
     #[error("the update operation is not allowed after boot")]
     UpdateNotAllowedPostBoot,
 
-    /// The tdshim file cannot be opened.
+    /// The firmware file cannot be opened.
     #[error(
-        "the tdshim file cannot be opened due to invalid tdshim path or invalid permissions: {0}"
+        "the firmware file cannot be opened due to invalid firmware path or invalid permissions: {0}"
     )]
-    InvalidTdshimPath(#[source] std::io::Error),
+    InvalidFirmwarePath(#[source] std::io::Error),
 
-    /// The tdshim file is unexpected.
-    #[error("the tdshim file is only expected for TDX instances")]
-    UnexpectedTdshimPath,
+    /// The firmware file is unexpected.
+    #[error("the firmware file is only expected for TDX instances")]
+    UnexpectedFirmwarePath,
 
-    /// The tdshim file is expected.
-    #[error("the tdshim file is expected for TDX instances")]
-    MissingTdshimPath,
+    /// The firmware file is expected.
+    #[error("the firmware file is expected for TDX instances")]
+    MissingFirmwarePath,
 }

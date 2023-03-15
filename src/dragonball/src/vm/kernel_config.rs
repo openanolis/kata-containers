@@ -11,10 +11,10 @@ pub struct KernelConfigInfo {
     initrd_file: Option<File>,
     /// The commandline for guest kernel.
     pub cmdline: linux_loader::cmdline::Cmdline,
-    /// The descriptor to the tdshim file.
-    pub tdshim_file: Option<File>,
-    /// Tdshim image path
-    pub(crate) tdshim_image_path: Option<String>,
+    /// The descriptor to the firmware file.
+    pub firmware_file: Option<File>,
+    /// Firmware image path
+    pub(crate) firmware_path: Option<String>,
 }
 
 impl KernelConfigInfo {
@@ -23,26 +23,26 @@ impl KernelConfigInfo {
         kernel_file: File,
         initrd_file: Option<File>,
         cmdline: linux_loader::cmdline::Cmdline,
-        tdshim_file: Option<File>,
-        tdshim_image_path: Option<String>,
+        firmware_file: Option<File>,
+        firmware_path: Option<String>,
     ) -> Self {
         KernelConfigInfo {
             kernel_file,
             initrd_file,
             cmdline,
-            tdshim_file,
-            tdshim_image_path,
+            firmware_file,
+            firmware_path,
         }
     }
 
-    /// Get a reference to the tdshim file.
-    pub fn tdshim_file(&self) -> Option<&File> {
-        self.tdshim_file.as_ref()
+    /// Get a reference to the firmware file.
+    pub fn firmware_file(&self) -> Option<&File> {
+        self.firmware_file.as_ref()
     }
 
-    /// Get a mutable reference to the tdshim file.
-    pub fn tdshim_file_mut(&mut self) -> Option<&mut File> {
-        self.tdshim_file.as_mut()
+    /// Get a mutable reference to the firmware file.
+    pub fn firmware_file_mut(&mut self) -> Option<&mut File> {
+        self.firmware_file.as_mut()
     }
 
     /// Get a mutable reference to the kernel file.

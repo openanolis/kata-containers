@@ -421,10 +421,10 @@ impl Vm {
             .map_err(StartMicroVmError::Vcpu)?;
 
         let vm_memory = vm_as.memory();
-        // load tdshim to memory
+        // load firmware to memory
         let sections = self.parse_tdvf_sections()?;
         let (hob_offset, payload_offset, payload_size, cmdline_offset) =
-            self.load_tdshim(vm_memory.deref(), &sections)?;
+            self.load_firmware(vm_memory.deref(), &sections)?;
         // load payload info to memory
         let payload_info =
             self.load_bzimage_payload(payload_offset, payload_size, vm_memory.deref())?;
@@ -476,7 +476,7 @@ impl Vm {
 }
 
 impl Vm {
-    /// Parse tdshim metadata
+    /// Parse firmware metadata
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn parse_tdvf_sections(
         &mut self,
@@ -486,15 +486,15 @@ impl Vm {
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
         // safe to unwarap here as we alredy checked when configuring boot source
-        let tdshim_file = kernel_config.tdshim_file_mut().unwrap();
-        dbs_tdx::td_shim::metadata::parse_tdvf_sections(tdshim_file)
+        let firmware_file = kernel_config.firmware_file_mut().unwrap();
+        dbs_tdx::td_shim::metadata::parse_tdvf_sections(firmware_file)
             .map_err(LoadTdDataError::ParseTdshim)
             .map_err(StartMicroVmError::TdDataLoader)
     }
 
-    /// Load data in tdshim image to memory
+    /// Load data in firmware image to memory
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
-    pub fn load_tdshim(
+    pub fn load_firmware(
         &mut self,
         vm_memory: &GuestMemoryImpl,
         sections: &[TdvfSection],
@@ -508,20 +508,20 @@ impl Vm {
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
         // safe to unwarap here as we alredy checked when configuring boot source
-        let tdshim_file = kernel_config.tdshim_file_mut().unwrap();
+        let firmware_file = kernel_config.firmware_file_mut().unwrap();
         for section in sections {
             info!(self.logger, "TDVF Section: {:x?}", section);
             match section.r#type {
                 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
                 TdvfSectionType::Bfv | TdvfSectionType::Cfv => {
-                    tdshim_file
+                    firmware_file
                         .seek(SeekFrom::Start(section.data_offset as u64))
                         .map_err(LoadTdDataError::ReadTdshim)
                         .map_err(StartMicroVmError::TdDataLoader)?;
                     vm_memory
                         .read_from(
                             GuestAddress(section.address),
-                            tdshim_file,
+                            firmware_file,
                             section.data_size as usize,
                         )
                         .map_err(LoadTdDataError::LoadData)
@@ -568,7 +568,7 @@ impl Vm {
         ))
     }
 
-    /// load bzImage as tdshim payload
+    /// load bzImage as firmware payload
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn load_bzimage_payload(
         &mut self,
@@ -626,7 +626,7 @@ impl Vm {
         Ok(payload_info)
     }
 
-    /// load vmlinux as tdshim payload
+    /// load vmlinux as firmware payload
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn load_vmlinux_payload(
         &mut self,
@@ -659,7 +659,7 @@ impl Vm {
             Ok(payload_info)
         }
     }
-    /// load cmdline as tdshim param
+    /// load cmdline as firmware param
     pub fn load_cmdline(
         &self,
         cmdline_offset: u64,
@@ -674,7 +674,7 @@ impl Vm {
             .map_err(StartMicroVmError::LoadCommandline)?;
         Ok(())
     }
-    /// generate hob list fot tdshim
+    /// generate hob list fot firmware
     #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
     pub fn generate_hob_list(
         &self,
