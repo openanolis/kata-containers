@@ -96,7 +96,7 @@ impl ResourceManagerBuilder {
     /// allow(clippy) is because `GUEST_MEM_START > MMIO_LOW_END`, we may modify GUEST_MEM_START or
     /// MMIO_LOW_END in the future.
     #[allow(clippy::absurd_extreme_comparisons)]
-    fn init_mmio_pool_helper(mmio: &mut IntervalTree<()>) {
+    fn init_mmio_pool_helper(mmio: &mut IntervalTree<()>, platform_mmio: &mut IntervalTree<()>) {
         mmio.insert(Range::new(MMIO_LOW_START, MMIO_LOW_END), None);
         if !(*GUEST_MEM_END < MMIO_LOW_START
             || GUEST_MEM_START > MMIO_LOW_END
@@ -105,11 +105,18 @@ impl ResourceManagerBuilder {
             #[cfg(target_arch = "x86_64")]
             {
                 let constraint = Constraint::new(MMIO_SPACE_RESERVED)
-                    .min(MMIO_LOW_END - MMIO_SPACE_RESERVED)
-                    .max(0xffff_ffffu64);
+                    .min(MMIO_LOW_END - MMIO_SPACE_RESERVED + 1)
+                    .max(MMIO_LOW_END);
                 let key = mmio.allocate(&constraint);
                 if let Some(k) = key.as_ref() {
                     mmio.update(k, ());
+                    // Using platform_mmio pool to avoid address overlap in the reserved address range.
+                    // The platform_mmio pool may occupy the middle position of mmio pool.
+                    // Not all the reserved address range should be managed by platform mmio pool.
+                    platform_mmio.insert(
+                        Range::new(MMIO_LOW_END - MMIO_SPACE_RESERVED + 1, MMIO_LOW_END),
+                        None,
+                    );
                 } else {
                     panic!("failed to reserve MMIO address range for x86 system devices");
                 }
@@ -123,7 +130,7 @@ impl ResourceManagerBuilder {
 
     /// init mmio_pool with helper function
     fn init_mmio_pool(mut self) -> Self {
-        Self::init_mmio_pool_helper(&mut self.mmio_pool);
+        Self::init_mmio_pool_helper(&mut self.mmio_pool, &mut self.platform_mmio_pool);
         self
     }
 
