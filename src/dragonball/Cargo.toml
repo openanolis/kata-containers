@@ -18,7 +18,8 @@ dbs-acpi = { git = "https://github.com/studychao/dragonball-sandbox.git", branch
 dbs-arch = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
 dbs-boot = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
 dbs-device = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-tdx = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
+#dbs-tdx = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
+dbs-tdx = { path = '../../../../dragonball-sandbox/crates/dbs-tdx' }
 dbs-interrupt = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch", features = ["kvm-irq"] }
 dbs-legacy-devices = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
 dbs-upcall = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
