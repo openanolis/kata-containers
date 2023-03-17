@@ -100,6 +100,11 @@ FIRMWAREPATH :=
 FIRMWAREVOLUMEPATH :=
 TDSHIMFIRMWAREPATH := ${PREFIXDEPS}/share/td-shim/td-shim.bin
 
+##VAR DEFROOTFSTYPE=<fstype> Default number of ext4
+ROOTFSTYPE_EXT4 := \"ext4\"
+ROOTFSTYPE_XFS := \"xfs\"
+ROOTFSTYPE_EROFS := \"erofs\"
+DEFROOTFSTYPE := $(ROOTFSTYPE_EXT4)
 ##VAR DEFVCPUS=<number> Default number of vCPUs
 DEFVCPUS := 1
 ##VAR DEFMAXVCPUS=<number> Default maximum number of vCPUs
@@ -210,7 +215,7 @@ ifneq (,$(DBCMD))
     DEFMAXVCPUS_DB := 1
     DEFBLOCKSTORAGEDRIVER_DB := virtio-blk
     DEFNETWORKMODEL_DB := tcfilter
-    KERNELPARAMS = console=ttyS1 agent.log_vport=1025
+    KERNELPARAMS = console=ttyS1 agent.log_vport=1025 agent.enable_signature_verification=false
 	
 	KERNELTYPE_DB = uncompressed
     KERNELNAME_DB = $(call MAKE_KERNEL_NAME,$(KERNELTYPE_DB))
@@ -280,6 +285,7 @@ USER_VARS += PROJECT_TYPE
 USER_VARS += RUNTIME_NAME
 USER_VARS += SHAREDIR
 USER_VARS += SYSCONFDIR
+USER_VARS += DEFROOTFSTYPE
 USER_VARS += DEFVCPUS
 USER_VARS += DEFMAXVCPUS
 USER_VARS += DEFMAXVCPUS_ACRN
