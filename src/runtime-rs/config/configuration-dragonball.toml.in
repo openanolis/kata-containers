@@ -17,8 +17,6 @@ ctlpath = "@DBCTLPATH@"
 kernel = "@KERNELPATH_DB@"
 image = "@IMAGEPATH@"
 
-<<<<<<< HEAD
-=======
 # rootfs filesystem type:
 #   - ext4 (default)
 #   - xfs
@@ -40,7 +38,6 @@ rootfs_type=@DEFROOTFSTYPE@
 # Default false
 # confidential_guest = true
 
->>>>>>> 5ec0a06ca... CC: runtime-rs support tdx
 # List of valid annotation names for the hypervisor
 # Each member of the list is a regular expression, which is the base name
 # of the annotation, e.g. "path" for io.katacontainers.config.hypervisor.path"

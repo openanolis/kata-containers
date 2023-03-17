@@ -14,8 +14,8 @@
 [hypervisor.dragonball]
 path = "@DBPATH@"
 ctlpath = "@DBCTLPATH@"
-kernel = "@KERNELPATH_DB@"
-image = "@IMAGEPATH@"
+kernel = "@KERNELTDXPATH_DB@"
+image = "@IMAGETDXPATH@"
 
 # rootfs filesystem type:
 #   - ext4 (default)
