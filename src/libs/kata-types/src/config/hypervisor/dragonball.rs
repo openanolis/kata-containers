@@ -130,11 +130,6 @@ impl ConfigPlugin for DragonballConfig {
             if !db.boot_info.initrd.is_empty() {
                 return Err(eother!("Initrd for dragonball hypervisor should be empty"));
             }
-            if !db.boot_info.firmware.is_empty() {
-                return Err(eother!(
-                    "Firmware for dragonball hypervisor should be empty"
-                ));
-            }
 
             if (db.cpu_info.default_vcpus > 0
                 && db.cpu_info.default_vcpus as u32 > default::MAX_DRAGONBALL_VCPUS)
