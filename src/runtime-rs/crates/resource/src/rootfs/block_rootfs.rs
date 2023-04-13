@@ -9,7 +9,7 @@ use crate::share_fs::{do_get_guest_path, do_get_host_path};
 use agent::Storage;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use hypervisor::DeviceType::Block;
+
 use hypervisor::{device_manager::DeviceManager, device_type::GenericConfig};
 use kata_types::mount::Mount;
 use nix::sys::stat::{self, SFlag};
@@ -57,7 +57,7 @@ impl BlockRootfs {
         let device_id = d
             .write()
             .await
-            .try_add_device(generic_device_config, &Block)
+            .try_add_device(generic_device_config)
             .await
             .context("failed to add deivce")?;
 
@@ -68,17 +68,19 @@ impl BlockRootfs {
             ..Default::default()
         };
 
-        storage.driver = d
+        let field_type = d
             .read()
             .await
-            .get_driver_options(&Block)
+            .get_driver_options(&device_id)
             .await
             .context("failed to get driver options")?;
+
+        storage.driver = field_type.clone();
 
         if let Some(path) = d
             .read()
             .await
-            .get_device_guest_path(device_id.as_str(), &Block)
+            .get_device_vm_path(device_id.as_str(), &field_type)
             .await
         {
             storage.source = path;
@@ -113,7 +115,7 @@ impl Rootfs for BlockRootfs {
         self.device_manager
             .write()
             .await
-            .try_remove_device(self.device_id.clone(), &Block)
+            .try_remove_device(self.device_id.clone())
             .await
     }
 }

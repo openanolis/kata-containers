@@ -35,6 +35,7 @@ pub struct BlockConfig {
 
 /// BlockDevice refers to a block storage device implementation
 pub struct BlockDevice {
+    // field_type: String,
     block_config: BlockConfig,
     base: GenericDevice,
 }

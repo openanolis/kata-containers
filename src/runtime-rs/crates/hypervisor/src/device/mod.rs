@@ -4,16 +4,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use crate::Hypervisor;
-use async_trait::async_trait;
-
-use self::device_type::{DeviceArgument, GenericConfig};
-mod blk_dev_manager;
 pub mod device_manager;
 pub mod device_type;
-mod vfio_dev_manager;
-mod vhost_dev_manager;
-use anyhow::Result;
+
+use crate::device_type::GenericConfig;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum DeviceType {
@@ -28,25 +22,11 @@ pub enum DeviceType {
     Undefined,
 }
 
-#[async_trait]
-pub trait DeviceManagerInner {
-    // try to add device
-    async fn try_add_device(
-        &mut self,
-        dev_info: &mut GenericConfig,
-        h: &dyn Hypervisor,
-        da: DeviceArgument,
-    ) -> Result<String>;
-    // try to remove device
-    async fn try_remove_device(
-        &mut self,
-        device_id: &str,
-        h: &dyn Hypervisor,
-    ) -> Result<Option<u64>>;
-    // get the device guest path
-    async fn get_device_guest_path(&self, id: &str) -> Option<String>;
-    // get the device vm path, it could be guest path or bdf path
-    async fn get_device_vm_path(&self, id: &str) -> Option<String>;
-    // get device manager driver options
-    async fn get_driver_options(&self) -> Result<String>;
+pub fn get_device_type(dev_info: &GenericConfig) -> &DeviceType {
+    // direct_volume/vfio_volume/spdk_volume:  dev_type "b"; major -1 minor 0
+    if dev_info.dev_type == "b" && dev_info.minor >= 0 {
+        return &DeviceType::Block;
+    }
+
+    &DeviceType::Undefined
 }

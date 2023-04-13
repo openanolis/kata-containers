@@ -241,34 +241,19 @@ impl ResourceManagerInner {
     pub async fn handler_devices(&self, _cid: &str, linux: &Linux) -> Result<Vec<Device>> {
         let mut devices_agent = vec![];
         for d in linux.devices.iter() {
-            // generate device config from oci spec
-            let mut device_config = self
-                .device_manager
-                .read()
-                .await
-                .new_device_info_from_oci(d, None)
-                .context("failed to generate device config from oci spec")?;
-
-            // get device_type
-            let device_type = self
-                .device_manager
-                .read()
-                .await
-                .get_device_type(&device_config.dev_type);
-
-            // attach device
+            // new device based on the linux device and get device_id
             let device_id = self
                 .device_manager
                 .write()
                 .await
-                .try_add_device(&mut device_config, &device_type)
+                .new_device(d)
                 .await
-                .context("failed to attach linux device")?;
+                .context("failed to new linux device")?;
 
             // create agent device
             let mut agent_device = Device {
                 id: device_id.clone(),
-                container_path: device_config.container_path.clone(),
+                container_path: d.path.clone(),
                 ..Default::default()
             };
 
@@ -276,7 +261,7 @@ impl ResourceManagerInner {
                 .device_manager
                 .read()
                 .await
-                .get_driver_options(&device_type)
+                .get_driver_options(&device_id)
                 .await
                 .context("failed to get driver options")?;
 
@@ -284,9 +269,9 @@ impl ResourceManagerInner {
                 .device_manager
                 .read()
                 .await
-                .get_vm_path(&device_id, &device_type)
+                .get_device_vm_path(&device_id, &agent_device.field_type)
                 .await
-                .context("failed to get driver options")?;
+                .context("failed to get device vm path")?;
 
             devices_agent.push(agent_device);
         }

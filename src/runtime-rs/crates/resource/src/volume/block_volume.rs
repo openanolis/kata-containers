@@ -6,14 +6,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::{collections::HashMap, fs, path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 
 use crate::share_fs::{do_get_guest_path, do_get_host_path};
 
 use super::{share_fs_volume::generate_mount_path, Volume};
 use agent::Storage;
 use anyhow::{anyhow, Context};
-use hypervisor::DeviceType::Block;
 use hypervisor::{device_manager::DeviceManager, device_type::GenericConfig};
 use nix::sys::stat::{self, SFlag};
 use tokio::sync::RwLock;
@@ -36,30 +35,23 @@ impl BlockVolume {
     ) -> Result<Self> {
         let fstat = stat::stat(m.source.as_str()).context(format!("stat {}", m.source))?;
         info!(sl!(), "device stat: {:?}", fstat);
-        let mut options = HashMap::new();
-        if read_only {
-            options.insert("read_only".to_string(), "true".to_string());
-        }
+
         let device_id = d
             .write()
             .await
-            .try_add_device(
-                &mut GenericConfig {
-                    host_path: m.source.clone(),
-                    container_path: m.destination.clone(),
-                    dev_type: "b".to_string(),
-                    major: stat::major(fstat.st_rdev) as i64,
-                    minor: stat::minor(fstat.st_rdev) as i64,
-                    file_mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    id: "".to_string(),
-                    bdf: None,
-                    driver_options: options,
-                    ..Default::default()
-                },
-                &Block,
-            )
+            .try_add_device(&mut GenericConfig {
+                host_path: m.source.clone(),
+                container_path: m.destination.clone(),
+                dev_type: "b".to_string(),
+                major: stat::major(fstat.st_rdev) as i64,
+                minor: stat::minor(fstat.st_rdev) as i64,
+                file_mode: 0,
+                uid: 0,
+                gid: 0,
+                id: "".to_string(),
+                bdf: None,
+                ..Default::default()
+            })
             .await
             .context("failed to add device")?;
 
@@ -70,14 +62,16 @@ impl BlockVolume {
         fs::create_dir_all(&host_path)
             .map_err(|e| anyhow!("failed to create rootfs dir {}: {:?}", host_path, e))?;
 
+        let field_type = d
+            .read()
+            .await
+            .get_driver_options(&device_id)
+            .await
+            .context("failed to get driver options")?;
+
         // storage
         let mut storage = Storage {
-            driver: d
-                .read()
-                .await
-                .get_driver_options(&Block)
-                .await
-                .context("failed to get driver options")?,
+            driver: field_type.clone(),
             options: if read_only {
                 vec!["ro".to_string()]
             } else {
@@ -90,7 +84,7 @@ impl BlockVolume {
         if let Some(path) = d
             .read()
             .await
-            .get_device_guest_path(device_id.as_str(), &Block)
+            .get_device_vm_path(device_id.as_str(), &field_type.clone())
             .await
         {
             storage.source = path;
@@ -140,7 +134,7 @@ impl Volume for BlockVolume {
         self.device_manager
             .write()
             .await
-            .try_remove_device(self.device_id.clone(), &Block)
+            .try_remove_device(self.device_id.clone())
             .await
     }
 }
