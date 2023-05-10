@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+mod vhost_user;
 mod virtio_blk;
 use anyhow::Result;
 use async_trait::async_trait;
