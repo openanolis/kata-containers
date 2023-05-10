@@ -14,7 +14,7 @@ pub const VIRTIO_BLOCK_PCI: &str = "virtio-blk-pci";
 pub const KATA_MMIO_BLK_DEV_TYPE: &str = "mmioblk";
 pub const KATA_BLK_DEV_TYPE: &str = "blk";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BlockConfig {
     /// Unique identifier of the drive.
     pub id: String,

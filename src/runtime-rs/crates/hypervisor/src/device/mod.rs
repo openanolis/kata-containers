@@ -7,3 +7,4 @@
 pub mod device_manager;
 pub mod driver;
 pub mod util;
+pub use device_manager::DeviceManager;
