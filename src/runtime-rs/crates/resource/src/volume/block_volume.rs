@@ -128,10 +128,12 @@ impl Volume for BlockVolume {
         Ok(s)
     }
 
-    async fn cleanup(&self) -> Result<()> {
-        // TODO: Clean up BlockVolume
-        warn!(sl!(), "Cleaning up BlockVolume is still unimplemented.");
-        Ok(())
+    async fn cleanup(&self, device_manager: &RwLock<DeviceManager>) -> Result<()> {
+        device_manager
+            .write()
+            .await
+            .try_remove_device(&self.device_id)
+            .await
     }
 
     fn get_device_id(&self) -> Result<Option<String>> {

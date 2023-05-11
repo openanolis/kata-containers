@@ -4,8 +4,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+use tokio::sync::RwLock;
+
 use anyhow::Result;
 use async_trait::async_trait;
+use hypervisor::device::DeviceManager;
 
 use super::Volume;
 
@@ -33,7 +36,7 @@ impl Volume for DefaultVolume {
         Ok(vec![])
     }
 
-    async fn cleanup(&self) -> Result<()> {
+    async fn cleanup(&self, _device_manager: &RwLock<DeviceManager>) -> Result<()> {
         // TODO: Clean up DefaultVolume
         warn!(sl!(), "Cleaning up DefaultVolume is still unimplemented.");
         Ok(())

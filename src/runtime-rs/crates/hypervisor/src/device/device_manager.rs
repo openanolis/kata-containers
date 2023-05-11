@@ -6,7 +6,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{anyhow, Context, Ok, Result};
+use anyhow::{anyhow, Context, Result};
 use kata_sys_util::rand::RandomBytes;
 use tokio::sync::Mutex;
 
@@ -109,6 +109,38 @@ impl DeviceManager {
             return Err(e);
         }
         Ok(())
+    }
+
+    pub async fn try_remove_device(&mut self, device_id: &str) -> Result<()> {
+        if let Some(dev) = self.devices.get(device_id) {
+            // get the count of device detached, skip detach once it reaches the 0.
+            let skip = dev.lock().await.decrease_attach_count().await?;
+            if skip {
+                return Ok(());
+            }
+            let result = match dev.lock().await.detach(self.hypervisor.as_ref()).await {
+                Ok(index) => {
+                    if let Some(i) = index {
+                        // release the declared block device index
+                        self.shared_info.release_device_index(i);
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    dev.lock().await.increase_attach_count().await?;
+                    Err(e)
+                }
+            };
+            if result.is_ok() {
+                // if detach success, remove it from device manager
+                self.devices.remove(device_id);
+            }
+            return result;
+        }
+        Err(anyhow!(
+            "device with specified ID hasn't been created. {}",
+            device_id
+        ))
     }
 
     pub async fn get_device_info(&self, device_id: &String) -> Result<DeviceConfig> {

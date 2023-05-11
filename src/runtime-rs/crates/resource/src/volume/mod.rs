@@ -27,7 +27,7 @@ pub trait Volume: Send + Sync {
     fn get_volume_mount(&self) -> Result<Vec<oci::Mount>>;
     fn get_storage(&self) -> Result<Vec<agent::Storage>>;
     fn get_device_id(&self) -> Result<Option<String>>;
-    async fn cleanup(&self) -> Result<()>;
+    async fn cleanup(&self, device_manager: &RwLock<DeviceManager>) -> Result<()>;
 }
 
 #[derive(Default)]

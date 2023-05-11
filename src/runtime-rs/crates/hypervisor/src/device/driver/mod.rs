@@ -44,7 +44,7 @@ pub trait Device: Send + Sync {
     // attach is to plug device into VM
     async fn attach(&self, h: &dyn hypervisor) -> Result<()>;
     // detach is to unplug device from VM
-    async fn detach(&self, h: &dyn hypervisor) -> Result<u64>;
+    async fn detach(&self, h: &dyn hypervisor) -> Result<Option<u64>>;
     // get_device_info returns device config
     async fn get_device_info(&self) -> DeviceConfig;
     // increase_attach_count is used to increase the attach count for a device

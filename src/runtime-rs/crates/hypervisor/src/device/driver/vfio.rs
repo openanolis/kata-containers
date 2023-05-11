@@ -156,7 +156,7 @@ impl Device for VfioConfig {
         todo!()
     }
 
-    async fn detach(&self, _h: &dyn hypervisor) -> Result<u64> {
+    async fn detach(&self, _h: &dyn hypervisor) -> Result<Option<u64>> {
         todo!()
     }
 

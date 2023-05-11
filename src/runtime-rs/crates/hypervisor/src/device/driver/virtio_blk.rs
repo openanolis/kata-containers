@@ -61,9 +61,9 @@ impl Device for BlockConfig {
         h.add_device(DeviceConfig::Block(self.clone())).await
     }
 
-    async fn detach(&self, h: &dyn hypervisor) -> Result<u64> {
+    async fn detach(&self, h: &dyn hypervisor) -> Result<Option<u64>> {
         h.remove_device(DeviceConfig::Block(self.clone())).await?;
-        Ok(self.index)
+        Ok(Some(self.index))
     }
 
     async fn get_device_info(&self) -> DeviceConfig {
