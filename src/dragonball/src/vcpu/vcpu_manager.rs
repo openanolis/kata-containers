@@ -17,7 +17,7 @@ use std::time::Duration;
 
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 use dbs_interrupt::ioapic::IoapicDevice;
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::{tdx_init_vcpu, TdxIoctlError};
 #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
 use dbs_upcall::{DevMgrService, UpcallClient};
@@ -127,7 +127,7 @@ pub enum VcpuManagerError {
     Kvm(#[source] kvm_ioctls::Error),
 
     /// Tdx init vcpu error
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     #[error("TDX init vcpu error:{0}")]
     TdxVcpuInit(#[source] TdxIoctlError),
 }
@@ -240,7 +240,7 @@ impl VcpuManager {
         io_manager: IoManagerCached,
         epoll_manager: EpollManager,
     ) -> Result<Arc<Mutex<Self>>> {
-        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+        #[cfg(feature = "tdx")]
         let is_tdx_enable = shared_info
             .read()
             .expect("Failed to determine if instance is confidential vm because shared_info couldn't be read due to poisoned lock")
@@ -753,7 +753,7 @@ impl VcpuManager {
     }
 }
 
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 impl VcpuManager {
     /// Init tdx vcpus
     pub fn init_tdx_vcpus(&self, hob_address: u64) -> Result<()> {
@@ -789,7 +789,7 @@ impl VcpuManager {
             self.vcpu_state_sender.clone(),
             request_ts,
             self.support_immediate_exit,
-            #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+            #[cfg(feature = "tdx")]
             interrupt_controller,
         )
         .map_err(VcpuManagerError::Vcpu)
@@ -1135,6 +1135,10 @@ mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1185,6 +1189,10 @@ mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };

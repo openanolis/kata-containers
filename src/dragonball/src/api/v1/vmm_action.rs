@@ -291,17 +291,16 @@ impl VmmService {
             .map_err(|e| BootSource(InvalidKernelPath(e)))?;
 
         // Open firmware image file if there is one.
-        let firmware_file = match boot_source_config.firmware_path {
-            None => {
-                if vm.is_tdx_enabled() {
-                    return Err(BootSource(MissingFirmwarePath));
-                }
-                None
+        let is_firmware_required = vm.is_tdx_enabled() || vm.is_sev_enabled();
+        let firmware_file = match (is_firmware_required, &boot_source_config.firmware_path) {
+            (false, None) => None,
+            (false, Some(_)) => {
+                return Err(BootSource(UnexpectedFirmwarePath));
             }
-            Some(ref path) => {
-                if !vm.is_tdx_enabled() {
-                    return Err(BootSource(UnexpectedFirmwarePath));
-                }
+            (true, None) => {
+                return Err(BootSource(MissingFirmwarePath));
+            }
+            (true, Some(path)) => {
                 Some(File::open(path).map_err(|e| BootSource(InvalidFirmwarePath(e)))?)
             }
         };
@@ -332,14 +331,14 @@ impl VmmService {
     }
 
     fn start_microvm(&mut self, vmm: &mut Vmm, event_mgr: &mut EventManager) -> VmmRequestResult {
-        use self::StartMicroVmError::MicroVMAlreadyRunning;
+        use self::StartMicroVmError::MicroVmAlreadyRunning;
         use self::VmmActionError::StartMicroVm;
 
         let vmm_seccomp_filter = vmm.vmm_seccomp_filter();
         let vcpu_seccomp_filter = vmm.vcpu_seccomp_filter();
         let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
         if vm.is_vm_initialized() {
-            return Err(StartMicroVm(MicroVMAlreadyRunning));
+            return Err(StartMicroVm(MicroVmAlreadyRunning));
         }
 
         vm.start_microvm(event_mgr, vmm_seccomp_filter, vcpu_seccomp_filter)
@@ -543,7 +542,7 @@ impl VmmService {
         let ctx = vm
             .create_device_op_context(Some(event_mgr.epoll_manager()))
             .map_err(|e| {
-                if let StartMicroVmError::MicroVMAlreadyRunning = e {
+                if let StartMicroVmError::MicroVmAlreadyRunning = e {
                     VmmActionError::VirtioNet(VirtioNetDeviceError::UpdateNotAllowedPostBoot)
                 } else if let StartMicroVmError::UpcallNotReady = e {
                     VmmActionError::UpcallNotReady
@@ -1011,7 +1010,7 @@ mod tests {
                 assert!(matches!(
                     result,
                     Err(VmmActionError::StartMicroVm(
-                        StartMicroVmError::MicroVMAlreadyRunning
+                        StartMicroVmError::MicroVmAlreadyRunning
                     ))
                 ));
                 let err_string = format!("{}", result.unwrap_err());

@@ -7,19 +7,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 #![allow(dead_code)]
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::{FromRawFd, RawFd};
 
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use dbs_arch::cpuid::cpu_leaf::leaf_0x4000_0001::eax::*;
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::tdx_get_caps;
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use kvm_bindings::CpuId;
 use kvm_bindings::KVM_API_VERSION;
 use kvm_ioctls::{Cap, Kvm, VmFd};
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use vmm_sys_util::errno;
 
 use crate::error::{Error as VmError, Result};
@@ -238,7 +238,7 @@ mod x86_64 {
     }
 }
 
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 impl KvmContext {
     /// Get CpuId supported by TDX
     pub fn tdx_supported_cpuid(

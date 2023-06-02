@@ -12,6 +12,8 @@ use serde_derive::{Deserialize, Serialize};
 pub enum ConfidentialVmType {
     /// Intel Trusted Domain
     TDX = 2,
+    /// AMD Secure Encrypted Virtualization (SEV, SEV-ES)
+    SEV,
 }
 
 /// The microvm state.
@@ -24,7 +26,11 @@ pub enum InstanceState {
     /// Microvm is not initialized.
     Uninitialized,
     /// Microvm is starting.
+    #[cfg(not(feature = "sev"))]
     Starting,
+    /// Microvm is starting.
+    #[cfg(feature = "sev")]
+    Starting(VmStartingStage),
     /// Microvm is running.
     Running,
     /// Microvm is Paused.
@@ -35,6 +41,28 @@ pub enum InstanceState {
     Halted,
     /// Microvm exit instead of process exit.
     Exited(i32),
+}
+
+/// Denotes the VM's starting stage. Currently used only when booting an SEV VM.
+///
+/// When booting an SEV VM,
+/// 1. after receiving the `start` data structure, the VMM will measure and
+///    encrypt the VM's memory, returning the memory's measurement. At this point,
+///    VM is at VmStartingStage::SevMeasured.
+/// 2. Then tenant will verify it, generate a secret, and call `start_microvm` again,
+/// 3. with which the VMM will continue the subsequent steps of booting the VM
+///    (starting vcpus, etc).
+///
+/// For more information about the SEV booting process, refer to "Launching a
+/// Guest" in Appendix A of
+/// https://www.amd.com/system/files/TechDocs/55766_SEV-KM_API_Specification.pdf
+#[cfg(feature = "sev")]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum VmStartingStage {
+    /// Initial stage
+    Initial,
+    /// SEV VM memory has already been measured
+    SevMeasured,
 }
 
 /// The state of async actions
@@ -87,6 +115,11 @@ impl InstanceInfo {
     /// return true if VM confidential type is TDX
     pub fn is_tdx_enabled(&self) -> bool {
         matches!(self.confidential_vm_type, Some(ConfidentialVmType::TDX))
+    }
+
+    /// return true if VM confidential type is SEV
+    pub fn is_sev_enabled(&self) -> bool {
+        matches!(self.confidential_vm_type, Some(ConfidentialVmType::SEV))
     }
 }
 

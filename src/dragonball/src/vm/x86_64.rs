@@ -7,25 +7,25 @@
 // found in the THIRD-PARTY file.
 
 use std::convert::TryInto;
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use std::io::{Seek, SeekFrom};
 use std::mem;
 use std::ops::Deref;
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use std::os::unix::io::AsRawFd;
 
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
 use dbs_address_space::AddressSpace;
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use dbs_address_space::AddressSpaceRegionType;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
-#[cfg(feature = "tdx")]
-use dbs_tdx::td_shim::hob::{PayloadImageType, PayloadInfo};
-#[cfg(feature = "tdx")]
-use dbs_tdx::td_shim::metadata::{TdvfSection, TdvfSectionType};
-#[cfg(feature = "tdx")]
-use dbs_tdx::td_shim::TD_SHIM_START;
+#[cfg(any(feature = "tdx", feature = "sev"))]
+use dbs_tdx::td_shim::{
+    hob::{PayloadImageType, PayloadInfo},
+    metadata::{TdvfSection, TdvfSectionType},
+    TD_SHIM_START,
+};
 #[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
 use dbs_utils::epoll_manager::EpollManager;
@@ -34,15 +34,19 @@ use dbs_utils::time::TimestampUs;
 use kvm_bindings::{kvm_enable_cap, KVM_CAP_SPLIT_IRQCHIP};
 use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
 use linux_loader::cmdline::Cmdline;
+#[cfg(feature = "sev")]
+use sev::{firmware::host::Firmware as SevFirmware, launch::sev as sev_launch};
 use slog::info;
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use vm_memory::ByteValued;
-use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
+use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory, VolatileMemory};
 
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::address_space_manager::AddressManagerError;
 use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
-#[cfg(feature = "tdx")]
+#[cfg(feature = "sev")]
+use crate::api::v1::{InstanceState, VmStartingStage};
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::error::LoadTdDataError;
 use crate::error::{Error, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
@@ -241,11 +245,19 @@ impl Vm {
         );
 
         if self.is_tdx_enabled() {
-            info!(self.logger, "Intel Trusted Domain microvm");
+            info!(self.logger, "Intel Trusted Domain microVM");
+
             #[cfg(feature = "tdx")]
             return self.init_tdx_microvm(vm_as);
             #[cfg(not(feature = "tdx"))]
-            return Err(StartMicroVmError::TdxError);
+            return Err(StartMicroVmError::TdxNotSupported);
+        } else if self.is_sev_enabled() {
+            info!(self.logger, "AMD SEV microVM");
+
+            #[cfg(feature = "sev")]
+            return self.init_sev_microvm(vm_as);
+            #[cfg(not(feature = "sev"))]
+            return Err(StartMicroVmError::SevNotSupported);
         } else {
             info!(self.logger, "None-confidential microvm");
 
@@ -259,6 +271,17 @@ impl Vm {
             info!(self.logger, "VM: initializing microvm done");
             Ok(())
         }
+    }
+
+    /// Complete the remaining VM initialization work.
+    #[inline]
+    pub fn init_microvm_rest(&mut self) -> std::result::Result<(), StartMicroVmError> {
+        #[cfg(feature = "sev")]
+        if self.is_sev_enabled() {
+            return self.init_sev_microvm_rest();
+        }
+
+        Ok(())
     }
 
     /// Execute system architecture specific configurations.
@@ -477,7 +500,7 @@ impl Vm {
 
 impl Vm {
     /// Parse firmware metadata
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(any(feature = "tdx", feature = "sev"))]
     pub fn parse_tdvf_sections(
         &mut self,
     ) -> std::result::Result<Vec<TdvfSection>, StartMicroVmError> {
@@ -493,7 +516,8 @@ impl Vm {
     }
 
     /// Load data in firmware image to memory
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(any(feature = "tdx", feature = "sev"))]
+    #[allow(unused)]
     pub fn load_firmware(
         &mut self,
         vm_memory: &GuestMemoryImpl,
@@ -512,7 +536,6 @@ impl Vm {
         for section in sections {
             info!(self.logger, "TDVF Section: {:x?}", section);
             match section.r#type {
-                #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
                 TdvfSectionType::Bfv | TdvfSectionType::Cfv => {
                     firmware_file
                         .seek(SeekFrom::Start(section.data_offset as u64))
@@ -541,19 +564,19 @@ impl Vm {
             }
         }
 
-        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+        #[cfg(feature = "tdx")]
         if hob_offset.is_none() {
             return Err(StartMicroVmError::TdDataLoader(LoadTdDataError::HobOffset));
         }
 
-        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+        #[cfg(feature = "tdx")]
         if payload_offset.is_none() || payload_size.is_none() {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadOffset,
             ));
         }
 
-        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+        #[cfg(feature = "tdx")]
         if cmdline_offset.is_none() {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadParamsOffset,
@@ -569,7 +592,7 @@ impl Vm {
     }
 
     /// load bzImage as firmware payload
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(any(feature = "tdx", feature = "sev"))]
     pub fn load_bzimage_payload(
         &mut self,
         payload_offset: u64,
@@ -627,7 +650,7 @@ impl Vm {
     }
 
     /// load vmlinux as firmware payload
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     pub fn load_vmlinux_payload(
         &mut self,
         payload_offset: u64,
@@ -639,7 +662,7 @@ impl Vm {
             self.load_kernel(vm_memory.deref(), Some(GuestAddress(payload_offset)))?;
         // Kernel should be loaded into the payload section, Otherwise data won't be accepted by
         // TD. Make sure that the kernel does not overflow this range.
-        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+
         if kernel_loader_result.kernel_end > (payload_offset + payload_size) {
             info!(
                 self.logger,
@@ -675,7 +698,7 @@ impl Vm {
         Ok(())
     }
     /// generate hob list fot firmware
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(any(feature = "tdx", feature = "sev"))]
     pub fn generate_hob_list(
         &self,
         hob_offset: u64,
@@ -717,5 +740,135 @@ impl Vm {
             hob.add_acpi_table(vm_memory, acpi_table.as_slice())?;
         }
         hob.finish(vm_memory)
+    }
+}
+
+#[cfg(feature = "sev")]
+impl Vm {
+    /// Initialize the SEV microVM.
+    pub fn init_sev_microvm(
+        &mut self,
+        vm_as: GuestAddressSpaceImpl,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        info!(self.logger, "VM: initializing SEV microVM");
+
+        let vm_memory = vm_as.memory();
+
+        // Load firmware into memory.
+        let sections = self.parse_tdvf_sections()?;
+        let (hob_offset, payload_offset, payload_size, cmdline_offset) =
+            self.load_firmware(vm_memory.deref(), &sections)?;
+
+        // Load payload info into memory.
+        let payload_info =
+            self.load_bzimage_payload(payload_offset, payload_size, vm_memory.deref())?;
+        self.load_cmdline(cmdline_offset, vm_memory.deref())?;
+
+        // Generate TD hob.
+        let max_vcpu_count = self.vm_config().max_vcpu_count;
+        let boot_vcpu_count = self.vm_config().vcpu_count;
+
+        let acpi_tables = create_acpi_tables_tdx(max_vcpu_count, boot_vcpu_count);
+        let address_space =
+            self.vm_address_space()
+                .cloned()
+                .ok_or(StartMicroVmError::GuestMemory(
+                    AddressManagerError::GuestMemoryNotInitialized,
+                ))?;
+
+        self.generate_hob_list(
+            hob_offset,
+            vm_memory.deref(),
+            address_space,
+            payload_info,
+            &acpi_tables,
+        )
+        .map_err(LoadTdDataError::LoadData)
+        .map_err(StartMicroVmError::TdDataLoader)?;
+
+        // Do some SEV ioctl(2).
+
+        let sev_fd = SevFirmware::open().map_err(StartMicroVmError::SevIoctlError)?;
+        // let platform_status = sev_fd
+        //     .platform_status()
+        //     .map_err(|e| Into::<std::io::Error>::into(e))
+        //     .map_err(sev::error::Error::IoError)
+        //     .map_err(StartMicroVmError::SevError)?;
+        // let build = platform_status.build;
+
+        // TODO: check is sev-es supported:
+        // status.flags & SEV_STATUS_FLAGS_CONFIG_ES
+        // SEV_STATUS_FLAGS_CONFIG_ES = 0x0100
+        // TODO: check is in-kernel irqchip allowed
+
+        let launcher = sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd.as_raw_fd())
+            .map_err(StartMicroVmError::SevIoctlError)?;
+        let start = self
+            .vm_config
+            .sev_start
+            .take()
+            .ok_or(StartMicroVmError::SevMissingStart)?;
+        let mut launcher = launcher
+            .start(start)
+            .map_err(StartMicroVmError::SevIoctlError)?;
+
+        self.vcpu_manager()
+            .map_err(StartMicroVmError::Vcpu)?
+            .create_vcpus(boot_vcpu_count, None, None)
+            .map_err(StartMicroVmError::Vcpu)?;
+
+        for region in vm_memory.iter() {
+            launcher
+                .update_data(unsafe { std::slice::from_raw_parts(region.as_ptr(), region.len()) })
+                .map_err(StartMicroVmError::SevIoctlError)?;
+        }
+        launcher
+            .update_vmsa()
+            .map_err(StartMicroVmError::SevIoctlError)?;
+
+        let launcher = launcher
+            .measure()
+            .map_err(StartMicroVmError::SevIoctlError)?;
+
+        let measurement = launcher.measurement();
+        self.sev_launcher = Some(launcher);
+        self.shared_info
+            .write()
+            .expect(
+                "Failed to start microVM because shared info couldn't \
+                    be written due to poisoned lock",
+            )
+            .state = InstanceState::Starting(VmStartingStage::SevMeasured);
+
+        info!(
+            self.logger,
+            "VM: SEV microVM measured. Method `start_microvm` returned, waiting \
+                to be called again with the secret to start the VM."
+        );
+        // debug!(self.logger, "VM: SEV measurement = {:?}", measurement);
+
+        Err(StartMicroVmError::SevMeasured(measurement))
+    }
+
+    fn init_sev_microvm_rest(&mut self) -> std::result::Result<(), StartMicroVmError> {
+        // Safe to unwarp because the current instance state is
+        // InstanceState::Starting(VmStartingStage::SevMeasured),
+        // at which sev_launcher is Some(..).
+        let mut launcher = self.sev_launcher.take().unwrap();
+        let secret: sev::launch::sev::Secret = self
+            .vm_config
+            .sev_secret
+            .take()
+            .ok_or(StartMicroVmError::SevMissingSecret)?;
+        // TODO: guest_address is ?
+        let guest = 0;
+        launcher
+            .inject(&secret, guest)
+            .map_err(StartMicroVmError::SevIoctlError)?;
+        let _handle = launcher
+            .finish()
+            .map_err(StartMicroVmError::SevIoctlError)?;
+
+        Ok(())
     }
 }

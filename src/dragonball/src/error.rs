@@ -9,10 +9,12 @@
 
 //! Error codes for the virtual machine monitor subsystem.
 
-#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+#[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::TdxIoctlError;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtIoError;
+#[cfg(feature = "sev")]
+use sev::launch::sev as sev_launch;
 
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 use crate::device_manager::ioapic_dev_mgr::IoapicDeviceMgrError;
@@ -74,7 +76,7 @@ pub enum Error {
     Vm(vm::VmError),
 
     /// confidential vm type Error
-    #[error("confidential-vm-type can only be used in x86_64 now")]
+    #[error("Confidential VM type is not supported by Dragonball or host's arch.")]
     ConfidentialVmType,
 }
 
@@ -120,7 +122,7 @@ pub enum StartMicroVmError {
 
     /// The start command was issued more than once.
     #[error("the virtual machine is already running")]
-    MicroVMAlreadyRunning,
+    MicroVmAlreadyRunning,
 
     /// Cannot start the VM because the kernel was not configured.
     #[error("cannot start the virtual machine without kernel configuration")]
@@ -216,16 +218,43 @@ pub enum StartMicroVmError {
     FsDeviceError(#[source] device_manager::fs_dev_mgr::FsDeviceError),
 
     /// TDX ioctl related error.
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     #[error("TDX ioctl related error.")]
     TdxIoctlError(#[source] TdxIoctlError),
 
     /// TDX not supported
     #[error("Dragonball without TDX support.")]
-    TdxError,
+    TdxNotSupported,
+
+    /// SEV ioctl related error.
+    #[cfg(feature = "sev")]
+    #[error("SEV error: {0}")]
+    SevIoctlError(#[source] std::io::Error),
+
+    /// Cannot start SEV VM beacuse `vm_config.sev_start` is not set
+    #[cfg(feature = "sev")]
+    #[error("cannot start SEV VM beacuse `vm_config.sev_start` is not set")]
+    SevMissingStart,
+
+    /// Cannot start SEV VM beacuse `vm_config.sev_secret` is not set
+    #[cfg(feature = "sev")]
+    #[error("cannot start SEV VM beacuse `vm_config.sev_secret` is not set")]
+    SevMissingSecret,
+
+    /// SEV not supported
+    #[error("Dragonball without SEV support.")]
+    SevNotSupported,
+
+    /// Starting an SEV VM requires two calls to `start_microvm`. This time
+    /// (the first time) it successfully completed and the measurement is returned.
+    /// However, the VM has not yet started. Call `start_microvm` again with the
+    /// `secret` set to start the VM.
+    #[cfg(feature = "sev")]
+    #[error("SEV VM measured and measurement returned.")]
+    SevMeasured(sev_launch::Measurement),
 
     /// Cannot load td data
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(any(feature = "tdx", feature = "sev"))]
     #[error("cannot load td data following tdshim metadata: {0}")]
     TdDataLoader(#[source] self::LoadTdDataError),
 

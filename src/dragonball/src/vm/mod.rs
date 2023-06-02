@@ -16,7 +16,9 @@ use kvm_ioctls::VmFd;
 use linux_loader::loader::{KernelLoader, KernelLoaderResult};
 use seccompiler::BpfProgram;
 use serde_derive::{Deserialize, Serialize};
-use slog::{error, info};
+#[cfg(feature = "sev")]
+use sev::launch::sev as sev_launch;
+use slog::{error, info, Logger};
 use vm_memory::{Bytes, GuestAddress, GuestAddressSpace};
 use vmm_sys_util::eventfd::EventFd;
 
@@ -27,7 +29,9 @@ use crate::address_space_manager::{
     AddressManagerError, AddressSpaceMgr, AddressSpaceMgrBuilder, GuestAddressSpaceImpl,
     GuestMemoryImpl,
 };
-use crate::api::v1::{InstanceInfo, InstanceState};
+#[cfg(feature = "sev")]
+use crate::api::v1::VmStartingStage;
+use crate::api::v1::{ConfidentialVmType, InstanceInfo, InstanceState};
 use crate::device_manager::console_manager::DmesgWriter;
 use crate::device_manager::{DeviceManager, DeviceMgrError, DeviceOpContext};
 use crate::error::{LoadInitrdError, Result, StartMicroVmError, StopMicrovmError};
@@ -127,6 +131,14 @@ pub struct VmConfigInfo {
     /// sock path
     pub serial_path: Option<String>,
 
+    /// AMD SEV `start`, used to establish a secure session with the AMD SP
+    #[cfg(feature = "sev")]
+    pub sev_start: Option<sev::launch::sev::Start>,
+
+    /// A packet containing SEV related secret information to be injected into the guest.
+    #[cfg(feature = "sev")]
+    pub sev_secret: Option<sev::launch::sev::Secret>,
+
     /// userspace iopaic enabled or not
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
     pub userspace_ioapic_enabled: bool,
@@ -149,6 +161,10 @@ impl Default for VmConfigInfo {
             mem_file_path: String::from(""),
             mem_size_mib: 128,
             serial_path: None,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         }
@@ -196,51 +212,44 @@ pub struct Vm {
 
     #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
     upcall_client: Option<Arc<UpcallClient<DevMgrService>>>,
+
+    #[cfg(feature = "sev")]
+    sev_launcher: Option<sev_launch::Launcher<sev_launch::Measured, i32, i32>>,
 }
 
 impl Vm {
     /// Constructs a new `Vm` instance using the given `Kvm` instance.
     pub fn new(
         kvm_fd: Option<RawFd>,
-        api_shared_info: Arc<RwLock<InstanceInfo>>,
+        shared_info: Arc<RwLock<InstanceInfo>>,
         epoll_manager: EpollManager,
     ) -> Result<Self> {
-        let id = api_shared_info.read().unwrap().id.clone();
+        let shared_info_guard = shared_info
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock");
+        let id = shared_info_guard.id.clone();
         let logger = slog_scope::logger().new(slog::o!("id" => id));
         let kvm = KvmContext::new(kvm_fd)?;
-        let vm_fd = match api_shared_info
-            .as_ref()
-            .read()
-            .expect("failed to get instance state, because shared info is poisoned lock")
-            .confidential_vm_type
-        {
-            None => Arc::new(kvm.create_vm()?),
-            Some(confidential_vm_type) => {
-                #[cfg(not(any(target_arch = "x86_64")))]
-                {
-                    error!(
-                        "confidential-vm-type {} only can be used in x86_64",
-                        confidential_vm_type as u64
-                    );
-                    return Err(Error::ConfidentialVmType);
-                }
-                #[cfg(target_arch = "x86_64")]
-                Arc::new(kvm.create_vm_with_type(confidential_vm_type as u64)?)
-            }
-        };
+        let vm_fd = Self::check_confidential_vm_type_and_create_vm(
+            &logger,
+            shared_info_guard.confidential_vm_type,
+            &kvm,
+        )?;
+        drop(shared_info_guard);
+
         let resource_manager = Arc::new(ResourceManager::new(Some(kvm.max_memslots())));
         let device_manager = DeviceManager::new(
             vm_fd.clone(),
             resource_manager.clone(),
             epoll_manager.clone(),
             &logger,
-            api_shared_info.clone(),
+            shared_info.clone(),
         );
 
         Ok(Vm {
             epoll_manager,
             kvm,
-            shared_info: api_shared_info,
+            shared_info,
 
             address_space: AddressSpaceMgr::default(),
             device_manager,
@@ -261,6 +270,68 @@ impl Vm {
             irqchip_handle: None,
             #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
             upcall_client: None,
+            #[cfg(feature = "sev")]
+            sev_launcher: None,
+        })
+    }
+
+    #[allow(unused_variables)]
+    fn check_confidential_vm_type_and_create_vm(
+        logger: &Logger,
+        confidential_vm_type: Option<ConfidentialVmType>,
+        kvm: &KvmContext,
+    ) -> Result<Arc<VmFd>> {
+        // Check compatibility of architecture and confidential computing features
+        // at compile time.
+        #[cfg(all(not(target_arch = "x86_64"), feature = "tdx"))]
+        compile_error!(
+            "Feature \"tdx\" of Dragonball can only be enabled under the x86_64 \
+                architecture."
+        );
+
+        #[cfg(all(not(target_arch = "x86_64"), feature = "sev"))]
+        compile_error!(
+            "Feature \"sev\" of Dragonball can only be enabled under the x86_64 \
+                architecture."
+        );
+
+        #[cfg(not(target_arch = "x86_64"))]
+        if let Some(ty) = confidential_vm_type {
+            error!(
+                logger,
+                "The confidential VM type {ty:?} can only be used under x86_64."
+            );
+            return Err(crate::error::Error::ConfidentialVmType);
+        }
+        #[cfg(target_arch = "x86_64")]
+        Ok(match confidential_vm_type {
+            Some(ConfidentialVmType::TDX) => {
+                #[cfg(not(feature = "tdx"))]
+                {
+                    error!(
+                        logger,
+                        "Unsupported confidential VM type {:?}: Dragonball built without feature \"tdx\".",
+                        ConfidentialVmType::TDX
+                    );
+                    return Err(crate::error::Error::ConfidentialVmType);
+                }
+                #[cfg(feature = "tdx")]
+                Arc::new(kvm.create_vm_with_type(ConfidentialVmType::TDX as u64)?)
+            }
+            Some(ConfidentialVmType::SEV) => {
+                #[cfg(not(feature = "sev"))]
+                {
+                    error!(
+                        logger,
+                        "Unsupported confidential VM type {:?}: Dragonball built without feature \"sev\".",
+                        ConfidentialVmType::SEV
+                    );
+                    return Err(crate::error::Error::ConfidentialVmType);
+                }
+                #[cfg(feature = "sev")]
+                Arc::new(kvm.create_vm()?)
+            }
+            _ => Arc::new(kvm.create_vm()?),
         })
     }
 
@@ -334,25 +405,25 @@ impl Vm {
         false
     }
 
+    /// Get the state of instance
+    pub fn instance_state(&self) -> InstanceState {
+        // Use expect() to crash if the other thread poisoned this lock.
+        let shared_info = self.shared_info.read().expect(
+            "Failed to determine the state of instance because shared info \
+                couldn't be read due to poisoned lock",
+        );
+        shared_info.state
+    }
+
     /// Check whether the VM has been initialized.
     pub fn is_vm_initialized(&self) -> bool {
-        let instance_state = {
-            // Use expect() to crash if the other thread poisoned this lock.
-            let shared_info = self.shared_info.read()
-                .expect("Failed to determine if instance is initialized because shared info couldn't be read due to poisoned lock");
-            shared_info.state
-        };
+        let instance_state = self.instance_state();
         instance_state != InstanceState::Uninitialized
     }
 
     /// Check whether the VM instance is running.
     pub fn is_vm_running(&self) -> bool {
-        let instance_state = {
-            // Use expect() to crash if the other thread poisoned this lock.
-            let shared_info = self.shared_info.read()
-                .expect("Failed to determine if instance is initialized because shared info couldn't be read due to poisoned lock");
-            shared_info.state
-        };
+        let instance_state = self.instance_state();
         instance_state == InstanceState::Running
     }
 
@@ -363,6 +434,15 @@ impl Vm {
             .read()
             .expect("failed to get instance state, because shared info is poisoned lock");
         shared_info.is_tdx_enabled()
+    }
+
+    /// return true if VM confidential type is SEV
+    pub fn is_sev_enabled(&self) -> bool {
+        let shared_info = self
+            .shared_info()
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock");
+        shared_info.is_sev_enabled()
     }
 
     /// Save VM instance exit state
@@ -591,12 +671,13 @@ impl Vm {
         let mut address_space_param = AddressSpaceMgrBuilder::new(&mem_type, &mem_file_path)
             .map_err(StartMicroVmError::AddressManagerError)?;
         address_space_param.set_kvm_vm_fd(self.vm_fd.clone());
+        let has_firmware = self.is_tdx_enabled() || self.is_sev_enabled();
         self.address_space
             .create_address_space(
                 &self.resource_manager,
                 &numa_regions,
                 address_space_param,
-                self.is_tdx_enabled(),
+                has_firmware,
             )
             .map_err(StartMicroVmError::AddressManagerError)?;
 
@@ -722,60 +803,112 @@ impl Vm {
         vcpu_seccomp_filter: BpfProgram,
     ) -> std::result::Result<(), StartMicroVmError> {
         info!(self.logger, "VM: received instance start command");
-        if self.is_vm_initialized() {
-            return Err(StartMicroVmError::MicroVMAlreadyRunning);
+
+        // See note of `api::v1::instance_info::VmStartingStage`.
+        #[cfg(feature = "sev")]
+        let is_multi_stage_start = self.is_sev_enabled();
+        #[cfg(not(feature = "sev"))]
+        let is_multi_stage_start = false;
+
+        // Whether to run the specific stage, if is None, run all stages.
+        let run_specific_stage = match (is_multi_stage_start, self.instance_state()) {
+            (false, InstanceState::Uninitialized) => None,
+            #[cfg(feature = "sev")]
+            (true, InstanceState::Uninitialized) => Some(0),
+            #[cfg(feature = "sev")]
+            (true, InstanceState::Starting(VmStartingStage::SevMeasured)) => Some(1),
+            (_, _) => {
+                return Err(StartMicroVmError::MicroVmAlreadyRunning);
+            }
+        };
+
+        // stage 0
+        if matches!(run_specific_stage, None | Some(0)) {
+            let request_ts = TimestampUs::default();
+            self.start_instance_request_ts = request_ts.time_us;
+            self.start_instance_request_cpu_ts = request_ts.cputime_us;
+
+            self.init_dmesg_logger();
+            self.check_health()?;
+
+            // Use expect() to crash if the other thread poisoned this lock.
+            self.shared_info
+                .write()
+                .expect(
+                    "Failed to start microVM because shared info couldn't \
+                        be written due to poisoned lock",
+                )
+                .state = {
+                #[cfg(feature = "sev")]
+                {
+                    InstanceState::Starting(VmStartingStage::Initial)
+                }
+                #[cfg(not(feature = "sev"))]
+                {
+                    InstanceState::Starting
+                }
+            };
+
+            self.init_guest_memory()?;
+            let vm_as = self
+                .vm_as()
+                .cloned()
+                .ok_or(StartMicroVmError::AddressManagerError(
+                    AddressManagerError::GuestMemoryNotInitialized,
+                ))?;
+
+            // TODO create interrupt_contriller here
+            // create userspace-ioapic
+            // init vcpu manager & device manager with ioapic
+            info!(self.logger, "VM: Init guest memory Done");
+
+            self.init_vcpu_manager(vm_as.clone(), vcpu_seccomp_filter)
+                .map_err(StartMicroVmError::Vcpu)?;
+            info!(self.logger, "VM: Init vcpu manager Done");
+
+            self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
+            info!(self.logger, "VM: Init microvm Done");
         }
 
-        let request_ts = TimestampUs::default();
-        self.start_instance_request_ts = request_ts.time_us;
-        self.start_instance_request_cpu_ts = request_ts.cputime_us;
+        // stage 1
+        if matches!(run_specific_stage, None | Some(1)) {
+            #[cfg(feature = "sev")]
+            self.init_microvm_rest()?;
 
-        self.init_dmesg_logger();
-        self.check_health()?;
+            let vm_as = self
+                .vm_as()
+                .cloned()
+                .ok_or(StartMicroVmError::AddressManagerError(
+                    AddressManagerError::GuestMemoryNotInitialized,
+                ))?;
 
-        // Use expect() to crash if the other thread poisoned this lock.
-        self.shared_info
-            .write()
-            .expect("Failed to start microVM because shared info couldn't be written due to poisoned lock")
-            .state = InstanceState::Starting;
+            let is_tee = self.is_tdx_enabled() || self.is_sev_enabled();
+            if !is_tee {
+                self.init_configure_system(&vm_as)?;
+                #[cfg(feature = "dbs-upcall")]
+                self.init_upcall()?;
+            }
 
-        self.init_guest_memory()?;
-        let vm_as = self
-            .vm_as()
-            .cloned()
-            .ok_or(StartMicroVmError::AddressManagerError(
-                AddressManagerError::GuestMemoryNotInitialized,
-            ))?;
+            info!(self.logger, "VM: register events");
+            self.register_events(event_mgr)?;
 
-        // TODO create interrupt_contriller here
-        // create userspace-ioapic
-        // init vcpu manager & device manager with ioapic
-        info!(self.logger, "VM: Init guest memory Done");
-        self.init_vcpu_manager(vm_as.clone(), vcpu_seccomp_filter)
-            .map_err(StartMicroVmError::Vcpu)?;
-        info!(self.logger, "VM: Init vcpu manager Done");
-        self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
-        info!(self.logger, "VM: Init microvm Done");
-        self.init_configure_system(&vm_as)?;
-        #[cfg(feature = "dbs-upcall")]
-        self.init_upcall()?;
+            info!(self.logger, "VM: start vcpus");
+            self.vcpu_manager()
+                .map_err(StartMicroVmError::Vcpu)?
+                .start_boot_vcpus(vmm_seccomp_filter)
+                .map_err(StartMicroVmError::Vcpu)?;
 
-        info!(self.logger, "VM: register events");
-        self.register_events(event_mgr)?;
+            // Use expect() to crash if the other thread poisoned this lock.
+            self.shared_info
+                .write()
+                .expect(
+                    "Failed to start microVM because shared info couldn't \
+                        be written due to poisoned lock",
+                )
+                .state = InstanceState::Running;
 
-        info!(self.logger, "VM: start vcpus");
-        self.vcpu_manager()
-            .map_err(StartMicroVmError::Vcpu)?
-            .start_boot_vcpus(vmm_seccomp_filter)
-            .map_err(StartMicroVmError::Vcpu)?;
-
-        // Use expect() to crash if the other thread poisoned this lock.
-        self.shared_info
-            .write()
-            .expect("Failed to start microVM because shared info couldn't be written due to poisoned lock")
-            .state = InstanceState::Running;
-
-        info!(self.logger, "VM started");
+            info!(self.logger, "VM started");
+        }
         Ok(())
     }
 }
@@ -851,7 +984,7 @@ impl Vm {
         &self,
         _epoll_mgr: Option<EpollManager>,
     ) -> std::result::Result<DeviceOpContext, StartMicroVmError> {
-        Err(StartMicroVmError::MicroVMAlreadyRunning)
+        Err(StartMicroVmError::MicroVmAlreadyRunning)
     }
 }
 
@@ -865,7 +998,7 @@ impl Vm {
         &self,
         _epoll_mgr: Option<EpollManager>,
     ) -> std::result::Result<DeviceOpContext, StartMicroVmError> {
-        Err(StartMicroVmError::MicroVMAlreadyRunning)
+        Err(StartMicroVmError::MicroVmAlreadyRunning)
     }
 }
 
@@ -925,6 +1058,10 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -953,6 +1090,10 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -994,6 +1135,10 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1068,6 +1213,10 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1110,7 +1259,7 @@ pub mod tests {
     // via dbuvm docker image
     #[test]
     #[cfg(feature = "test-resources")]
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     fn test_load_payload_and_cmdline() {
         let kernel_path = "/test_resources/linux-loader/test_elf.bin";
         let kernel_path_buf = PathBuf::from(kernel_path);
@@ -1174,7 +1323,7 @@ pub mod tests {
     // via dbuvm docker image
     #[test]
     #[cfg(feature = "test-resources")]
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     fn test_load_firmware() {
         // prepare resource
         use crate::api::v1::ConfidentialVmType;
@@ -1238,7 +1387,7 @@ pub mod tests {
         assert!(res.is_ok());
     }
     #[test]
-    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[cfg(feature = "tdx")]
     fn test_generate_hob() {
         let vcpu_count = 1;
         let max_vcpu_count = 3;
@@ -1257,6 +1406,11 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
         let mut vm = create_vm_instance();

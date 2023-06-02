@@ -41,6 +41,10 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(feature = "sev")]
+            sev_start: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
