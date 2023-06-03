@@ -96,7 +96,18 @@ pub enum VmmAction {
     ConfigureBootSource(BootSourceConfig),
 
     /// Launch the microVM. This action can only be called before the microVM has booted.
+    ///
+    /// For SEV VM, it needs to first call `StartMicroVm`, followed by
+    /// `StartMicroVmWithSecret`. Normally, the first call will return
+    /// `StartMicroVmError::SevMeasured(Measurement)`. The user should verify the
+    /// measurement, generate a secret, and use it for the second call. When the
+    /// second call returns Ok, the VM is truly successfully started.
     StartMicroVm,
+
+    /// Launch the microVM with the SEV secret. Before calling this,
+    /// `StartMicroVm` must be called first.
+    #[cfg(feature = "sev")]
+    StartMicroVmWithSevSecret(sev::launch::sev::Secret),
 
     /// Shutdown the vmicroVM. This action can only be called after the microVM has booted.
     /// When vmm is used as the crate by the other process, which is need to
@@ -216,6 +227,10 @@ impl VmmService {
                 self.configure_boot_source(vmm, boot_source_body)
             }
             VmmAction::StartMicroVm => self.start_microvm(vmm, event_mgr),
+            #[cfg(feature = "sev")]
+            VmmAction::StartMicroVmWithSevSecret(secret) => {
+                self.start_microvm_with_sev_secret(vmm, event_mgr, Box::new(secret))
+            }
             VmmAction::ShutdownMicroVm => self.shutdown_microvm(vmm),
             VmmAction::GetVmConfiguration => Ok(VmmData::MachineConfiguration(Box::new(
                 self.machine_config.clone(),
@@ -336,10 +351,35 @@ impl VmmService {
 
         let vmm_seccomp_filter = vmm.vmm_seccomp_filter();
         let vcpu_seccomp_filter = vmm.vcpu_seccomp_filter();
+
         let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
         if vm.is_vm_initialized() {
             return Err(StartMicroVm(MicroVmAlreadyRunning));
         }
+
+        vm.start_microvm(event_mgr, vmm_seccomp_filter, vcpu_seccomp_filter)
+            .map(|_| VmmData::Empty)
+            .map_err(StartMicroVm)
+    }
+
+    #[cfg(feature = "sev")]
+    fn start_microvm_with_sev_secret(
+        &mut self,
+        vmm: &mut Vmm,
+        event_mgr: &mut EventManager,
+        secret: Box<sev::launch::sev::Secret>,
+    ) -> VmmRequestResult {
+        use self::StartMicroVmError::IncorrectSevStartCallSequence;
+        use self::VmmActionError::StartMicroVm;
+
+        let vmm_seccomp_filter = vmm.vmm_seccomp_filter();
+        let vcpu_seccomp_filter = vmm.vcpu_seccomp_filter();
+
+        let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
+        if vm.instance_state() != InstanceState::Starting(VmStartingStage::SevMeasured) {
+            return Err(StartMicroVm(IncorrectSevStartCallSequence));
+        }
+        vm.set_sev_secret(secret);
 
         vm.start_microvm(event_mgr, vmm_seccomp_filter, vcpu_seccomp_filter)
             .map(|_| VmmData::Empty)
@@ -435,6 +475,12 @@ impl VmmService {
         #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
         {
             config.userspace_ioapic_enabled = machine_config.userspace_ioapic_enabled;
+        }
+        #[cfg(feature = "sev")]
+        {
+            if machine_config.sev_start.is_some() {
+                config.sev_start = machine_config.sev_start;
+            }
         }
 
         vm.set_vm_config(config.clone());

@@ -124,6 +124,12 @@ pub enum StartMicroVmError {
     #[error("the virtual machine is already running")]
     MicroVmAlreadyRunning,
 
+    /// Incorrect SEV VM starting call sequence, the SEV VM is not in the
+    /// Starting(VmStartingStage::SevMeasured) state.
+    #[cfg(feature = "sev")]
+    #[error("the SEV VM is not in the Starting(VmStartingStage::SevMeasured) state")]
+    IncorrectSevStartCallSequence,
+
     /// Cannot start the VM because the kernel was not configured.
     #[error("cannot start the virtual machine without kernel configuration")]
     MissingKernelConfig,
