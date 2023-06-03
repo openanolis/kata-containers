@@ -133,11 +133,7 @@ pub struct VmConfigInfo {
 
     /// AMD SEV `start`, used to establish a secure session with the AMD SP
     #[cfg(feature = "sev")]
-    pub sev_start: Option<sev::launch::sev::Start>,
-
-    /// A packet containing SEV related secret information to be injected into the guest.
-    #[cfg(feature = "sev")]
-    pub sev_secret: Option<sev::launch::sev::Secret>,
+    pub sev_start: Option<Box<sev::launch::sev::Start>>,
 
     /// userspace iopaic enabled or not
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
@@ -163,8 +159,6 @@ impl Default for VmConfigInfo {
             serial_path: None,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         }
@@ -215,6 +209,8 @@ pub struct Vm {
 
     #[cfg(feature = "sev")]
     sev_launcher: Option<sev_launch::Launcher<sev_launch::Measured, i32, i32>>,
+    #[cfg(feature = "sev")]
+    sev_secret: Option<Box<sev::launch::sev::Secret>>,
 }
 
 impl Vm {
@@ -272,6 +268,8 @@ impl Vm {
             upcall_client: None,
             #[cfg(feature = "sev")]
             sev_launcher: None,
+            #[cfg(feature = "sev")]
+            sev_secret: None,
         })
     }
 
@@ -386,6 +384,12 @@ impl Vm {
     /// Set the virtual machine configuration information.
     pub fn set_vm_config(&mut self, config: VmConfigInfo) {
         self.vm_config = config;
+    }
+
+    /// Set the SEV secret.
+    #[cfg(feature = "sev")]
+    pub fn set_sev_secret(&mut self, secret: Box<sev_launch::Secret>) {
+        self.sev_secret = Some(secret);
     }
 
     /// Gets a reference to the kvm file descriptor owned by this VM.
@@ -872,7 +876,6 @@ impl Vm {
 
         // stage 1
         if matches!(run_specific_stage, None | Some(1)) {
-            #[cfg(feature = "sev")]
             self.init_microvm_rest()?;
 
             let vm_as = self
@@ -1060,8 +1063,6 @@ pub mod tests {
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1092,8 +1093,6 @@ pub mod tests {
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1137,8 +1136,6 @@ pub mod tests {
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1215,8 +1212,6 @@ pub mod tests {
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1408,8 +1403,6 @@ pub mod tests {
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
             sev_start: None,
-            #[cfg(feature = "sev")]
-            sev_secret: None,
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };

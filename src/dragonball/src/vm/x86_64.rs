@@ -809,7 +809,7 @@ impl Vm {
             .take()
             .ok_or(StartMicroVmError::SevMissingStart)?;
         let mut launcher = launcher
-            .start(start)
+            .start(*start)
             .map_err(StartMicroVmError::SevIoctlError)?;
 
         self.vcpu_manager()
@@ -855,8 +855,7 @@ impl Vm {
         // InstanceState::Starting(VmStartingStage::SevMeasured),
         // at which sev_launcher is Some(..).
         let mut launcher = self.sev_launcher.take().unwrap();
-        let secret: sev::launch::sev::Secret = self
-            .vm_config
+        let secret: sev::launch::sev::Secret = *self
             .sev_secret
             .take()
             .ok_or(StartMicroVmError::SevMissingSecret)?;
