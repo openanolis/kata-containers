@@ -207,8 +207,11 @@ pub struct Vm {
     #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
     upcall_client: Option<Arc<UpcallClient<DevMgrService>>>,
 
+    // Note: the launcher holds the fd of the opened SEV device, and when it is
+    // dropped, the fd will be closed.
     #[cfg(feature = "sev")]
-    sev_launcher: Option<sev_launch::Launcher<sev_launch::Measured, i32, i32>>,
+    sev_launcher:
+        Option<sev_launch::Launcher<sev_launch::Measured, i32, sev::firmware::host::Firmware>>,
     #[cfg(feature = "sev")]
     sev_secret: Option<Box<sev::launch::sev::Secret>>,
 }

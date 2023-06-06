@@ -801,7 +801,7 @@ impl Vm {
         // SEV_STATUS_FLAGS_CONFIG_ES = 0x0100
         // TODO: check is in-kernel irqchip allowed
 
-        let launcher = sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd.as_raw_fd())
+        let launcher = sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd)
             .map_err(StartMicroVmError::SevIoctlError)?;
         let start = self
             .vm_config
@@ -859,8 +859,12 @@ impl Vm {
             .sev_secret
             .take()
             .ok_or(StartMicroVmError::SevMissingSecret)?;
-        // TODO: guest_address is ?
-        let guest = 0;
+
+        // FIXME: guest_address is ?
+        let mmap = self.vm_as().clone().unwrap().memory();
+        let region = mmap.iter().next().unwrap();
+        let guest = region.as_ptr() as usize;
+
         launcher
             .inject(&secret, guest)
             .map_err(StartMicroVmError::SevIoctlError)?;
