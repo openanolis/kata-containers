@@ -39,7 +39,7 @@ use sev::{firmware::host::Firmware as SevFirmware, launch::sev as sev_launch};
 use slog::info;
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use vm_memory::ByteValued;
-use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory, VolatileMemory};
+use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
 
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::address_space_manager::AddressManagerError;
@@ -251,26 +251,28 @@ impl Vm {
             return self.init_tdx_microvm(vm_as);
             #[cfg(not(feature = "tdx"))]
             return Err(StartMicroVmError::TdxNotSupported);
-        } else if self.is_sev_enabled() {
+        }
+
+        if self.is_sev_enabled() {
             info!(self.logger, "AMD SEV microVM");
 
             #[cfg(feature = "sev")]
             return self.init_sev_microvm(vm_as);
             #[cfg(not(feature = "sev"))]
             return Err(StartMicroVmError::SevNotSupported);
-        } else {
-            info!(self.logger, "None-confidential microvm");
-
-            let vm_memory = vm_as.memory();
-            let kernel_loader_result = self.load_kernel(vm_memory.deref(), None)?;
-            self.vcpu_manager()
-                .map_err(StartMicroVmError::Vcpu)?
-                .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
-                .map_err(StartMicroVmError::Vcpu)?;
-
-            info!(self.logger, "VM: initializing microvm done");
-            Ok(())
         }
+
+        info!(self.logger, "None-confidential microvm");
+
+        let vm_memory = vm_as.memory();
+        let kernel_loader_result = self.load_kernel(vm_memory.deref(), None)?;
+        self.vcpu_manager()
+            .map_err(StartMicroVmError::Vcpu)?
+            .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
+            .map_err(StartMicroVmError::Vcpu)?;
+
+        info!(self.logger, "VM: initializing microvm done");
+        Ok(())
     }
 
     /// Complete the remaining VM initialization work.

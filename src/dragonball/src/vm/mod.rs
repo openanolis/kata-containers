@@ -824,9 +824,7 @@ impl Vm {
             (true, InstanceState::Uninitialized) => Some(0),
             #[cfg(feature = "sev")]
             (true, InstanceState::Starting(VmStartingStage::SevMeasured)) => Some(1),
-            (_, _) => {
-                return Err(StartMicroVmError::MicroVmAlreadyRunning);
-            }
+            _ => return Err(StartMicroVmError::MicroVmAlreadyRunning),
         };
 
         // stage 0
