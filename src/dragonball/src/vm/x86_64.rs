@@ -821,7 +821,7 @@ impl Vm {
 
         for region in vm_memory.iter() {
             launcher
-                .update_data(unsafe { std::slice::from_raw_parts(region.as_ptr(), region.len()) })
+                .update_data(unsafe { std::slice::from_raw_parts(region.as_ptr(), region.size()) })
                 .map_err(StartMicroVmError::SevIoctlError)?;
         }
         launcher
