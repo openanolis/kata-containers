@@ -29,9 +29,6 @@ pub struct MemResource {
 
     /// MemResource of each container
     pub(crate) container_mem_resources: Arc<RwLock<HashMap<String, LinuxResources>>>,
-
-    /// Use guest swap
-    pub(crate) use_guest_swap: bool,
 }
 
 impl MemResource {
@@ -45,7 +42,6 @@ impl MemResource {
         Ok(Self {
             current_mem: Arc::new(RwLock::new(hypervisor_config.memory_info.default_memory)),
             container_mem_resources: Arc::new(RwLock::new(HashMap::new())),
-            use_guest_swap: hypervisor_config.memory_info.enable_guest_swap,
             orig_toml_default_mem: init_size_manager.get_orig_toml_default_mem(),
         })
     }
@@ -61,18 +57,15 @@ impl MemResource {
             .await
             .context("update container memory resources")?;
         // the unit here is MB
-        let (mut mem_sb_mb, need_pod_swap, swap_sb_mb) = self
-            .total_mems(self.use_guest_swap)
+        let mut mem_sb_mb = self
+            .total_mems()
             .await
             .context("failed to calculate total memory requirement for containers")?;
         mem_sb_mb += self.orig_toml_default_mem;
-        if need_pod_swap {
-            mem_sb_mb += swap_sb_mb;
-        }
         info!(sl!(), "calculate mem_sb_mb {}", mem_sb_mb);
 
         let curr_mem = self
-            .do_update_mem_resource(mem_sb_mb, swap_sb_mb, hypervisor)
+            .do_update_mem_resource(mem_sb_mb, hypervisor)
             .await
             .context("failed to update_mem_resource")?;
 
@@ -85,12 +78,13 @@ impl MemResource {
         *current_mem = new_mem;
     }
 
-    async fn total_mems(&self, use_guest_swap: bool) -> Result<(u32, bool, u32)> {
-        // sb stands for sandbox
-        let mut mem_sandbox = 0;
-        let mut need_pod_swap = false;
-        let mut swap_sandbox = 0;
+    async fn get_current_mem(&self) -> u32 {
+        let current_mem = self.current_mem.read().await;
+        *current_mem
+    }
 
+    async fn total_mems(&self) -> Result<u32> {
+        let mut mem_sandbox = 0;
         let resources = self.container_mem_resources.read().await;
 
         for (_, r) in resources.iter() {
@@ -100,36 +94,17 @@ impl MemResource {
 
             if let Some(memory) = &r.memory {
                 // set current_limit to 0 if memory limit is not set to container
-                let current_limit = memory.limit.map_or(0, |limit| {
+                let _current_limit = memory.limit.map_or(0, |limit| {
                     mem_sandbox += limit as u64;
                     info!(sl!(), "memory sb: {}, memory limit: {}", mem_sandbox, limit);
                     limit
                 });
-
-                if let Some(swappiness) = memory.swappiness {
-                    if swappiness > 0 && use_guest_swap {
-                        if let Some(swap) = memory.swap {
-                            if swap > current_limit {
-                                swap_sandbox = swap.saturating_sub(current_limit);
-                            }
-                        }
-                        // if current_limit is 0, the container will have access to the entire memory available on the host system
-                        // so we add swap for this
-                        else if current_limit == 0 {
-                            need_pod_swap = true;
-                        } else {
-                            swap_sandbox += current_limit;
-                        }
-                    }
-                }
+                // TODO support memory guest swap
+                // https://github.com/kata-containers/kata-containers/issues/7293
             }
         }
 
-        Ok((
-            (mem_sandbox >> MIB_TO_BYTES_SHIFT) as u32,
-            need_pod_swap,
-            (swap_sandbox >> MIB_TO_BYTES_SHIFT) as u32,
-        ))
+        Ok((mem_sandbox >> MIB_TO_BYTES_SHIFT) as u32)
     }
 
     // update container_cpu_resources field
@@ -156,12 +131,13 @@ impl MemResource {
     async fn do_update_mem_resource(
         &self,
         new_mem: u32,
-        _swap_sz_mb: u32,
         hypervisor: &dyn Hypervisor,
     ) -> Result<u32> {
         info!(sl!(), "requesting vmm to update memory to {:?}", new_mem);
+
+        let current_mem = self.get_current_mem().await;
         let (new_memory, _mem_config) = hypervisor
-            .resize_memory(new_mem)
+            .resize_memory(current_mem, new_mem)
             .await
             .context("resize memory")?;
 
