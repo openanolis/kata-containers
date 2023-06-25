@@ -18,7 +18,7 @@ pub fn setup_tracing(name: &'static str, logger: &Logger) -> Result<()> {
 
     let exporter = vsock_exporter::Exporter::builder()
         .with_logger(&logger)
-        .init();
+        .init()?;
 
     let config = Config::default();
 
