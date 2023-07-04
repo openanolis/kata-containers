@@ -612,7 +612,7 @@ dependencies = [
 [[package]]
 name = "dbs-acpi"
 version = "0.1.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "vm-memory",
 ]
@@ -620,7 +620,7 @@ dependencies = [
 [[package]]
 name = "dbs-address-space"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "arc-swap",
  "lazy_static",
@@ -634,7 +634,7 @@ dependencies = [
 [[package]]
 name = "dbs-allocator"
 version = "0.1.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "thiserror",
 ]
@@ -642,7 +642,7 @@ dependencies = [
 [[package]]
 name = "dbs-arch"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "kvm-bindings",
  "kvm-ioctls",
@@ -656,7 +656,7 @@ dependencies = [
 [[package]]
 name = "dbs-boot"
 version = "0.3.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "dbs-arch",
  "kvm-bindings",
@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "dbs-device"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "thiserror",
 ]
@@ -679,7 +679,7 @@ dependencies = [
 [[package]]
 name = "dbs-interrupt"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "byteorder",
  "dbs-arch",
@@ -697,7 +697,7 @@ dependencies = [
 [[package]]
 name = "dbs-legacy-devices"
 version = "0.1.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "dbs-device",
  "dbs-utils",
@@ -711,7 +711,7 @@ dependencies = [
 [[package]]
 name = "dbs-tdx"
 version = "0.1.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "dbs-boot",
  "kvm-bindings",
@@ -724,7 +724,7 @@ dependencies = [
 [[package]]
 name = "dbs-upcall"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "anyhow",
  "dbs-utils",
@@ -737,7 +737,7 @@ dependencies = [
 [[package]]
 name = "dbs-utils"
 version = "0.2.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "anyhow",
  "event-manager",
@@ -752,7 +752,7 @@ dependencies = [
 [[package]]
 name = "dbs-virtio-devices"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#3b689c24fcb2dca49b82af52f1c60dd077d568f0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "byteorder",
  "caps",
