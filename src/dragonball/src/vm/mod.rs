@@ -812,10 +812,7 @@ impl Vm {
         info!(self.logger, "VM: received instance start command");
 
         // See note of `api::v1::instance_info::VmStartingStage`.
-        #[cfg(feature = "sev")]
-        let is_multi_stage_start = self.is_sev_enabled();
-        #[cfg(not(feature = "sev"))]
-        let is_multi_stage_start = false;
+        let is_multi_stage_start = cfg!(feature = "sev") && self.is_sev_enabled();
 
         // Whether to run the specific stage, if is None, run all stages.
         let run_specific_stage = match (is_multi_stage_start, self.instance_state()) {
@@ -1432,6 +1429,7 @@ pub mod tests {
             address_space,
             payload_info,
             &acpi_tables,
+            ConfidentialVmType::TDX,
         );
         assert!(res.is_ok());
     }

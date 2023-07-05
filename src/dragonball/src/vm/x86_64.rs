@@ -43,7 +43,6 @@ use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
 
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::address_space_manager::AddressManagerError;
-use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
 #[cfg(feature = "sev")]
 use crate::api::v1::{InstanceState, VmStartingStage};
 #[cfg(any(feature = "tdx", feature = "sev"))]
@@ -51,6 +50,10 @@ use crate::error::LoadTdDataError;
 use crate::error::{Error, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
 use crate::vm::{Vm, VmError};
+use crate::{
+    address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl},
+    api::v1::ConfidentialVmType,
+};
 
 /// Configures the system and should be called once per vm before starting vcpu
 /// threads.
@@ -477,6 +480,7 @@ impl Vm {
             address_space,
             payload_info,
             &acpi_tables,
+            ConfidentialVmType::TDX,
         )
         .map_err(LoadTdDataError::LoadData)
         .map_err(StartMicroVmError::TdDataLoader)?;
@@ -566,31 +570,26 @@ impl Vm {
             }
         }
 
-        #[cfg(feature = "tdx")]
-        if hob_offset.is_none() {
+        let Some(hob_offset) = hob_offset else {
             return Err(StartMicroVmError::TdDataLoader(LoadTdDataError::HobOffset));
-        }
+        };
 
-        #[cfg(feature = "tdx")]
-        if payload_offset.is_none() || payload_size.is_none() {
+        // return Ok((hob_offset, 0, 0, 0));
+
+        let (Some(payload_offset), Some(payload_size)) = (payload_offset, payload_size) else {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadOffset,
             ));
-        }
+        };
 
-        #[cfg(feature = "tdx")]
-        if cmdline_offset.is_none() {
+        let Some(cmdline_offset) = cmdline_offset else {
             return Err(StartMicroVmError::TdDataLoader(
                 LoadTdDataError::PayloadParamsOffset,
             ));
-        }
+        };
+
         // Safe to unwrap here
-        Ok((
-            hob_offset.unwrap(),
-            payload_offset.unwrap(),
-            payload_size.unwrap(),
-            cmdline_offset.unwrap(),
-        ))
+        Ok((hob_offset, payload_offset, payload_size, cmdline_offset))
     }
 
     /// load bzImage as firmware payload
@@ -708,6 +707,7 @@ impl Vm {
         address_space: AddressSpace,
         payload_info: PayloadInfo,
         acpi_tables: &[dbs_acpi::sdt::Sdt],
+        cc_type: ConfidentialVmType,
     ) -> std::result::Result<(), vm_memory::GuestMemoryError> {
         let mut hob = dbs_tdx::td_shim::hob::TdHob::start(hob_offset);
         // add memory resource
@@ -727,7 +727,12 @@ impl Vm {
             })
             .unwrap();
         for (is_ram, start, size) in memory_regions {
-            hob.add_memory_resource(vm_memory, start, size, is_ram)?;
+            let is_unaccept_mem = if cc_type == ConfidentialVmType::TDX {
+                is_ram
+            } else {
+                false
+            };
+            hob.add_memory_resource(vm_memory, start, size, is_unaccept_mem)?;
         }
         // add mmio resource
         hob.add_mmio_resource(
@@ -784,6 +789,7 @@ impl Vm {
             address_space,
             payload_info,
             &acpi_tables,
+            ConfidentialVmType::SEV,
         )
         .map_err(LoadTdDataError::LoadData)
         .map_err(StartMicroVmError::TdDataLoader)?;
@@ -803,7 +809,9 @@ impl Vm {
         // SEV_STATUS_FLAGS_CONFIG_ES = 0x0100
         // TODO: check is in-kernel irqchip allowed
 
-        let launcher = sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd)
+        // let launcher = sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd)
+        //     .map_err(StartMicroVmError::SevIoctlError)?;
+        let launcher = sev_launch::Launcher::new(self.vm_fd().as_raw_fd(), sev_fd)
             .map_err(StartMicroVmError::SevIoctlError)?;
         let start = self
             .vm_config
@@ -819,14 +827,23 @@ impl Vm {
             .create_vcpus(boot_vcpu_count, None, None)
             .map_err(StartMicroVmError::Vcpu)?;
 
+        info!(self.logger, "Encrypting guest data...");
+        let timer = std::time::Instant::now();
+
         for region in vm_memory.iter() {
             launcher
                 .update_data(unsafe { std::slice::from_raw_parts(region.as_ptr(), region.size()) })
                 .map_err(StartMicroVmError::SevIoctlError)?;
         }
-        launcher
-            .update_vmsa()
-            .map_err(StartMicroVmError::SevIoctlError)?;
+        // launcher
+        //     .update_vmsa()
+        //     .map_err(StartMicroVmError::SevIoctlError)?;
+
+        let elapsed = timer.elapsed();
+        info!(
+            self.logger,
+            "Encrypting guest data... done in {:?}", elapsed
+        );
 
         let launcher = launcher
             .measure()
@@ -856,7 +873,7 @@ impl Vm {
         // Safe to unwarp because the current instance state is
         // InstanceState::Starting(VmStartingStage::SevMeasured),
         // at which sev_launcher is Some(..).
-        let mut launcher = self.sev_launcher.take().unwrap();
+        let mut launcher = self.sev_launcher.take().expect("Missing SEV launcher.");
         let secret: sev::launch::sev::Secret = *self
             .sev_secret
             .take()
@@ -866,6 +883,9 @@ impl Vm {
         let mmap = self.vm_as().clone().unwrap().memory();
         let region = mmap.iter().next().unwrap();
         let guest = region.as_ptr() as usize;
+
+        // let guest = guest + region.size() / 2; // 暂时放在中间
+        let guest = guest + region.size() - 16; // 暂时放在末尾
 
         launcher
             .inject(&secret, guest)
