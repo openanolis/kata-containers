@@ -756,7 +756,7 @@ impl Vm {
         info!(self.logger, "VM: Init vcpu manager Done");
         self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
         info!(self.logger, "VM: Init microvm Done");
-        if !self.is_tdx_enabled(){
+        if !self.is_tdx_enabled() {
             self.init_configure_system(&vm_as)?;
         }
         #[cfg(feature = "dbs-upcall")]

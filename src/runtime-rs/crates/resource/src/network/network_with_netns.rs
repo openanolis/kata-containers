@@ -10,6 +10,7 @@ use std::sync::{
 };
 
 use super::endpoint::endpoint_persist::EndpointState;
+use agent::IPAddress;
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
@@ -22,7 +23,7 @@ use super::{
         Endpoint, IPVlanEndpoint, MacVlanEndpoint, PhysicalEndpoint, VethEndpoint, VlanEndpoint,
     },
     network_entity::NetworkEntity,
-    network_info::network_info_from_link::NetworkInfoFromLink,
+    network_info::network_info_from_link::{self, NetworkInfoFromLink},
     utils::{link, netns},
     Network,
 };
@@ -150,10 +151,18 @@ async fn get_entity_from_netns(config: &NetworkWithNetNsConfig) -> Result<Vec<Ne
             continue;
         }
 
-        let idx = idx.fetch_add(1, Ordering::Relaxed);
-        let (endpoint, network_info) = create_endpoint(&handle, link.as_ref(), idx, config)
+        let ip_addrs = network_info_from_link::handle_addresses(&handle, attrs)
             .await
-            .context("create endpoint")?;
+            .context("handle ip addresses")?;
+        if ip_addrs.is_empty() {
+            continue;
+        }
+
+        let idx = idx.fetch_add(1, Ordering::Relaxed);
+        let (endpoint, network_info) =
+            create_endpoint(&handle, link.as_ref(), idx, ip_addrs, config)
+                .await
+                .context("create endpoint")?;
 
         entity_list.push(NetworkEntity::new(endpoint, network_info));
     }
@@ -165,6 +174,7 @@ async fn create_endpoint(
     handle: &rtnetlink::Handle,
     link: &dyn link::Link,
     idx: u32,
+    ip_addrs: Vec<IPAddress>,
     config: &NetworkWithNetNsConfig,
 ) -> Result<(Arc<dyn Endpoint>, Arc<dyn NetworkInfo>)> {
     let _netns_guard = netns::NetnsGuard::new(&config.netns_path)
@@ -229,7 +239,7 @@ async fn create_endpoint(
     };
 
     let network_info = Arc::new(
-        NetworkInfoFromLink::new(handle, link, &endpoint.hardware_addr().await)
+        NetworkInfoFromLink::new(handle, link, &endpoint.hardware_addr().await, ip_addrs)
             .await
             .context("network info from link")?,
     );
