@@ -215,7 +215,7 @@ ifneq (,$(DBCMD))
     DEFMAXVCPUS_DB := 1
     DEFBLOCKSTORAGEDRIVER_DB := virtio-blk
     DEFNETWORKMODEL_DB := tcfilter
-    KERNELPARAMS = console=ttyS1 agent.log_vport=1025 agent.enable_signature_verification=false
+    KERNELPARAMS = console=ttyS1 agent.log_vport=1025 agent.enable_signature_verification=false root=/dev/vda1 tdx_disable_filter
 	
 	KERNELTYPE_DB = uncompressed
     KERNELNAME_DB = $(call MAKE_KERNEL_NAME,$(KERNELTYPE_DB))
