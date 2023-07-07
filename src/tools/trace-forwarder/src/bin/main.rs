@@ -1,15 +1,20 @@
 // Copyright (c) 2020-2021 Intel Corporation
+// Copyright (c) 2023 Alibaba Cloud
+// Copyright (c) 2023 Ant Group
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#![warn(unused_extern_crates)]
-use anyhow::{anyhow, Result};
-use clap::{crate_name, crate_version, App, Arg};
-use slog::{error, info, Logger};
 use std::env;
 use std::io;
 use std::process::exit;
+
+use anyhow::{anyhow, Result};
+use clap::{crate_name, crate_version, App, Arg};
+use kata_trace_forwarder::client::{self, VsockTraceClient, VsockType};
+use kata_trace_forwarder::exporter;
+use kata_trace_forwarder::utils::{str_to_vsock_cid, str_to_vsock_port, VSOCK_CID_ANY_STR};
+use slog::{error, info, Logger};
 
 // Traces will be created using this program name
 const DEFAULT_TRACE_NAME: &str = "kata-agent";
@@ -25,16 +30,6 @@ const DEFAULT_KATA_VSOCK_TRACING_PORT: &str = "10240";
 
 const DEFAULT_JAEGER_HOST: &str = "127.0.0.1";
 const DEFAULT_JAEGER_PORT: &str = "6831";
-
-mod handler;
-mod server;
-mod tracer;
-mod utils;
-
-use crate::utils::{
-    make_hybrid_socket_path, str_to_vsock_cid, str_to_vsock_port, VSOCK_CID_ANY_STR,
-};
-use server::VsockType;
 
 fn announce(logger: &Logger, version: &str, dump_only: bool) {
     let commit = env::var("VERSION_COMMIT").map_or(String::new(), |s| s);
@@ -85,7 +80,7 @@ fn make_description_text() -> String {
     agent-specific socket. However, once the forwarder has started running, it
     drops privileges and will continue running as user {user:?}.
     "#,
-        user = server::NON_PRIV_USER
+        user = client::NON_PRIV_USER
     )
 }
 
@@ -116,9 +111,12 @@ fn make_examples_text(program_name: &str) -> String {
 }
 
 fn handle_hybrid_vsock(socket_path: &str, port: Option<&str>) -> Result<VsockType> {
-    let socket_path = make_hybrid_socket_path(socket_path, port, DEFAULT_KATA_VSOCK_TRACING_PORT)?;
+    let port = str_to_vsock_port(port, DEFAULT_KATA_VSOCK_TRACING_PORT)?;
 
-    let vsock = VsockType::Hybrid { socket_path };
+    let vsock = VsockType::Hybrid {
+        socket_path: socket_path.to_string(),
+        port,
+    };
 
     Ok(vsock)
 }
@@ -127,7 +125,10 @@ fn handle_standard_vsock(cid: Option<&str>, port: Option<&str>) -> Result<VsockT
     let cid = str_to_vsock_cid(cid)?;
     let port = str_to_vsock_port(port, DEFAULT_KATA_VSOCK_TRACING_PORT)?;
 
-    let vsock = VsockType::Standard { port, cid };
+    let vsock = VsockType::Standard {
+        context_id: cid,
+        port,
+    };
 
     Ok(vsock)
 }
@@ -260,16 +261,14 @@ fn real_main() -> Result<()> {
         return Err(anyhow!("Jaeger host cannot be blank"));
     }
 
-    let server = server::VsockTraceServer::new(
-        &logger,
-        vsock,
-        jaeger_host,
+    let exporter = exporter::create_jaeger_trace_exporter(
+        trace_name.to_string(),
+        jaeger_host.to_string(),
         jaeger_port,
-        trace_name,
-        dump_only,
-    );
+    )?;
+    let mut client = VsockTraceClient::new(vsock, &logger, dump_only, exporter);
 
-    let result = server.start();
+    let result = client.start();
 
     if result.is_err() {
         error!(logger, "failed"; "error" => format!("{:?}", result.err()));
@@ -291,8 +290,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_result;
-    use utils::{
+    use kata_trace_forwarder::assert_result;
+    use kata_trace_forwarder::utils::{
         ERR_HVSOCK_SOC_PATH_EMPTY, ERR_VSOCK_CID_EMPTY, ERR_VSOCK_CID_NOT_NUMERIC,
         ERR_VSOCK_PORT_EMPTY, ERR_VSOCK_PORT_NOT_NUMERIC, ERR_VSOCK_PORT_ZERO, VSOCK_CID_ANY,
     };

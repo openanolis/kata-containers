@@ -46,30 +46,6 @@ macro_rules! assert_result {
     };
 }
 
-// Create a Hybrid VSOCK path from the specified socket, appending either
-// the user specified port or the default port.
-pub fn make_hybrid_socket_path(
-    socket_path: &str,
-    user_port: Option<&str>,
-    default_port: &str,
-) -> Result<String> {
-    if socket_path.is_empty() {
-        return Err(anyhow!(ERR_HVSOCK_SOC_PATH_EMPTY));
-    }
-
-    let port_str = if let Some(user_port) = user_port {
-        user_port
-    } else {
-        default_port
-    };
-
-    let port = port_str_to_port(port_str)?;
-
-    let full_path = format!("{}_{}", socket_path, port);
-
-    Ok(full_path)
-}
-
 // Convert a string to a VSOCK CID value.
 pub fn str_to_vsock_cid(cid: Option<&str>) -> Result<u32> {
     let cid_str = if let Some(cid) = cid {

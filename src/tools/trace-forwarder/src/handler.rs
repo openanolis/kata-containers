@@ -1,16 +1,20 @@
 // Copyright (c) 2020-2021 Intel Corporation
+// Copyright (c) 2023 Alibaba Cloud
+// Copyright (c) 2023 Ant Group
 //
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use anyhow::{anyhow, Context, Result};
-use byteorder::{ByteOrder, NetworkEndian};
-use futures::executor::block_on;
-use opentelemetry::sdk::export::trace::{SpanData, SpanExporter};
-use slog::{debug, info, o, Logger};
-use std::fs::File;
 use std::io::{ErrorKind, Read};
-use std::os::unix::io::{FromRawFd, RawFd};
+use std::os::unix::net::UnixStream;
+
+use anyhow::{anyhow, Context, Result};
+use byteorder::ByteOrder;
+use byteorder::NetworkEndian;
+use futures::executor::block_on;
+use opentelemetry::sdk::export::trace::SpanData;
+use opentelemetry::sdk::export::trace::SpanExporter;
+use slog::{debug, info, o, Logger};
 
 // The VSOCK "packet" protocol used comprises two elements:
 //
@@ -25,12 +29,8 @@ use std::os::unix::io::{FromRawFd, RawFd};
 // vsock-exporter.
 const HEADER_SIZE_BYTES: u64 = std::mem::size_of::<u64>() as u64;
 
-fn mk_io_err(msg: &str) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, msg.to_string())
-}
-
 async fn handle_async_connection<'a>(
-    logger: Logger,
+    logger: &Logger,
     mut conn: &'a mut dyn Read,
     exporter: &'a mut dyn SpanExporter,
     dump_only: bool,
@@ -41,7 +41,7 @@ async fn handle_async_connection<'a>(
 
     handle_trace_data(logger.clone(), &mut conn, exporter, dump_only)
         .await
-        .map_err(|e| mk_io_err(&format!("failed to handle data: {:}", e)))?;
+        .context("handle trace data")?;
 
     debug!(&logger, "handled connection");
 
@@ -106,14 +106,12 @@ async fn handle_trace_data<'a>(
 }
 
 pub fn handle_connection(
-    logger: Logger,
-    fd: RawFd,
+    logger: &Logger,
+    stream: &mut UnixStream,
     exporter: &mut dyn SpanExporter,
     dump_only: bool,
 ) -> Result<()> {
-    let mut file = unsafe { File::from_raw_fd(fd) };
-
-    let conn = handle_async_connection(logger, &mut file, exporter, dump_only);
+    let conn = handle_async_connection(logger, stream, exporter, dump_only);
 
     block_on(conn)?;
 
