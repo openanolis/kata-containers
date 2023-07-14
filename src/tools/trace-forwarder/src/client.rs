@@ -12,13 +12,13 @@ use std::thread::{self};
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use opentelemetry_jaeger::Exporter;
 use privdrop::PrivDrop;
 use slog::Logger;
 use slog::{debug, info, o};
 use vsock::VsockStream;
 
 use super::handler;
+use crate::handler::SpanHandler;
 
 const DEFAULT_RETRY_TIMES: u32 = 150;
 const DEFAULT_KATA_AGENT_VSOCK_TIMEOUT: u64 = 5; // 5 second
@@ -39,44 +39,51 @@ pub enum VsockType {
 pub struct VsockTraceClient {
     pub vsock: VsockType,
 
-    pub exporter: Exporter,
+    pub span_handler: SpanHandler,
 
     pub logger: Logger,
     pub dump_only: bool,
 }
 
 impl VsockTraceClient {
-    pub fn new(vsock: VsockType, logger: &Logger, dump_only: bool, exporter: Exporter) -> Self {
+    pub fn new(
+        vsock: VsockType,
+        logger: &Logger,
+        dump_only: bool,
+        span_handler: SpanHandler,
+    ) -> Self {
         let logger = logger.new(o!("subsystem" => "client"));
 
         VsockTraceClient {
             vsock,
-            exporter,
+            span_handler,
             logger,
             dump_only,
         }
     }
 
-    pub fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
         let mut stream = connect_vsock(
             &self.logger,
             &self.vsock,
             DEFAULT_KATA_AGENT_VSOCK_TIMEOUT,
             DEFAULT_RETRY_TIMES,
         )
+        .await
         .context("connect vsock")?;
 
         // handle stream
         handler::handle_connection(
             &self.logger,
             &mut stream,
-            &mut self.exporter,
+            &mut self.span_handler,
             self.dump_only,
         )
+        .await
     }
 }
 
-pub fn connect_vsock(
+pub async fn connect_vsock(
     logger: &Logger,
     vsock: &VsockType,
     timeout: u64,
@@ -84,7 +91,7 @@ pub fn connect_vsock(
 ) -> Result<UnixStream> {
     match vsock.clone() {
         VsockType::Standard { context_id, port } => {
-            connect_standard_vsock(logger, context_id, port, retry_times)
+            connect_standard_vsock(logger, context_id, port, retry_times).await
         }
         VsockType::Hybrid { socket_path, port } => {
             let logger_priv = logger
@@ -97,6 +104,7 @@ pub fn connect_vsock(
 
             let stream =
                 connect_hybrid_vsock(logger, socket_path.as_str(), port, timeout, retry_times)
+                    .await
                     .context("connect hybrid vsock")?;
 
             // Having connect to the hvsock, drop privileges
@@ -106,7 +114,7 @@ pub fn connect_vsock(
     }
 }
 
-fn connect_standard_vsock(
+async fn connect_standard_vsock(
     logger: &Logger,
     cid: u32,
     port: u32,
@@ -140,7 +148,7 @@ fn connect_standard_vsock(
     ))
 }
 
-fn connect_hybrid_vsock(
+async fn connect_hybrid_vsock(
     logger: &Logger,
     socket_path: &str,
     port: u32,

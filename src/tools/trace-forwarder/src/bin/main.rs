@@ -7,12 +7,12 @@
 
 use std::env;
 use std::io;
-use std::process::exit;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{crate_name, crate_version, App, Arg};
 use kata_trace_forwarder::client::{self, VsockTraceClient, VsockType};
 use kata_trace_forwarder::exporter;
+use kata_trace_forwarder::handler::SpanHandler;
 use kata_trace_forwarder::utils::{str_to_vsock_cid, str_to_vsock_port, VSOCK_CID_ANY_STR};
 use slog::{error, info, Logger};
 
@@ -133,7 +133,7 @@ fn handle_standard_vsock(cid: Option<&str>, port: Option<&str>) -> Result<VsockT
     Ok(vsock)
 }
 
-fn real_main() -> Result<()> {
+async fn real_main() -> Result<()> {
     let version = crate_version!();
     let name = crate_name!();
 
@@ -266,9 +266,10 @@ fn real_main() -> Result<()> {
         jaeger_host.to_string(),
         jaeger_port,
     )?;
-    let mut client = VsockTraceClient::new(vsock, &logger, dump_only, exporter);
+    let mut client =
+        VsockTraceClient::new(vsock, &logger, dump_only, SpanHandler::Exporter(exporter));
 
-    let result = client.start();
+    let result = client.start().await;
 
     if result.is_err() {
         error!(logger, "failed"; "error" => format!("{:?}", result.err()));
@@ -279,12 +280,16 @@ fn real_main() -> Result<()> {
     Ok(())
 }
 
-fn main() {
-    if let Err(e) = real_main() {
+fn main() -> Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("new tokio runtime")?;
+    if let Err(e) = rt.block_on(real_main()) {
         eprintln!("ERROR: {:#?}", e);
-        exit(1);
     }
-    exit(0);
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -362,7 +367,7 @@ mod tests {
                 cid: None,
                 port: None,
                 result: Ok(VsockType::Standard {
-                    cid: VSOCK_CID_ANY,
+                    context_id: VSOCK_CID_ANY,
                     port: DEFAULT_KATA_VSOCK_TRACING_PORT.parse::<u32>().unwrap(),
                 }),
             },
@@ -395,7 +400,7 @@ mod tests {
                 cid: Some("1"),
                 port: None,
                 result: Ok(VsockType::Standard {
-                    cid: 1,
+                    context_id: 1,
                     port: DEFAULT_KATA_VSOCK_TRACING_PORT.parse::<u32>().unwrap(),
                 }),
             },
@@ -403,7 +408,7 @@ mod tests {
                 cid: Some("123"),
                 port: Some("999"),
                 result: Ok(VsockType::Standard {
-                    cid: 123,
+                    context_id: 123,
                     port: 999,
                 }),
             },
@@ -411,7 +416,7 @@ mod tests {
                 cid: Some(VSOCK_CID_ANY_STR),
                 port: Some("999"),
                 result: Ok(VsockType::Standard {
-                    cid: VSOCK_CID_ANY,
+                    context_id: VSOCK_CID_ANY,
                     port: 999,
                 }),
             },

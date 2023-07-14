@@ -6,14 +6,14 @@
 //
 
 use std::io::{ErrorKind, Read};
-use std::os::unix::net::UnixStream;
 
 use anyhow::{anyhow, Context, Result};
 use byteorder::ByteOrder;
 use byteorder::NetworkEndian;
-use futures::executor::block_on;
 use opentelemetry::sdk::export::trace::SpanData;
 use opentelemetry::sdk::export::trace::SpanExporter;
+use opentelemetry::sdk::trace::Tracer;
+use opentelemetry_jaeger::Exporter;
 use slog::{debug, info, o, Logger};
 
 // The VSOCK "packet" protocol used comprises two elements:
@@ -29,17 +29,23 @@ use slog::{debug, info, o, Logger};
 // vsock-exporter.
 const HEADER_SIZE_BYTES: u64 = std::mem::size_of::<u64>() as u64;
 
-async fn handle_async_connection<'a>(
+#[derive(Debug)]
+pub enum SpanHandler {
+    Exporter(Exporter),
+    Tracer(Tracer),
+}
+
+pub async fn handle_connection<'a>(
     logger: &Logger,
     mut conn: &'a mut dyn Read,
-    exporter: &'a mut dyn SpanExporter,
+    span_handler: &mut SpanHandler,
     dump_only: bool,
 ) -> Result<()> {
     let logger = logger.new(o!("subsystem" => "handler"));
 
     debug!(logger, "handling connection");
 
-    handle_trace_data(logger.clone(), &mut conn, exporter, dump_only)
+    handle_trace_data(logger.clone(), &mut conn, span_handler, dump_only)
         .await
         .context("handle trace data")?;
 
@@ -51,7 +57,7 @@ async fn handle_async_connection<'a>(
 async fn handle_trace_data<'a>(
     logger: Logger,
     reader: &'a mut dyn Read,
-    exporter: &'a mut dyn SpanExporter,
+    span_handler: &mut SpanHandler,
     dump_only: bool,
 ) -> Result<()> {
     loop {
@@ -89,15 +95,9 @@ async fn handle_trace_data<'a>(
         if dump_only {
             debug!(logger, "dump-only: {:?}", span_data);
         } else {
-            let batch = vec![span_data];
-
-            // Call low-level Jaeger exporter to send the trace span immediately.
-            let result = exporter.export(batch).await;
-
-            if result.is_err() {
-                return Err(anyhow!("failed to export trace spans: {:?}", result));
-            }
-
+            export_trace_data(span_handler, span_data)
+                .await
+                .context("export trace data")?;
             debug!(logger, "exported trace spans");
         }
     }
@@ -105,15 +105,23 @@ async fn handle_trace_data<'a>(
     Ok(())
 }
 
-pub fn handle_connection(
-    logger: &Logger,
-    stream: &mut UnixStream,
-    exporter: &mut dyn SpanExporter,
-    dump_only: bool,
-) -> Result<()> {
-    let conn = handle_async_connection(logger, stream, exporter, dump_only);
+async fn export_trace_data(span_handler: &mut SpanHandler, span_data: SpanData) -> Result<()> {
+    match span_handler {
+        SpanHandler::Exporter(exporter) => {
+            // Call low-level Jaeger exporter to send the trace span immediately.
+            let batch = vec![span_data];
+            exporter.export(batch).await.context("export trace span")
+        }
+        SpanHandler::Tracer(tracer) => {
+            // Use tracer's processor to expand trace data.
+            if let Some(provider) = tracer.provider() {
+                let processors = provider.span_processors().iter().peekable();
 
-    block_on(conn)?;
-
-    Ok(())
+                for processor in processors {
+                    processor.on_end(span_data.clone());
+                }
+            }
+            Ok(())
+        }
+    }
 }
