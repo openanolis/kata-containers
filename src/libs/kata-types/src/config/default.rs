@@ -23,6 +23,7 @@ lazy_static! {
 pub const DEFAULT_AGENT_NAME: &str = "kata-agent";
 pub const DEFAULT_AGENT_VSOCK_PORT: u32 = 1024;
 pub const DEFAULT_AGENT_LOG_PORT: u32 = 1025;
+pub const DEFAULT_AGENT_TRACE_PORT: u32 = 10240;
 pub const DEFAULT_AGENT_DBG_CONSOLE_PORT: u32 = 1026;
 pub const DEFAULT_AGENT_TYPE_NAME: &str = AGENT_NAME_KATA;
 pub const DEFAULT_AGENT_DIAL_TIMEOUT_MS: u32 = 10;

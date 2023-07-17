@@ -12,6 +12,8 @@ logging::logger_with_subsystem!(sl, "agent");
 pub mod kata;
 mod log_forwarder;
 mod sock;
+mod trace_forwarder;
+pub use trace_forwarder::init_agent_tracer;
 pub mod types;
 pub use types::{
     ARPNeighbor, ARPNeighbors, AddArpNeighborRequest, BlkioStatsEntry, CheckRequest,

@@ -31,6 +31,9 @@ const DEFAULT_KATA_VSOCK_TRACING_PORT: &str = "10240";
 const DEFAULT_JAEGER_HOST: &str = "127.0.0.1";
 const DEFAULT_JAEGER_PORT: &str = "6831";
 
+const DEFAULT_KATA_AGENT_VSOCK_DIAL_RETRY_TIMES: u32 = 150;
+const DEFAULT_KATA_AGENT_VSOCK_DIAL_TIMEOUT: u64 = 5; // 5 second
+
 fn announce(logger: &Logger, version: &str, dump_only: bool) {
     let commit = env::var("VERSION_COMMIT").map_or(String::new(), |s| s);
 
@@ -269,7 +272,12 @@ async fn real_main() -> Result<()> {
     let mut client =
         VsockTraceClient::new(vsock, &logger, dump_only, SpanHandler::Exporter(exporter));
 
-    let result = client.start().await;
+    let result = client
+        .start(
+            DEFAULT_KATA_AGENT_VSOCK_DIAL_TIMEOUT,
+            DEFAULT_KATA_AGENT_VSOCK_DIAL_RETRY_TIMES,
+        )
+        .await;
 
     if result.is_err() {
         error!(logger, "failed"; "error" => format!("{:?}", result.err()));

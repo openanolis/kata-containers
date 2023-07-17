@@ -101,7 +101,7 @@ impl RuntimeHandlerManagerInner {
                 &config.runtime.jaeger_endpoint,
                 &config.runtime.jaeger_user,
                 &config.runtime.jaeger_password,
-            ) {
+            ).await {
                 warn!(sl!(), "failed to setup tracing, {:?}", e);
             }
         }

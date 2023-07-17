@@ -25,7 +25,7 @@ pub fn create_jaeger_trace_exporter(
         .with_service_name(jaeger_service_name)
         .with_agent_endpoint(socket_addr.to_string())
         .with_tags(vec![KeyValue::new("exporter", exporter_type)])
-        .init_exporter()
+        .init_sync_exporter()
         .context("create exporter")?;
 
     Ok(exporter)

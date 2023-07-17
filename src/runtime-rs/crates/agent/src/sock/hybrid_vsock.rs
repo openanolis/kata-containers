@@ -17,8 +17,8 @@ use super::{ConnectConfig, Sock, Stream};
 
 #[derive(Debug, PartialEq)]
 pub struct HybridVsock {
-    uds: String,
-    port: u32,
+    pub uds: String,
+    pub port: u32,
 }
 
 impl HybridVsock {

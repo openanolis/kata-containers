@@ -12,8 +12,8 @@ use byteorder::ByteOrder;
 use byteorder::NetworkEndian;
 use opentelemetry::sdk::export::trace::SpanData;
 use opentelemetry::sdk::export::trace::SpanExporter;
-use opentelemetry::sdk::trace::Tracer;
 use opentelemetry_jaeger::Exporter;
+use opentelemetry::sdk::trace::Tracer;
 use slog::{debug, info, o, Logger};
 
 // The VSOCK "packet" protocol used comprises two elements:
@@ -37,7 +37,7 @@ pub enum SpanHandler {
 
 pub async fn handle_connection<'a>(
     logger: &Logger,
-    mut conn: &'a mut dyn Read,
+    mut conn: &'a mut (dyn Read + Send),
     span_handler: &mut SpanHandler,
     dump_only: bool,
 ) -> Result<()> {
@@ -56,7 +56,7 @@ pub async fn handle_connection<'a>(
 
 async fn handle_trace_data<'a>(
     logger: Logger,
-    reader: &'a mut dyn Read,
+    reader: &'a mut (dyn Read + Send),
     span_handler: &mut SpanHandler,
     dump_only: bool,
 ) -> Result<()> {

@@ -10,7 +10,7 @@ use crate::config::{ConfigOps, TomlConfig};
 pub use vendor::AgentVendor;
 
 use super::default::{
-    DEFAULT_AGENT_DIAL_TIMEOUT_MS, DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT,
+    DEFAULT_AGENT_DIAL_TIMEOUT_MS, DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT, DEFAULT_AGENT_TRACE_PORT,
 };
 use crate::eother;
 
@@ -48,6 +48,10 @@ pub struct Agent {
     /// Agent log port
     #[serde(default = "default_log_port")]
     pub log_port: u32,
+
+    /// Agent trace port
+    #[serde(default = "default_trace_port")]
+    pub trace_port: u32,
 
     /// Agent connection dialing timeout value in millisecond
     #[serde(default = "default_dial_timeout")]
@@ -92,6 +96,7 @@ impl std::default::Default for Agent {
             debug_console_enabled: false,
             server_port: DEFAULT_AGENT_VSOCK_PORT,
             log_port: DEFAULT_AGENT_LOG_PORT,
+            trace_port: DEFAULT_AGENT_TRACE_PORT,
             dial_timeout_ms: DEFAULT_AGENT_DIAL_TIMEOUT_MS,
             reconnect_timeout_ms: 3_000,
             request_timeout_ms: 30_000,
@@ -108,6 +113,10 @@ fn default_server_port() -> u32 {
 
 fn default_log_port() -> u32 {
     DEFAULT_AGENT_LOG_PORT
+}
+
+fn default_trace_port() -> u32 {
+    DEFAULT_AGENT_TRACE_PORT
 }
 
 fn default_dial_timeout() -> u32 {

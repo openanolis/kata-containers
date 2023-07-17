@@ -69,7 +69,7 @@ impl KataTracer {
     /// inside KATA_TRACER.
     ///
     /// Note that the span will be noop(not collected) if a invalid subscriber is set
-    pub fn trace_setup(
+    pub async fn trace_setup(
         &mut self,
         sid: &str,
         jaeger_endpoint: &str,
@@ -80,15 +80,14 @@ impl KataTracer {
         let endpoint = verify_jaeger_config(jaeger_endpoint, jaeger_username, jaeger_password)?;
 
         // derive a subscriber to collect span info
-        let tracer = opentelemetry_jaeger::new_collector_pipeline()
+        let tracer = opentelemetry_jaeger::new_pipeline() 
             .with_service_name(format!("kata-sb-{}", &sid[0..min(8, sid.len())]))
-            .with_endpoint(endpoint)
-            .with_username(jaeger_username)
-            .with_password(jaeger_password)
-            .with_hyper()
+            .with_agent_endpoint(endpoint)
+            .with_collector_username(jaeger_username)
+            .with_collector_password(jaeger_password)
             .install_batch(Tokio)?;
 
-        let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        let layer = tracing_opentelemetry::layer().with_tracer(tracer.clone());
 
         let sub = Registry::default().with(layer);
 
@@ -100,6 +99,9 @@ impl KataTracer {
 
         // enter the rootspan
         self.trace_enter_root();
+
+        // init agent tracer
+        agent::init_agent_tracer(tracer).await?;
 
         // modity the enable state, note that we have successfully enable tracing
         self.enable();

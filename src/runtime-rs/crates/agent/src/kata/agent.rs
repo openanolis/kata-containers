@@ -34,12 +34,16 @@ impl AgentManager for KataAgent {
             .context("connect agent server")?;
         self.start_log_forwarder()
             .await
-            .context("connect log forwarder")?;
+            .context("start log forwarder")?;
+        self.start_trace_forwarder()
+            .await
+            .context("start trace forwarder")?;
         Ok(())
     }
 
     async fn stop(&self) {
         self.stop_log_forwarder().await;
+        self.stop_trace_forwarder().await;
     }
 
     async fn agent_sock(&self) -> Result<String> {

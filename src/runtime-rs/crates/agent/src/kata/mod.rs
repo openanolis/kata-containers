@@ -18,7 +18,7 @@ use protocols::{agent_ttrpc_async as agent_ttrpc, health_ttrpc_async as health_t
 use tokio::sync::RwLock;
 use ttrpc::asynchronous::Client;
 
-use crate::{log_forwarder::LogForwarder, sock};
+use crate::{log_forwarder::LogForwarder, sock, trace_forwarder::TraceForwarder};
 
 // https://github.com/firecracker-microvm/firecracker/blob/master/docs/vsock.md
 #[derive(Debug, Default)]
@@ -42,6 +42,9 @@ pub(crate) struct KataAgentInner {
 
     /// Log forwarder
     log_forwarder: LogForwarder,
+
+    /// Trace forwarder
+    trace_forwarder: TraceForwarder,
 }
 
 impl std::fmt::Debug for KataAgentInner {
@@ -70,6 +73,7 @@ impl KataAgent {
                 socket_address: "".to_string(),
                 config,
                 log_forwarder: LogForwarder::new(),
+                trace_forwarder: TraceForwarder::new(),
             })),
         }
     }
@@ -139,6 +143,27 @@ impl KataAgent {
     pub(crate) async fn stop_log_forwarder(&self) {
         let mut inner = self.inner.write().await;
         inner.log_forwarder.stop();
+    }
+
+    pub(crate) async fn start_trace_forwarder(&self) -> Result<()> {
+        let mut inner = self.inner.write().await;
+        let config = sock::ConnectConfig::new(
+            inner.config.dial_timeout_ms as u64,
+            inner.config.reconnect_timeout_ms as u64,
+        );
+        let address = inner.socket_address.clone();
+        let port = inner.config.trace_port;
+        inner
+            .trace_forwarder
+            .start(&address, port, config)
+            .await
+            .context("start trace forwarder")?;
+        Ok(())
+    }
+
+    pub(crate) async fn stop_trace_forwarder(&self) {
+        let mut inner = self.inner.write().await;
+        inner.trace_forwarder.stop();
     }
 
     pub(crate) async fn agent_sock(&self) -> Result<String> {

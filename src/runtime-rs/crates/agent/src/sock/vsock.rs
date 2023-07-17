@@ -18,8 +18,8 @@ use super::{ConnectConfig, Sock, Stream};
 
 #[derive(Debug, PartialEq)]
 pub struct Vsock {
-    vsock_cid: u32,
-    port: u32,
+    pub vsock_cid: u32,
+    pub port: u32,
 }
 
 impl Vsock {

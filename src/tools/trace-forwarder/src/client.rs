@@ -20,9 +20,6 @@ use vsock::VsockStream;
 use super::handler;
 use crate::handler::SpanHandler;
 
-const DEFAULT_RETRY_TIMES: u32 = 150;
-const DEFAULT_KATA_AGENT_VSOCK_TIMEOUT: u64 = 5; // 5 second
-
 // Username that is assumed to exist, used when dropping root privileges
 // when running with Hybrid VSOCK.
 pub const NON_PRIV_USER: &str = "nobody";
@@ -62,15 +59,10 @@ impl VsockTraceClient {
         }
     }
 
-    pub async fn start(&mut self) -> Result<()> {
-        let mut stream = connect_vsock(
-            &self.logger,
-            &self.vsock,
-            DEFAULT_KATA_AGENT_VSOCK_TIMEOUT,
-            DEFAULT_RETRY_TIMES,
-        )
-        .await
-        .context("connect vsock")?;
+    pub async fn start(&mut self, dial_timeout_secs: u64, dial_retry_times: u32) -> Result<()> {
+        let mut stream = connect_vsock(&self.logger, &self.vsock, dial_timeout_secs, dial_retry_times)
+            .await
+            .context("connect vsock")?;
 
         // handle stream
         handler::handle_connection(
@@ -80,6 +72,9 @@ impl VsockTraceClient {
             self.dump_only,
         )
         .await
+        .context("handle connection")?;
+
+        Ok(())
     }
 }
 

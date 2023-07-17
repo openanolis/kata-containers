@@ -81,8 +81,8 @@ impl AsyncRead for Stream {
 /// Connect config
 #[derive(Debug)]
 pub struct ConnectConfig {
-    dial_timeout_ms: u64,
-    reconnect_timeout_ms: u64,
+    pub dial_timeout_ms: u64,
+    pub reconnect_timeout_ms: u64,
 }
 
 impl ConnectConfig {
@@ -95,7 +95,7 @@ impl ConnectConfig {
 }
 
 #[derive(Debug, PartialEq)]
-enum SockType {
+pub(crate) enum SockType {
     Vsock(Vsock),
     HybridVsock(HybridVsock),
 }
@@ -117,7 +117,7 @@ pub fn new(address: &str, port: u32) -> Result<Arc<dyn Sock>> {
     }
 }
 
-fn parse(address: &str, port: u32) -> Result<SockType> {
+pub(crate) fn parse(address: &str, port: u32) -> Result<SockType> {
     let url = Url::parse(address).context("parse url")?;
     match url.scheme() {
         VSOCK_SCHEME => {

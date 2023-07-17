@@ -342,7 +342,7 @@ dependencies = [
  "libc",
  "logging",
  "nix",
- "opentelemetry 0.14.0",
+ "opentelemetry",
  "opentelemetry-jaeger",
  "privdrop",
  "serde",
@@ -481,9 +481,9 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "opentelemetry"
-version = "0.14.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "492848ff47f11b7f9de0443b404e2c5775f695e1af6b7076ca25f999581d547a"
+checksum = "e1cf9b1c4e9a6c4de793c632496fa490bdc0e1eea73f0c91394f7b6990935d22"
 dependencies = [
  "async-trait",
  "crossbeam-channel",
@@ -498,33 +498,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry"
-version = "0.16.0"
+name = "opentelemetry-jaeger"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1cf9b1c4e9a6c4de793c632496fa490bdc0e1eea73f0c91394f7b6990935d22"
+checksum = "db22f492873ea037bc267b35a0e8e4fb846340058cb7c864efe3d0bf23684593"
 dependencies = [
  "async-trait",
- "crossbeam-channel",
- "futures",
- "js-sys",
  "lazy_static",
- "percent-encoding",
- "pin-project",
- "rand",
+ "opentelemetry",
+ "opentelemetry-semantic-conventions",
  "thiserror",
+ "thrift",
 ]
 
 [[package]]
-name = "opentelemetry-jaeger"
-version = "0.13.0"
+name = "opentelemetry-semantic-conventions"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fd9ed34f208e0394bfb17522ba0d890925685dfd883147670ed474339d4647"
+checksum = "ffeac823339e8b0f27b961f4385057bf9f97f2863bc745bd015fd6091f2270e9"
 dependencies = [
- "async-trait",
- "lazy_static",
- "opentelemetry 0.14.0",
- "thiserror",
- "thrift",
+ "opentelemetry",
 ]
 
 [[package]]
@@ -1032,7 +1025,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ffbf13a0f8b054a4e59df3a173b818e9c6177c02789871f2073977fd0062076"
 dependencies = [
- "opentelemetry 0.16.0",
+ "opentelemetry",
  "tracing",
  "tracing-core",
  "tracing-log",
