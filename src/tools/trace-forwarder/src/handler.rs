@@ -49,8 +49,6 @@ pub async fn handle_connection<'a>(
         .await
         .context("handle trace data")?;
 
-    debug!(&logger, "handled connection");
-
     Ok(())
 }
 

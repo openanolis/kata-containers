@@ -338,7 +338,7 @@ func KataAgentKernelParams(config KataAgentConfig) []Param {
 	return params
 }
 
-func (k *kataAgent) handleTraceSettings(config KataAgentConfig) bool {
+func (k *kataAgent) handleTraceSettings(config KataAgentConfig, sid string) bool {
 	disableVMShutdown := false
 
 	if config.Trace {
@@ -359,7 +359,7 @@ func (k *kataAgent) init(ctx context.Context, sandbox *Sandbox, config KataAgent
 	span, _ := katatrace.Trace(ctx, k.Logger(), "init", kataAgentTracingTags)
 	defer span.End()
 
-	disableVMShutdown = k.handleTraceSettings(config)
+	disableVMShutdown = k.handleTraceSettings(config, sandbox.id)
 	k.keepConn = config.LongLiveConn
 	k.kmodules = config.KernelModules
 	k.dialTimout = config.DialTimeout
@@ -418,6 +418,7 @@ func (k *kataAgent) configure(ctx context.Context, h Hypervisor, id, sharePath s
 		if err = h.AddDevice(ctx, s, VSockPCIDev); err != nil {
 			return err
 		}
+		k.saveVsockContextId(ctx, id, config)
 	case types.HybridVSock:
 		err = h.AddDevice(ctx, s, HybridVirtioVsockDev)
 		if err != nil {
@@ -451,6 +452,26 @@ func (k *kataAgent) configure(ctx context.Context, h Hypervisor, id, sharePath s
 
 func (k *kataAgent) configureFromGrpc(ctx context.Context, h Hypervisor, id string, config KataAgentConfig) error {
 	return k.internalConfigure(ctx, h, id, config)
+}
+
+func (k *kataAgent) saveVsockContextId(ctx context.Context, id string, config KataAgentConfig) {
+	if config.Trace {
+		// For case of vsock, trace-forwarder need cid to connect to
+		// the server in kata-agent. We save this value in current pod's
+		// working directory.
+		if vsock, ok := k.vmSocket.(types.VSock); ok {
+			vsockFileName := fmt.Sprintf("/run/vc/sbs/%s/vsock", id)
+			vsockFile, err := os.OpenFile(vsockFileName, os.O_CREATE|os.O_RDWR, 0666)
+			if err != nil {
+				k.Logger().WithField("Create vsock info file:", vsockFileName).WithError(err)
+			}
+
+			defer vsockFile.Close()
+
+			vsockCidStr := fmt.Sprintf("context_id: %d\n", vsock.ContextID)
+			vsockFile.WriteString(vsockCidStr)
+		}
+	}
 }
 
 func (k *kataAgent) createSandbox(ctx context.Context, sandbox *Sandbox) error {

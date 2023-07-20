@@ -1104,7 +1104,7 @@ func TestKataAgentHandleTraceSettings(t *testing.T) {
 			Trace: d.trace,
 		}
 
-		disableVMShutdown := k.handleTraceSettings(config)
+		disableVMShutdown := k.handleTraceSettings(config, "foo")
 
 		if d.expectDisableVMShutdown {
 			assert.Truef(disableVMShutdown, "test %d (%+v)", i, d)
