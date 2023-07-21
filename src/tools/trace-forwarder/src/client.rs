@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write, Read};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::net::UnixStream;
 use std::thread::{self};
@@ -60,9 +60,20 @@ impl VsockTraceClient {
     }
 
     pub async fn start(&mut self, dial_timeout_secs: u64, dial_retry_times: u32) -> Result<()> {
-        let mut stream = connect_vsock(&self.logger, &self.vsock, dial_timeout_secs, dial_retry_times)
-            .await
-            .context("connect vsock")?;
+        let mut stream = connect_vsock(
+            &self.logger,
+            &self.vsock,
+            dial_timeout_secs,
+            dial_retry_times,
+        )
+        .await
+        .context("connect vsock")?;
+
+        // Debug code
+        // Bad UnixStream
+        // let mut buf: [u8; 8] = [0; 8];
+        // stream.read_exact(&mut buf).context("read stream")?;
+        // info!(&self.logger, "read stream buffer: {:?}", buf);
 
         // handle stream
         handler::handle_connection(
@@ -86,7 +97,15 @@ pub async fn connect_vsock(
 ) -> Result<UnixStream> {
     match vsock.clone() {
         VsockType::Standard { context_id, port } => {
-            connect_standard_vsock(logger, context_id, port, retry_times).await
+            let stream = connect_standard_vsock(logger, context_id, port, retry_times).await?;
+
+            // Debug code
+            // Bad VsockStream
+            // let mut buf: [u8; 8] = [0; 8];
+            // stream.read_exact(&mut buf).context("read stream")?;
+            // info!(logger, "read stream buffer: {:?}", buf);
+
+            Ok(stream)
         }
         VsockType::Hybrid { socket_path, port } => {
             let logger_priv = logger
@@ -125,7 +144,19 @@ async fn connect_standard_vsock(
                     port,
                     stream.as_raw_fd()
                 );
+
+                // Debug Code
+                // let mut buf: [u8; 8] = [0; 8];
+                // VsockStream ok
+                // stream.read_exact(&mut buf).context("read vsock stream")?;
+                // info!(logger, "read buffer {:?}", buf);
+
                 let stream = unsafe { UnixStream::from_raw_fd(stream.as_raw_fd()) };
+
+                // UnixStream ok
+                // stream.read_exact(&mut buf).context("read vsock stream")?;
+                // info!(logger, "read buffer {:?}", buf);
+
                 return Ok(stream);
             }
             Err(e) => {

@@ -12,8 +12,8 @@ use byteorder::ByteOrder;
 use byteorder::NetworkEndian;
 use opentelemetry::sdk::export::trace::SpanData;
 use opentelemetry::sdk::export::trace::SpanExporter;
-use opentelemetry_jaeger::Exporter;
 use opentelemetry::sdk::trace::Tracer;
+use opentelemetry_jaeger::Exporter;
 use slog::{debug, info, o, Logger};
 
 // The VSOCK "packet" protocol used comprises two elements:

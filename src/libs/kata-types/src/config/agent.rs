@@ -10,7 +10,8 @@ use crate::config::{ConfigOps, TomlConfig};
 pub use vendor::AgentVendor;
 
 use super::default::{
-    DEFAULT_AGENT_DIAL_TIMEOUT_MS, DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_VSOCK_PORT, DEFAULT_AGENT_TRACE_PORT,
+    DEFAULT_AGENT_DIAL_TIMEOUT_MS, DEFAULT_AGENT_LOG_PORT, DEFAULT_AGENT_TRACE_PORT,
+    DEFAULT_AGENT_VSOCK_PORT,
 };
 use crate::eother;
 
