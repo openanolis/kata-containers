@@ -30,6 +30,8 @@ pub enum AddressSpaceRegionType {
     DeviceMemory,
     /// DAX address region for virtio-fs/virtio-pmem.
     DAXMemory,
+    /// Memory for guest firmware
+    Firmware,
 }
 
 /// Struct to maintain configuration information about a guest address region.

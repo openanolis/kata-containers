@@ -74,6 +74,10 @@ impl AddressSpaceLayout {
                     return false;
                 }
             }
+            AddressSpaceRegionType::Firmware => {
+                // We should add Firmware address check in the future.
+                return true;
+            }
         }
 
         true
