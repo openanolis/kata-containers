@@ -420,6 +420,7 @@ impl FsDeviceMgr {
                 Box::new(handler),
                 epoll_mgr,
                 limiter,
+                false,
             )
             .map_err(FsDeviceError::CreateFsDevice)?,
         );

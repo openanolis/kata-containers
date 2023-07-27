@@ -44,16 +44,6 @@ mod defs {
     pub const MAX_PKT_BUF_SIZE: usize = 64 * 1024;
 
     pub mod uapi {
-        /// Virtio feature flags.
-        ///
-        /// Defined in `/include/uapi/linux/virtio_config.h`.
-        ///
-        /// The device processes available buffers in the same order in which
-        /// the device offers them.
-        pub const VIRTIO_F_IN_ORDER: usize = 35;
-        /// The device conforms to the virtio spec version 1.0.
-        pub const VIRTIO_F_VERSION_1: u32 = 32;
-
         /// Virtio vsock device ID.
         ///
         /// Defined in `include/uapi/linux/virtio_ids.h`.
@@ -329,6 +319,7 @@ mod tests {
                     Arc::new(defs::QUEUE_SIZES.to_vec()),
                     epoll_manager,
                     TestMuxer::new(),
+                    false,
                 )
                 .unwrap(),
             }
@@ -397,6 +388,7 @@ mod tests {
                     Arc::new(defs::QUEUE_SIZES.to_vec()),
                     EpollManager::default(),
                     TestMuxer::new(),
+                    false,
                 )
                 .unwrap(),
                 mem: Arc::new(self.mem.clone()),

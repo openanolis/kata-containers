@@ -367,6 +367,7 @@ impl VirtioNetDeviceMgr {
             epoll_mgr,
             rx_rate_limiter,
             tx_rate_limiter,
+            false,
         )?;
 
         Ok(Box::new(net_device))

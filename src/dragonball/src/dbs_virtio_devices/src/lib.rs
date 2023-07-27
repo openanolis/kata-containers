@@ -106,6 +106,17 @@ pub const TYPE_PMEM: u32 = 27;
 pub const VIRTIO_INTR_VRING: u32 = 0x01;
 /// Device configuration changed.
 pub const VIRTIO_INTR_CONFIG: u32 = 0x02;
+/// Virtio feature flags.
+///
+/// Defined in `/include/uapi/linux/virtio_config.h`.
+///
+/// The device processes available buffers in the same order in which
+/// the device offers them.
+pub const VIRTIO_F_IN_ORDER: usize = 35;
+/// The device conforms to the virtio spec version 1.0.
+pub const VIRTIO_F_VERSION_1: u32 = 32;
+/// The device can work behind
+pub const VIRTIO_F_IOMMU_PLATFORM: u32 = 33;
 
 /// Error code for VirtioDevice::activate().
 #[derive(Debug, thiserror::Error)]
