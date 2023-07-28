@@ -132,6 +132,28 @@ impl<T: InterruptManager> DeviceInterruptManager<T> {
         Ok(mgr)
     }
 
+    /// create interrupt group for ioapic
+    pub fn new_with_ioapic(intr_mgr: T) -> Result<Self> {
+        let mut mgr = DeviceInterruptManager {
+            mode: DeviceInterruptMode::Disabled,
+            activated: false,
+            current_idx: usize::MAX,
+            mode2idx: [usize::MAX; 5],
+            intr_mgr,
+            intr_groups: Vec::new(),
+            #[cfg(feature = "msi-irq")]
+            msi_config: Vec::new(),
+            device_id: None,
+        };
+        let group = mgr
+            .intr_mgr
+            .create_group(InterruptSourceType::MsiIrq, 0, 24)?;
+        mgr.resize_msi_config_space(group.len());
+        mgr.mode2idx[DeviceInterruptMode::GenericMsiIrq as usize] = mgr.intr_groups.len();
+        mgr.intr_groups.push(group);
+        Ok(mgr)
+    }
+
     /// Set device_id for MSI routing
     pub fn set_device_id(&mut self, device_id: Option<u32>) {
         self.device_id = device_id;
@@ -154,12 +176,16 @@ impl<T: InterruptManager> DeviceInterruptManager<T> {
             return Ok(());
         }
 
-        // Enter Legacy mode by default if Legacy mode is supported.
-        if self.mode == DeviceInterruptMode::Disabled
-            && self.mode2idx[DeviceInterruptMode::LegacyIrq as usize] != usize::MAX
-        {
-            self.set_working_mode(DeviceInterruptMode::LegacyIrq)?;
+        if self.mode == DeviceInterruptMode::Disabled {
+            if self.mode2idx[DeviceInterruptMode::LegacyIrq as usize] != usize::MAX {
+                // Enter Legacy mode by default if Legacy mode is supported.
+                self.set_working_mode(DeviceInterruptMode::LegacyIrq)?;
+            } else if self.mode2idx[DeviceInterruptMode::GenericMsiIrq as usize] != usize::MAX {
+                // Enter Generic Msi Irq mode if Legacy mode not supported & Generic Msi enabled
+                self.set_working_mode(DeviceInterruptMode::GenericMsiIrq)?;
+            }
         }
+
         if self.mode == DeviceInterruptMode::Disabled {
             return Err(Error::from_raw_os_error(libc::EINVAL));
         }

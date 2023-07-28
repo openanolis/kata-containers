@@ -34,6 +34,10 @@ use super::*;
 use legacy_irq::LegacyIrq;
 #[cfg(feature = "kvm-msi-irq")]
 use msi_irq::MsiIrq;
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+pub(crate) mod userspace_legacy_irq;
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+use self::userspace_legacy_irq::UserspaceLegacyIrq;
 
 #[cfg(feature = "kvm-legacy-irq")]
 mod legacy_irq;
@@ -71,6 +75,8 @@ impl KvmIrqManager {
                 groups: HashMap::new(),
                 routes: Arc::new(KvmIrqRouting::new(vmfd)),
                 max_msi_irqs: DEFAULT_MAX_MSI_IRQS_PER_DEVICE,
+                #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+                ioapic: None,
             }),
         }
     }
@@ -80,6 +86,21 @@ impl KvmIrqManager {
         // Safe to unwrap because there's no legal way to break the mutex.
         let mgr = self.mgr.lock().unwrap();
         mgr.initialize()
+    }
+
+    /// Prepare the interrupt manager for generating interrupts into the target VM.
+    /// Using this initialize function when using KVM_SPLIT_IRQ_CHIPS & userspace emulated IOAPIC.
+    ///
+    /// # Arguments
+    /// * 'ioapic' : userspace emulated IOAPIC device.
+    #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+    pub fn initialize_with_userspace_ioapic(
+        &self,
+        ioapic: Arc<dyn InterruptController>,
+    ) -> Result<()> {
+        // Safe to unwrap because there's no legal way to break the mutex.
+        let mut mgr = self.mgr.lock().unwrap();
+        mgr.initialize_with_userspace_ioapic(ioapic)
     }
 
     /// Set maximum supported MSI interrupts per device.
@@ -113,11 +134,22 @@ struct KvmIrqManagerObj {
     routes: Arc<KvmIrqRouting>,
     groups: HashMap<InterruptIndex, Arc<Box<dyn InterruptSourceGroup>>>,
     max_msi_irqs: InterruptIndex,
+    #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+    ioapic: Option<Arc<dyn InterruptController>>,
 }
 
 impl KvmIrqManagerObj {
     fn initialize(&self) -> Result<()> {
         self.routes.initialize()?;
+        Ok(())
+    }
+
+    #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+    pub fn initialize_with_userspace_ioapic(
+        &mut self,
+        ioapic: Arc<dyn InterruptController>,
+    ) -> Result<()> {
+        self.ioapic = Some(ioapic);
         Ok(())
     }
 
@@ -130,12 +162,30 @@ impl KvmIrqManagerObj {
         #[allow(unreachable_patterns)]
         let group: Arc<Box<dyn InterruptSourceGroup>> = match ty {
             #[cfg(feature = "kvm-legacy-irq")]
-            InterruptSourceType::LegacyIrq => Arc::new(Box::new(LegacyIrq::new(
-                base,
-                count,
-                self.vmfd.clone(),
-                self.routes.clone(),
-            )?)),
+            InterruptSourceType::LegacyIrq => {
+                #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+                if self.ioapic.is_some() {
+                    Arc::new(Box::new(UserspaceLegacyIrq::new(
+                        Arc::clone(self.ioapic.as_ref().unwrap()),
+                        base,
+                        count,
+                    )?))
+                } else {
+                    Arc::new(Box::new(LegacyIrq::new(
+                        base,
+                        count,
+                        self.vmfd.clone(),
+                        self.routes.clone(),
+                    )?))
+                }
+                #[cfg(not(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic")))]
+                Arc::new(Box::new(LegacyIrq::new(
+                    base,
+                    count,
+                    self.vmfd.clone(),
+                    self.routes.clone(),
+                )?))
+            }
             #[cfg(feature = "kvm-msi-irq")]
             InterruptSourceType::MsiIrq => Arc::new(Box::new(MsiIrq::new(
                 base,

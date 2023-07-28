@@ -71,6 +71,9 @@ pub mod kvm;
 #[cfg(feature = "kvm-irq")]
 pub use self::kvm::KvmIrqManager;
 
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+pub mod ioapic;
+
 /// Reuse std::io::Result to simplify interoperability among crates.
 pub type Result<T> = std::io::Result<T>;
 
@@ -242,3 +245,27 @@ pub trait InterruptSourceGroup: Send + Sync {
         false
     }
 }
+
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+/// Trait for support interrupt controller
+pub trait InterruptController: Send + Sync + Downcast {
+    /// Service irq from pins
+    fn service_irq(&self, irq: usize) -> Result<()>;
+    /// Get Irqfd
+    fn notifier(&self, irq: usize) -> Result<EventFd>;
+    /// Irq mask
+    fn mask(&self, irq: usize) -> Result<()>;
+    /// Irq unmask
+    fn unmask(&self, irq: usize) -> Result<()>;
+    /// End of interrupt
+    fn end_of_interrupt(&self, vector: u8) -> Result<()>;
+    /// enable irq
+    fn enable_irq(&self, irq: usize) -> Result<()>;
+    /// disable irq
+    fn disable_irq(&self, irq: usize) -> Result<()>;
+    /// update irq
+    fn update_irq(&self, irq: usize) -> Result<()>;
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+impl_downcast!(InterruptController);
