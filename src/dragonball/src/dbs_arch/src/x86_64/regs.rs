@@ -79,6 +79,7 @@ pub fn setup_msrs(vcpu: &VcpuFd) -> Result<()> {
     let kvm_msrs =
         Msrs::from_entries(&entry_vec).map_err(|_| Error::SetModelSpecificRegistersCount)?;
 
+    #[cfg(not(feature = "tdx"))]
     vcpu.set_msrs(&kvm_msrs)
         .map_err(Error::SetModelSpecificRegisters)
         .and_then(|msrs_written| {
@@ -88,6 +89,11 @@ pub fn setup_msrs(vcpu: &VcpuFd) -> Result<()> {
                 Ok(msrs_written)
             }
         })?;
+
+    #[cfg(feature = "tdx")]
+    vcpu.set_msrs(&kvm_msrs)
+        .map_err(Error::SetModelSpecificRegisters)?;
+
     Ok(())
 }
 

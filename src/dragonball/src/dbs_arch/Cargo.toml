@@ -24,3 +24,6 @@ vm-memory = { version = "0.9", features = ["backend-mmap"] }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[features]
+tdx = []
