@@ -30,6 +30,8 @@ pub struct BootSourceConfig {
     /// The boot arguments to pass to the kernel.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_args: Option<String>,
+    /// Path of the fimrware image.
+    pub fimrware_image_path: Option<String>,
 }
 
 /// Errors associated with actions on `BootSourceConfig`.
@@ -52,4 +54,18 @@ pub enum BootSourceConfigError {
     /// The boot source cannot be update post boot.
     #[error("the update operation is not allowed after boot")]
     UpdateNotAllowedPostBoot,
+
+    /// The fimrware file cannot be opened.
+    #[error(
+        "the fimrware file cannot be opened due to invalid fimrware path or invalid permissions: {0}"
+    )]
+    InvalidTdshimPath(#[source] std::io::Error),
+
+    /// The fimrware file is unexpected.
+    #[error("the fimrware file is only expected for TDX instances")]
+    UnexpectedTdshimPath,
+
+    /// The fimrware file is expected.
+    #[error("the fimrware file is expected for TDX instances")]
+    MissingTdshimPath,
 }

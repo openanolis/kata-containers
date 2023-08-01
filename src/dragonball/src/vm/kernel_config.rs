@@ -11,6 +11,10 @@ pub struct KernelConfigInfo {
     initrd_file: Option<File>,
     /// The commandline for guest kernel.
     cmdline: linux_loader::cmdline::Cmdline,
+    /// The descriptor to the fimrware file.
+    pub fimrware_file: Option<File>,
+    /// Tdshim image path
+    pub(crate) fimrware_image_path: Option<String>,
 }
 
 impl KernelConfigInfo {
@@ -19,12 +23,26 @@ impl KernelConfigInfo {
         kernel_file: File,
         initrd_file: Option<File>,
         cmdline: linux_loader::cmdline::Cmdline,
+        fimrware_file: Option<File>,
+        fimrware_image_path: Option<String>,
     ) -> Self {
         KernelConfigInfo {
             kernel_file,
             initrd_file,
             cmdline,
+            fimrware_file,
+            fimrware_image_path,
         }
+    }
+
+    /// Get a reference to the fimrware file.
+    pub fn fimrware_file(&self) -> Option<&File> {
+        self.fimrware_file.as_ref()
+    }
+
+    /// Get a mutable reference to the fimrware file.
+    pub fn fimrware_file_mut(&mut self) -> Option<&mut File> {
+        self.fimrware_file.as_mut()
     }
 
     /// Get a mutable reference to the kernel file.
@@ -64,7 +82,13 @@ mod tests {
         let initrd = TempFile::new().unwrap();
         let mut cmdline = linux_loader::cmdline::Cmdline::new(1024);
         cmdline.insert_str("ro").unwrap();
-        let mut info = KernelConfigInfo::new(kernel.into_file(), Some(initrd.into_file()), cmdline);
+        let mut info = KernelConfigInfo::new(
+            kernel.into_file(),
+            Some(initrd.into_file()),
+            cmdline,
+            None,
+            None,
+        );
 
         assert_eq!(info.cmdline.as_cstring().unwrap().as_bytes(), b"ro");
         assert!(info.initrd_file_mut().is_some());

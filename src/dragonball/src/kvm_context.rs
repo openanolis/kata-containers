@@ -16,13 +16,13 @@ use kvm_bindings::KVM_API_VERSION;
 use kvm_ioctls::{Cap, Kvm, VmFd};
 
 //use crate::error::{Error, Result};
+use crate::error::{Error as VmError, Result};
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_arch::cpuid::cpu_leaf::leaf_0x4000_0001::eax::*;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_tdx::tdx_ioctls::tdx_get_caps;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use vmm_sys_util::errno;
-use crate::error::{Error as VmError, Result};
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required

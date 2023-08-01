@@ -1196,6 +1196,8 @@ mod tests {
             kernel_file,
             None,
             linux_loader::cmdline::Cmdline::new(0x1000),
+            None,
+            None,
         );
 
         let address_space = vm.vm_address_space().cloned();

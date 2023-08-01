@@ -22,6 +22,8 @@ pub mod tests {
             kernel_file.into_file(),
             None,
             cmd_line,
+            None,
+            None,
         ));
 
         let vm_config = VmConfigInfo {

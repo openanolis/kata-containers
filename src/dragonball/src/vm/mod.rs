@@ -1061,6 +1061,8 @@ pub mod tests {
             kernel_file.into_file(),
             None,
             cmd_line,
+            None,
+            None,
         ));
 
         vm.init_devices(epoll_mgr).unwrap();

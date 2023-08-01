@@ -327,8 +327,8 @@ impl VmmService {
         boot_source_config: BootSourceConfig,
     ) -> VmmRequestResult {
         use super::BootSourceConfigError::{
-            InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath,
-            UpdateNotAllowedPostBoot,
+            InvalidInitrdPath, InvalidKernelCommandLine, InvalidKernelPath, InvalidTdshimPath,
+            MissingTdshimPath, UnexpectedTdshimPath, UpdateNotAllowedPostBoot,
         };
         use super::VmmActionError::BootSource;
 
@@ -339,6 +339,22 @@ impl VmmService {
 
         let kernel_file = File::open(&boot_source_config.kernel_path)
             .map_err(|e| BootSource(InvalidKernelPath(e)))?;
+
+        // Open fimrware image file if there is one.
+        let fimrware_file = match boot_source_config.fimrware_image_path {
+            None => {
+                if vm.is_tdx_enabled() {
+                    return Err(BootSource(MissingTdshimPath));
+                }
+                None
+            }
+            Some(ref path) => {
+                if !vm.is_tdx_enabled() {
+                    return Err(BootSource(UnexpectedTdshimPath));
+                }
+                Some(File::open(path).map_err(|e| BootSource(InvalidTdshimPath(e)))?)
+            }
+        };
 
         let initrd_file = match boot_source_config.initrd_path {
             None => None,
@@ -353,7 +369,13 @@ impl VmmService {
             .insert_str(boot_args)
             .map_err(|e| BootSource(InvalidKernelCommandLine(e)))?;
 
-        let kernel_config = KernelConfigInfo::new(kernel_file, initrd_file, cmdline);
+        let kernel_config = KernelConfigInfo::new(
+            kernel_file,
+            initrd_file,
+            cmdline,
+            fimrware_file,
+            boot_source_config.fimrware_image_path.clone(),
+        );
         vm.set_kernel_config(kernel_config);
 
         Ok(VmmData::Empty)
