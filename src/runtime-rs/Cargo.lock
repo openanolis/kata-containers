@@ -697,6 +697,7 @@ dependencies = [
 name = "dbs-tdx"
 version = "0.1.0"
 dependencies = [
+ "dbs-boot",
  "kvm-bindings",
  "log",
  "thiserror",

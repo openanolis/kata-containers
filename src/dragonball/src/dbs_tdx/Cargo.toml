@@ -16,6 +16,7 @@ kvm-bindings = { version = "0.6.0", features = ["fam-wrappers"] }
 vmm-sys-util = "0.11.0"
 vm-memory = "0.9.0"
 log = "0.4.14"
+dbs-boot = { path = "../dbs_boot" }
 
 [dev-dependencies]
 serde_json = "1.0.9"
