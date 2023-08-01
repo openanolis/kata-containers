@@ -570,7 +570,7 @@ impl BlockDeviceMgr {
             Arc::new(cfg.queue_sizes()),
             epoll_mgr,
             limiters,
-            false,
+            ctx.is_tdx_enabled(),
         )?))
     }
 

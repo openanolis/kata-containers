@@ -221,7 +221,7 @@ impl VsockDeviceMgr {
                     info.config.guest_cid as u64,
                     Arc::new(info.config.queue_sizes()),
                     epoll_mgr.clone(),
-                    false,
+                    ctx.is_tdx_enabled(),
                 )
                 .map_err(VirtioError::VirtioVsockError)
                 .map_err(StartMicroVmError::CreateVsockDevice)?,

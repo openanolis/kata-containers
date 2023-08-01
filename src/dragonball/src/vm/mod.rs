@@ -516,9 +516,9 @@ impl Vm {
             vm_as.clone(),
             epoll_manager,
             kernel_config,
+            &self.vm_config,
             self.dmesg_fifo.take(),
             self.address_space.address_space(),
-            &self.vm_config,
         )?;
 
         info!(self.logger, "VM: start devices");

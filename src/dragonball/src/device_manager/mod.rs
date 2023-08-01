@@ -348,6 +348,14 @@ impl DeviceOpContext {
         &self.logger
     }
 
+    pub(crate) fn is_tdx_enabled(&self) -> bool {
+        self.shared_info
+            .as_ref()
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_tdx_enabled()
+    }
+
     #[allow(unused_variables)]
     fn generate_kernel_boot_args(&mut self, kernel_config: &mut KernelConfigInfo) -> Result<()> {
         if self.is_hotplug {
@@ -576,6 +584,16 @@ impl DeviceManager {
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
+    /// Check if tdx enabled
+    fn is_tdx_enabled(&self) -> bool {
+        self.shared_info
+            .as_ref()
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_tdx_enabled()
+    }
+
     /// Get the underlying IoManager to dispatch IO read/write requests.
     pub fn io_manager(&self) -> IoManagerCached {
         IoManagerCached::new(self.io_manager.clone())
@@ -598,6 +616,7 @@ impl DeviceManager {
     pub fn create_legacy_devices(
         &mut self,
         ctx: &mut DeviceOpContext,
+        vm_config: &VmConfigInfo,
     ) -> std::result::Result<(), StartMicroVmError> {
         #[cfg(any(
             target_arch = "x86_64",
@@ -609,9 +628,20 @@ impl DeviceManager {
 
             #[cfg(target_arch = "x86_64")]
             {
+                let cmos_params: Option<(u64, u64)> = if self.is_tdx_enabled() {
+                    let memory_size_byte = (vm_config.mem_size_mib as u64) << 20;
+                    let memory_below_4g =
+                        std::cmp::min(dbs_boot::layout::MMIO_LOW_START, memory_size_byte);
+                    let memory_above_4g: u64 = memory_size_byte - memory_below_4g;
+                    Some((memory_below_4g, memory_above_4g))
+                } else {
+                    None
+                };
+
                 legacy_manager = LegacyDeviceManager::create_manager(
                     &mut tx.io_manager,
                     Some(self.vm_fd.clone()),
+                    cmos_params,
                 );
             }
 
@@ -698,9 +728,9 @@ impl DeviceManager {
         vm_as: GuestAddressSpaceImpl,
         epoll_mgr: EpollManager,
         kernel_config: &mut KernelConfigInfo,
+        vm_config: &VmConfigInfo,
         dmesg_fifo: Option<Box<dyn io::Write + Send>>,
         address_space: Option<&AddressSpace>,
-        vm_config: &VmConfigInfo,
     ) -> std::result::Result<(), StartMicroVmError> {
         let mut ctx = DeviceOpContext::new(
             Some(epoll_mgr),
@@ -714,7 +744,7 @@ impl DeviceManager {
 
         let com1_sock_path = vm_config.serial_path.clone();
 
-        self.create_legacy_devices(&mut ctx)?;
+        self.create_legacy_devices(&mut ctx, vm_config)?;
         self.init_legacy_devices(dmesg_fifo, com1_sock_path, &mut ctx)?;
 
         #[cfg(feature = "virtio-blk")]
