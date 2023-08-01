@@ -57,6 +57,8 @@ use std::io::Error;
 use std::ops::Deref;
 use std::sync::Arc;
 
+#[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
+use downcast_rs::{impl_downcast, Downcast};
 use vmm_sys_util::eventfd::EventFd;
 
 mod manager;
@@ -70,7 +72,6 @@ pub use self::notifier::*;
 pub mod kvm;
 #[cfg(feature = "kvm-irq")]
 pub use self::kvm::KvmIrqManager;
-
 #[cfg(all(target_arch = "x86_64", feature = "kvm-userspace-ioapic"))]
 pub mod ioapic;
 

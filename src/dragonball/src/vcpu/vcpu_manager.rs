@@ -16,6 +16,8 @@ use std::sync::{Arc, Barrier, Mutex, RwLock};
 use std::time::Duration;
 
 use dbs_arch::VpmuFeatureLevel;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 use dbs_tdx::tdx_ioctls::{tdx_init_vcpu, TdxIoctlError};
 #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
@@ -241,6 +243,9 @@ pub struct VcpuManager {
     // X86 specific fields.
     #[cfg(target_arch = "x86_64")]
     pub(crate) supported_cpuid: kvm_bindings::CpuId,
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub(crate) interrupt_controller: Option<Arc<IoapicDevice>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -341,6 +346,8 @@ impl VcpuManager {
             upcall_channel: None,
             #[cfg(target_arch = "x86_64")]
             supported_cpuid,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            interrupt_controller: None,
         }));
 
         let handler = Box::new(VcpuEpollHandler {
@@ -804,6 +811,8 @@ impl VcpuManager {
         request_ts: TimestampUs,
     ) -> Result<Vcpu> {
         // It's safe to unwrap because guest_kernel always exist until vcpu manager done
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        let interrupt_controller = self.interrupt_controller.clone();
         Vcpu::new_x86_64(
             cpu_index,
             vcpu_fd,
@@ -815,8 +824,16 @@ impl VcpuManager {
             self.vcpu_state_sender.clone(),
             request_ts,
             self.support_immediate_exit,
+            #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+            interrupt_controller,
         )
         .map_err(VcpuManagerError::Vcpu)
+    }
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    /// add interrupt controller for each vcpu
+    pub fn set_interrupt_controller(&mut self, interrupt_controller: Arc<IoapicDevice>) {
+        self.interrupt_controller = Some(interrupt_controller);
     }
 }
 
@@ -1158,6 +1175,8 @@ mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config);
         vm.init_guest_memory().unwrap();
@@ -1206,6 +1225,8 @@ mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config.clone());
         vm.init_guest_memory().unwrap();

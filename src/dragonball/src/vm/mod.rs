@@ -138,6 +138,10 @@ pub struct VmConfigInfo {
 
     /// sock path
     pub serial_path: Option<String>,
+
+    /// userspace iopaic enabled or not
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub userspace_ioapic_enabled: bool,
 }
 
 impl Default for VmConfigInfo {
@@ -157,6 +161,8 @@ impl Default for VmConfigInfo {
             mem_file_path: String::from(""),
             mem_size_mib: 128,
             serial_path: None,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         }
     }
 }
@@ -500,11 +506,6 @@ impl Vm {
             .as_mut()
             .ok_or(StartMicroVmError::MissingKernelConfig)?;
 
-        info!(self.logger, "VM: create interrupt manager");
-        self.device_manager
-            .create_interrupt_manager()
-            .map_err(StartMicroVmError::DeviceManager)?;
-
         info!(self.logger, "VM: create devices");
         let vm_as =
             self.address_space
@@ -770,12 +771,21 @@ impl Vm {
                 AddressManagerError::GuestMemoryNotInitialized,
             ))?;
 
+        // TODO create interrupt_contriller here
+        // create userspace-ioapic
+        // init vcpu manager & device manager with ioapic
+        info!(self.logger, "VM: Init guest memory Done");
         self.init_vcpu_manager(vm_as.clone(), vcpu_seccomp_filter)
             .map_err(StartMicroVmError::Vcpu)?;
+        info!(self.logger, "VM: Init vcpu manager Done");
         self.init_microvm(event_mgr.epoll_manager(), vm_as.clone(), request_ts)?;
-        self.init_configure_system(&vm_as)?;
-        #[cfg(feature = "dbs-upcall")]
-        self.init_upcall()?;
+        info!(self.logger, "VM: Init microvm Done");
+
+        if !self.is_tdx_enabled() {
+            self.init_configure_system(&vm_as)?;
+            #[cfg(feature = "dbs-upcall")]
+            self.init_upcall()?;
+        }
 
         info!(self.logger, "VM: register events");
         self.register_events(event_mgr)?;
@@ -968,6 +978,8 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
 
         let mut vm = create_vm_instance();
@@ -1000,6 +1012,8 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config);
         assert!(vm.init_guest_memory().is_ok());
@@ -1048,6 +1062,8 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
 
         vm.set_vm_config(vm_config);
@@ -1126,6 +1142,8 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
 
         vm.set_vm_config(vm_config);
@@ -1313,6 +1331,8 @@ pub mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         };
         let mut vm = create_vm_instance();
         vm.set_vm_config(vm_config);

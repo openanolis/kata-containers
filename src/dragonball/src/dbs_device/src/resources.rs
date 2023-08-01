@@ -80,6 +80,15 @@ pub enum ResourceConstraint {
         /// Number of slots to allocate.
         size: u32,
     },
+    /// Constraint for a Memory Mapped IO address range used by platform device.
+    PlatformMmioAddress {
+        /// Allocating resource within the range [`min`, `max`] if specified.
+        range: Option<(u64, u64)>,
+        /// Alignment for the allocated address.
+        align: u64,
+        /// Size for the allocated address range.
+        size: u64,
+    },
 }
 
 impl ResourceConstraint {

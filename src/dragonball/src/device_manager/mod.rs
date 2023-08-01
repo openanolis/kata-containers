@@ -80,6 +80,11 @@ pub mod virtio_net_dev_mgr;
 #[cfg(feature = "virtio-net")]
 use self::virtio_net_dev_mgr::VirtioNetDeviceMgr;
 
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+pub mod ioapic_dev_mgr;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use self::ioapic_dev_mgr::IoapicDeviceMgr;
+
 #[cfg(feature = "virtio-fs")]
 /// virtio-block device manager
 pub mod fs_dev_mgr;
@@ -545,6 +550,11 @@ pub struct DeviceManager {
 
     #[cfg(feature = "virtio-balloon")]
     pub(crate) balloon_manager: BalloonDeviceMgr,
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub(crate) ioapic_manager: IoapicDeviceMgr,
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub(crate) userspace_ioapic_enabled: bool,
 }
 
 impl DeviceManager {
@@ -581,6 +591,10 @@ impl DeviceManager {
             mem_manager: MemDeviceMgr::default(),
             #[cfg(feature = "virtio-balloon")]
             balloon_manager: BalloonDeviceMgr::default(),
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            ioapic_manager: IoapicDeviceMgr::default(),
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            userspace_ioapic_enabled: false,
         }
     }
 
@@ -592,6 +606,31 @@ impl DeviceManager {
             .read()
             .expect("failed to get instance state, because shared info is poisoned lock")
             .is_tdx_enabled()
+    }
+
+    /// set userspace_ioapic_enabled after machine config
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub fn set_userspace_ioapic_enabled(&mut self, userspace_ioapic_enabled: bool) {
+        self.userspace_ioapic_enabled = userspace_ioapic_enabled;
+    }
+
+    /// Create interrupt manager with userspace ioapic device .
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub fn create_userspace_ioapic(
+        &mut self,
+        ctx: &mut DeviceOpContext,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        self.ioapic_manager
+            .attach_device(ctx)
+            .map_err(StartMicroVmError::IoapicDevice)?;
+        self.irq_manager
+            .initialize_with_userspace_ioapic(
+                self.ioapic_manager
+                    .get_device()
+                    .map_err(StartMicroVmError::IoapicDevice)?,
+            )
+            .map_err(StartMicroVmError::MissingIoapicDevice)?;
+        Ok(())
     }
 
     /// Get the underlying IoManager to dispatch IO read/write requests.
@@ -743,6 +782,19 @@ impl DeviceManager {
         );
 
         let com1_sock_path = vm_config.serial_path.clone();
+
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        {
+            if self.userspace_ioapic_enabled {
+                self.create_userspace_ioapic(&mut ctx)?;
+            } else {
+                self.create_interrupt_manager()
+                    .map_err(StartMicroVmError::DeviceManager)?;
+            }
+        }
+        #[cfg(not(all(target_arch = "x86_64", feature = "userspace-ioapic")))]
+        self.create_interrupt_manager()
+            .map_err(StartMicroVmError::DeviceManager)?;
 
         self.create_legacy_devices(&mut ctx, vm_config)?;
         self.init_legacy_devices(dmesg_fifo, com1_sock_path, &mut ctx)?;
@@ -1174,6 +1226,10 @@ mod tests {
                 balloon_manager: BalloonDeviceMgr::default(),
                 #[cfg(target_arch = "aarch64")]
                 mmio_device_info: HashMap::new(),
+                #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+                ioapic_manager: IoapicDeviceMgr::default(),
+                #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+                userspace_ioapic_enabled: false,
 
                 logger,
                 shared_info,
@@ -1215,6 +1271,7 @@ mod tests {
                 sockets: 1,
             },
             vpmu_feature: 0,
+            userspace_ioapic_enabled: false,
         };
         vm.set_vm_config(vm_config.clone());
         vm.init_guest_memory().unwrap();

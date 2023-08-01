@@ -15,7 +15,9 @@ use std::os::unix::io::AsRawFd;
 
 #[cfg(feature = "tdx")]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
-use dbs_address_space::{AddressSpace, AddressSpaceRegionType};
+use dbs_address_space::AddressSpace;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_address_space::AddressSpaceRegionType;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
 #[cfg(feature = "tdx")]
 use dbs_tdx::td_shim::hob::{PayloadImageType, PayloadInfo};
@@ -27,6 +29,8 @@ use dbs_tdx::td_shim::TD_SHIM_START;
 use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
 use dbs_utils::epoll_manager::EpollManager;
 use dbs_utils::time::TimestampUs;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use kvm_bindings::{kvm_enable_cap, KVM_CAP_SPLIT_IRQCHIP};
 use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
 use linux_loader::cmdline::Cmdline;
 use linux_loader::configurator::{linux::LinuxBootConfigurator, BootConfigurator, BootParams};
@@ -35,8 +39,12 @@ use slog::info;
 use vm_memory::Bytes;
 use vm_memory::{Address, GuestAddress, GuestAddressSpace, GuestMemory};
 
-use crate::address_space_manager::{AddressManagerError, GuestAddressSpaceImpl, GuestMemoryImpl};
-use crate::error::{Error, LoadTdDataError, Result, StartMicroVmError};
+#[cfg(feature = "tdx")]
+use crate::address_space_manager::AddressManagerError;
+use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
+#[cfg(feature = "tdx")]
+use crate::error::LoadTdDataError;
+use crate::error::{Error, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
 use crate::vm::{Vm, VmError};
 
@@ -189,9 +197,28 @@ impl Vm {
         self.init_tss()?;
         // For x86_64 we need to create the interrupt controller before calling `KVM_CREATE_VCPUS`
         // while on aarch64 we need to do it the other way around.
-        self.setup_interrupt_controller()?;
-        self.create_pit()?;
-        self.init_devices(epoll_mgr)?;
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        {
+            if self.vm_config.userspace_ioapic_enabled {
+                self.setup_split_irqchips()?;
+                self.device_manager.set_userspace_ioapic_enabled(true);
+                self.init_devices(epoll_mgr)?;
+                let interrupt_controller = self.device_manager.ioapic_manager.get_device().unwrap();
+                self.vcpu_manager()
+                    .map_err(StartMicroVmError::Vcpu)?
+                    .set_interrupt_controller(interrupt_controller);
+            } else {
+                self.setup_interrupt_controller()?;
+                self.create_pit()?;
+                self.init_devices(epoll_mgr)?;
+            }
+        }
+        #[cfg(not(all(target_arch = "x86_64", feature = "userspace-ioapic")))]
+        {
+            self.setup_interrupt_controller()?;
+            self.create_pit()?;
+            self.init_devices(epoll_mgr)?;
+        }
 
         let reset_event_fd = self.device_manager.get_reset_eventfd().unwrap();
         self.vcpu_manager()
@@ -292,6 +319,20 @@ impl Vm {
         // correct amount of memory from our pointer, and we verify the return result.
         self.vm_fd
             .create_pit2(pit_config)
+            .map_err(|e| StartMicroVmError::ConfigureVm(VmError::VmSetup(e)))
+    }
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    /// Creates spilt irq chips
+    pub(crate) fn setup_split_irqchips(&mut self) -> std::result::Result<(), StartMicroVmError> {
+        let mut cap = kvm_enable_cap {
+            cap: KVM_CAP_SPLIT_IRQCHIP,
+            ..Default::default()
+        };
+        //cap.args[0] = NUM_IOAPIC_PINS as u64;
+        cap.args[0] = 24u64;
+        self.vm_fd
+            .enable_cap(&cap)
             .map_err(|e| StartMicroVmError::ConfigureVm(VmError::VmSetup(e)))
     }
 

@@ -24,6 +24,11 @@ use seccompiler::{apply_filter, BpfProgram, Error as SecError};
 use vmm_sys_util::eventfd::EventFd;
 use vmm_sys_util::signal::{register_signal_handler, Killable};
 
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::InterruptController;
+
 use super::sm::StateMachine;
 use crate::metric::{IncMetric, METRICS};
 use crate::signal_handler::sigrtmin;
@@ -44,6 +49,9 @@ const MAGIC_IOPORT_DEBUG_INFO: u16 = MAGIC_IOPORT_BASE;
 
 /// Signal number (SIGRTMIN) used to kick Vcpus.
 pub const VCPU_RTSIG_OFFSET: i32 = 0;
+
+/// TDX KVM exit code.
+pub const KVM_EXIT_TDX: u32 = 35;
 
 #[cfg(target_arch = "x86_64")]
 /// Errors associated with the wrappers over KVM ioctls.
@@ -310,6 +318,9 @@ pub struct Vcpu {
     /// Multiprocessor affinity register recorded for aarch64
     #[cfg(target_arch = "aarch64")]
     pub(crate) mpidr: u64,
+
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    pub(crate) interrupt_controller: Option<Arc<IoapicDevice>>,
 }
 
 // Using this for easier explicit type-casting to help IDEs interpret the code.
@@ -503,6 +514,25 @@ impl Vcpu {
                             Err(VcpuError::VcpuUnhandledKvmExit)
                         }
                     },
+                    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+                    VcpuExit::IoapicEoi(vector) => {
+                        self.interrupt_controller
+                            .as_ref()
+                            .unwrap()
+                            .end_of_interrupt(vector)
+                            .unwrap();
+                        //TODO METRICS
+                        Ok(VcpuEmulation::Handled)
+                    }
+                    VcpuExit::Unsupported(event_type) => {
+                        if event_type == KVM_EXIT_TDX {
+                            info!("Received KVM_EXIT_TDX signal");
+                            Ok(VcpuEmulation::Handled)
+                        } else {
+                            error!("Unsupported exit reason on vcpu run: {:?}", event_type);
+                            Err(VcpuError::VcpuUnhandledKvmExit)
+                        }
+                    }
                     r => {
                         METRICS.vcpu.failures.inc();
                         // TODO: Are we sure we want to finish running a vcpu upon
@@ -855,6 +885,7 @@ pub mod tests {
             tx,
             time_stamp,
             false,
+            None,
         )
         .unwrap();
 

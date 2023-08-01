@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 use dbs_arch::cpuid::{process_cpuid, VmSpec};
 use dbs_arch::gdt::gdt_entry;
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use dbs_interrupt::ioapic::IoapicDevice;
 use dbs_utils::time::TimestampUs;
 use kvm_bindings::CpuId;
 use kvm_ioctls::{VcpuFd, VmFd};
@@ -52,6 +54,8 @@ impl Vcpu {
         vcpu_state_sender: Sender<VcpuStateEvent>,
         create_ts: TimestampUs,
         support_immediate_exit: bool,
+        #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+        interrupt_controller: Option<Arc<IoapicDevice>>,
     ) -> Result<Self> {
         let (event_sender, event_receiver) = channel();
         let (response_sender, response_receiver) = channel();
@@ -70,6 +74,8 @@ impl Vcpu {
             exit_evt,
             support_immediate_exit,
             cpuid,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+            interrupt_controller,
         })
     }
 

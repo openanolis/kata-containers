@@ -16,6 +16,8 @@ use dbs_tdx::tdx_ioctls::TdxIoctlError;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtIoError;
 
+#[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+use crate::device_manager::ioapic_dev_mgr::IoapicDeviceMgrError;
 use crate::{address_space_manager, device_manager, resource_manager, vcpu, vm};
 
 /// Shorthand result type for internal VMM commands.
@@ -242,6 +244,15 @@ pub enum StartMicroVmError {
     /// Cannot access guest address space manager.
     #[error("cannot access guest address space manager: {0}")]
     GuestMemory(#[source] address_space_manager::AddressManagerError),
+
+    /// Ioapic Device Errors
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    #[error("ioapic device: {0}")]
+    IoapicDevice(IoapicDeviceMgrError),
+    /// Missing Ioapic device
+    #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
+    #[error("missing Ioapic device: {0}")]
+    MissingIoapicDevice(std::io::Error),
 }
 
 /// Errors associated with starting the instance.
