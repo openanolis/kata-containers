@@ -783,16 +783,8 @@ impl VcpuManager {
 
 #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
 impl VcpuManager {
-    /// create default num of vcpus for bootup and init tdx vcpus
-    pub fn create_tdx_vcpus(&mut self, entry_addr: u64) -> Result<()> {
-        info!("create boot vcpus");
-        let boot_vcpu_count = self.vcpu_config.boot_vcpu_count;
-        // TODO init cpuid
-        self.create_vcpus(boot_vcpu_count, None, None)?;
-        self.init_tdx_vcpus(entry_addr)
-    }
     /// Init tdx vcpus
-    fn init_tdx_vcpus(&self, hob_address: u64) -> Result<()> {
+    pub fn init_tdx_vcpus(&self, hob_address: u64) -> Result<()> {
         for vcpu_info in &self.vcpu_infos {
             if let Some(vcpu_fd) = &vcpu_info.vcpu_fd {
                 tdx_init_vcpu(&vcpu_fd.as_raw_fd(), hob_address)

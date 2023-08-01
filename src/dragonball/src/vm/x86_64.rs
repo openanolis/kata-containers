@@ -11,6 +11,8 @@ use std::ops::Deref;
 #[cfg(feature = "tdx")]
 use std::os::unix::io::AsRawFd;
 
+#[cfg(feature = "tdx")]
+use dbs_acpi::acpi::create_acpi_tables_tdx;
 use dbs_address_space::AddressSpace;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
 #[cfg(feature = "tdx")]
@@ -356,15 +358,26 @@ impl Vm {
         _request_ts: TimestampUs,
     ) -> std::result::Result<(), StartMicroVmError> {
         info!(self.logger, "VM: start initializing tdx microvm ...");
-        // Init TD before create vcpu
+        // init TD before create vcpu
         self.init_tdx()?;
-        // Create and Init vcpus
-        // TODO: right entrypoints should not be 0x0
-        // TODO fix cpuid befor create vcpu
+        // create vcpus
+        info!(self.logger, "create boot vcpus");
+        let boot_vcpu_count = self.vm_config().vcpu_count;
+        let max_vcpu_count = self.vm_config().max_vcpu_count;
         self.vcpu_manager()
             .map_err(StartMicroVmError::Vcpu)?
-            .create_tdx_vcpus(0x0)
+            .create_vcpus(boot_vcpu_count, None, None)
             .map_err(StartMicroVmError::Vcpu)?;
+
+        // TODO: right entrypoints should not be 0x0
+        // init vcpus
+        self.vcpu_manager()
+            .map_err(StartMicroVmError::Vcpu)?
+            .init_tdx_vcpus(0x0)
+            .map_err(StartMicroVmError::Vcpu)?;
+
+        // TODO: acpi tables will in subsequent patchs
+        let _ = create_acpi_tables_tdx(max_vcpu_count, boot_vcpu_count);
         // TODO: init memory region
         self.finalize_tdx()?;
         info!(self.logger, "VM: initializing tdx microvm done");
