@@ -78,7 +78,7 @@ impl Default for TdvfSectionType {
 /// Parse tdx section.
 ///
 /// #Arguments
-/// * `file` - The tdshim image file.
+/// * `file` - The firmware image file.
 pub fn parse_tdvf_sections(file: &mut File) -> std::result::Result<Vec<TdvfSection>, TdvfError> {
     // The 32-bit offset to the TDVF metadata is located 32 bytes from
     // the end of the file.
@@ -130,8 +130,8 @@ mod tests {
     #[cfg(feature = "test-resources")]
     fn test_parse_tdvf_sections() {
         use crate::metadata::{parse_tdvf_sections, TdvfSectionType};
-        let mut f = std::fs::File::open("/test_resources/img/x86_64/tdx/tdshim.bin")
-            .expect("can not fond tdshim image");
+        let mut f = std::fs::File::open("/test_resources/img/x86_64/tdx/firmware.bin")
+            .expect("can not fond firmware image");
         let sections = parse_tdvf_sections(&mut f).unwrap();
         for section in sections.iter() {
             let r#type = section.r#type;

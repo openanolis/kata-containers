@@ -10,11 +10,11 @@ pub struct KernelConfigInfo {
     /// The descriptor to the initrd file, if there is one
     initrd_file: Option<File>,
     /// The commandline for guest kernel.
-    cmdline: linux_loader::cmdline::Cmdline,
-    /// The descriptor to the fimrware file.
-    pub fimrware_file: Option<File>,
+    pub cmdline: linux_loader::cmdline::Cmdline,
+    /// The descriptor to the firmware file.
+    pub firmware_file: Option<File>,
     /// Tdshim image path
-    pub(crate) fimrware_image_path: Option<String>,
+    pub(crate) firmware_image_path: Option<String>,
 }
 
 impl KernelConfigInfo {
@@ -23,26 +23,26 @@ impl KernelConfigInfo {
         kernel_file: File,
         initrd_file: Option<File>,
         cmdline: linux_loader::cmdline::Cmdline,
-        fimrware_file: Option<File>,
-        fimrware_image_path: Option<String>,
+        firmware_file: Option<File>,
+        firmware_image_path: Option<String>,
     ) -> Self {
         KernelConfigInfo {
             kernel_file,
             initrd_file,
             cmdline,
-            fimrware_file,
-            fimrware_image_path,
+            firmware_file,
+            firmware_image_path,
         }
     }
 
-    /// Get a reference to the fimrware file.
-    pub fn fimrware_file(&self) -> Option<&File> {
-        self.fimrware_file.as_ref()
+    /// Get a reference to the firmware file.
+    pub fn firmware_file(&self) -> Option<&File> {
+        self.firmware_file.as_ref()
     }
 
-    /// Get a mutable reference to the fimrware file.
-    pub fn fimrware_file_mut(&mut self) -> Option<&mut File> {
-        self.fimrware_file.as_mut()
+    /// Get a mutable reference to the firmware file.
+    pub fn firmware_file_mut(&mut self) -> Option<&mut File> {
+        self.firmware_file.as_mut()
     }
 
     /// Get a mutable reference to the kernel file.

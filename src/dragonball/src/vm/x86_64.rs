@@ -7,14 +7,22 @@
 // found in the THIRD-PARTY file.
 
 use std::convert::TryInto;
+#[cfg(feature = "tdx")]
+use std::io::{Seek, SeekFrom};
 use std::ops::Deref;
 #[cfg(feature = "tdx")]
 use std::os::unix::io::AsRawFd;
 
 #[cfg(feature = "tdx")]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
-use dbs_address_space::AddressSpace;
+use dbs_address_space::{AddressSpace, AddressSpaceRegionType};
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
+#[cfg(feature = "tdx")]
+use dbs_tdx::td_shim::hob::{PayloadImageType, PayloadInfo};
+#[cfg(feature = "tdx")]
+use dbs_tdx::td_shim::metadata::{TdvfSection, TdvfSectionType};
+#[cfg(feature = "tdx")]
+use dbs_tdx::td_shim::TD_SHIM_START;
 #[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
 use dbs_utils::epoll_manager::EpollManager;
@@ -23,10 +31,12 @@ use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_
 use linux_loader::cmdline::Cmdline;
 use linux_loader::configurator::{linux::LinuxBootConfigurator, BootConfigurator, BootParams};
 use slog::info;
+#[cfg(feature = "tdx")]
+use vm_memory::Bytes;
 use vm_memory::{Address, GuestAddress, GuestAddressSpace, GuestMemory};
 
-use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
-use crate::error::{Error, Result, StartMicroVmError};
+use crate::address_space_manager::{AddressManagerError, GuestAddressSpaceImpl, GuestMemoryImpl};
+use crate::error::{Error, LoadTdDataError, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
 use crate::vm::{Vm, VmError};
 
@@ -160,23 +170,6 @@ impl Vm {
 
 impl Vm {
     /// Initialize the virtual machine instance.
-    pub fn init_microvm(
-        &mut self,
-        epoll_mgr: EpollManager,
-        vm_as: GuestAddressSpaceImpl,
-        request_ts: TimestampUs,
-    ) -> std::result::Result<(), StartMicroVmError> {
-        info!(self.logger, "VM: checking if is confidential microvm ...");
-        if self.is_tdx_enabled() {
-            #[cfg(feature = "tdx")]
-            return self.init_tdx_microvm(epoll_mgr, vm_as, request_ts);
-            #[cfg(not(feature = "tdx"))]
-            return Err(StartMicroVmError::TdxError);
-        }
-
-        self.init_legacy_microvm(epoll_mgr, vm_as, request_ts)
-    }
-    /// Initialize the virtual machine instance.
     ///
     /// It initialize the virtual machine instance by:
     /// 1) initialize virtual machine global state and configuration.
@@ -185,13 +178,13 @@ impl Vm {
     /// 4) create and initialize vCPUs.
     /// 5) configure CPU power management features.
     /// 6) load guest kernel image.
-    pub fn init_legacy_microvm(
+    pub fn init_microvm(
         &mut self,
         epoll_mgr: EpollManager,
         vm_as: GuestAddressSpaceImpl,
         request_ts: TimestampUs,
     ) -> std::result::Result<(), StartMicroVmError> {
-        info!(self.logger, "VM: start initializing legacy microvm ...");
+        info!(self.logger, "VM: start initializing microvm ...");
 
         self.init_tss()?;
         // For x86_64 we need to create the interrupt controller before calling `KVM_CREATE_VCPUS`
@@ -211,15 +204,30 @@ impl Vm {
             info!(self.logger, "VM: enable CPU disable_idle_exits capability");
         }
 
-        let vm_memory = vm_as.memory();
-        let kernel_loader_result = self.load_kernel(vm_memory.deref())?;
-        self.vcpu_manager()
-            .map_err(StartMicroVmError::Vcpu)?
-            .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
-            .map_err(StartMicroVmError::Vcpu)?;
+        info!(
+            self.logger,
+            "VM: checking if it is confidential microvm ..."
+        );
 
-        info!(self.logger, "VM: initializing microvm done");
-        Ok(())
+        if self.is_tdx_enabled() {
+            info!(self.logger, "Intel Trusted Domain microvm");
+            #[cfg(feature = "tdx")]
+            return self.init_tdx_microvm(vm_as);
+            #[cfg(not(feature = "tdx"))]
+            return Err(StartMicroVmError::TdxError);
+        } else {
+            info!(self.logger, "None-confidential microvm");
+
+            let vm_memory = vm_as.memory();
+            let kernel_loader_result = self.load_kernel(vm_memory.deref(), None)?;
+            self.vcpu_manager()
+                .map_err(StartMicroVmError::Vcpu)?
+                .create_boot_vcpus(request_ts, kernel_loader_result.kernel_load)
+                .map_err(StartMicroVmError::Vcpu)?;
+
+            info!(self.logger, "VM: initializing microvm done");
+            Ok(())
+        }
     }
 
     /// Execute system architecture specific configurations.
@@ -353,9 +361,7 @@ impl Vm {
     /// 8) finalize TD
     pub fn init_tdx_microvm(
         &mut self,
-        _epoll_mgr: EpollManager,
-        _vm_as: GuestAddressSpaceImpl,
-        _request_ts: TimestampUs,
+        vm_as: GuestAddressSpaceImpl,
     ) -> std::result::Result<(), StartMicroVmError> {
         info!(self.logger, "VM: start initializing tdx microvm ...");
         // init TD before create vcpu
@@ -369,18 +375,223 @@ impl Vm {
             .create_vcpus(boot_vcpu_count, None, None)
             .map_err(StartMicroVmError::Vcpu)?;
 
-        // TODO: right entrypoints should not be 0x0
+        let vm_memory = vm_as.memory();
+        // load firmware to memory
+        let sections = self.parse_tdvf_sections()?;
+        let (hob_offset, payload_offset, payload_size, cmdline_offset) =
+            self.load_firmware(vm_memory.deref(), &sections)?;
+        // load payload info to memory
+        let payload_info = self.load_payload(payload_offset, payload_size, vm_memory.deref())?;
+        self.load_cmdline(cmdline_offset, vm_memory.deref())?;
+
         // init vcpus
         self.vcpu_manager()
             .map_err(StartMicroVmError::Vcpu)?
-            .init_tdx_vcpus(0x0)
+            .init_tdx_vcpus(hob_offset)
             .map_err(StartMicroVmError::Vcpu)?;
 
-        // TODO: acpi tables will in subsequent patchs
-        let _ = create_acpi_tables_tdx(max_vcpu_count, boot_vcpu_count);
-        // TODO: init memory region
+        let acpi_tables = create_acpi_tables_tdx(max_vcpu_count, boot_vcpu_count);
+
+        let address_space =
+            self.vm_address_space()
+                .cloned()
+                .ok_or(StartMicroVmError::GuestMemory(
+                    AddressManagerError::GuestMemoryNotInitialized,
+                ))?;
+
+        // generate hob list
+        self.generate_hob_list(
+            hob_offset,
+            vm_memory.deref(),
+            address_space,
+            payload_info,
+            &acpi_tables,
+        )
+        .map_err(LoadTdDataError::LoadData)
+        .map_err(StartMicroVmError::TdDataLoader)?;
+        // init(accept) memory regions
+        for section in sections {
+            let host_address = vm_memory
+                .deref()
+                .get_host_address(GuestAddress(section.address))
+                .unwrap();
+            self.init_tdx_memory(
+                host_address as u64,
+                section.address,
+                section.size,
+                section.attributes == 1,
+            )?;
+        }
+
         self.finalize_tdx()?;
         info!(self.logger, "VM: initializing tdx microvm done");
         Ok(())
+    }
+}
+
+#[cfg(feature = "tdx")]
+impl Vm {
+    /// Parse firmware metadata
+    pub fn parse_tdvf_sections(
+        &mut self,
+    ) -> std::result::Result<Vec<TdvfSection>, StartMicroVmError> {
+        let kernel_config = self
+            .kernel_config
+            .as_mut()
+            .ok_or(StartMicroVmError::MissingKernelConfig)?;
+        // safe to unwarap here as we alredy checked when configuring boot source
+        let firmware_file = kernel_config.firmware_file_mut().unwrap();
+        dbs_tdx::td_shim::metadata::parse_tdvf_sections(firmware_file)
+            .map_err(LoadTdDataError::ParseTdshim)
+            .map_err(StartMicroVmError::TdDataLoader)
+    }
+    /// Load data in firmware image to memory
+    pub fn load_firmware(
+        &mut self,
+        vm_memory: &GuestMemoryImpl,
+        sections: &[TdvfSection],
+    ) -> std::result::Result<(u64, u64, u64, u64), StartMicroVmError> {
+        let mut hob_offset: Option<u64> = None;
+        let mut payload_offset: Option<u64> = None;
+        let mut payload_size: Option<u64> = None;
+        let mut cmdline_offset: Option<u64> = None;
+        let kernel_config = self
+            .kernel_config
+            .as_mut()
+            .ok_or(StartMicroVmError::MissingKernelConfig)?;
+        // safe to unwarap here as we alredy checked when configuring boot source
+        let firmware_file = kernel_config.firmware_file_mut().unwrap();
+        for section in sections {
+            info!(self.logger, "TDVF Section: {:x?}", section);
+            match section.r#type {
+                TdvfSectionType::Bfv | TdvfSectionType::Cfv => {
+                    firmware_file
+                        .seek(SeekFrom::Start(section.data_offset as u64))
+                        .map_err(LoadTdDataError::ReadTdshim)
+                        .map_err(StartMicroVmError::TdDataLoader)?;
+                    vm_memory
+                        .read_from(
+                            GuestAddress(section.address),
+                            firmware_file,
+                            section.data_size as usize,
+                        )
+                        .map_err(LoadTdDataError::LoadData)
+                        .map_err(StartMicroVmError::TdDataLoader)?;
+                }
+                TdvfSectionType::TdHob => {
+                    hob_offset = Some(section.address);
+                }
+                TdvfSectionType::Payload => {
+                    payload_offset = Some(section.address);
+                    payload_size = Some(section.size);
+                }
+                TdvfSectionType::PayloadParam => {
+                    cmdline_offset = Some(section.address);
+                }
+                _ => {}
+            }
+        }
+        if hob_offset.is_none() {
+            return Err(StartMicroVmError::TdDataLoader(LoadTdDataError::HobOffset));
+        }
+        if payload_offset.is_none() || payload_size.is_none() {
+            return Err(StartMicroVmError::TdDataLoader(
+                LoadTdDataError::PayloadOffset,
+            ));
+        }
+        if cmdline_offset.is_none() {
+            return Err(StartMicroVmError::TdDataLoader(
+                LoadTdDataError::PayloadParamsOffset,
+            ));
+        }
+        // Safe to unwrap here
+        Ok((
+            hob_offset.unwrap(),
+            payload_offset.unwrap(),
+            payload_size.unwrap(),
+            cmdline_offset.unwrap(),
+        ))
+    }
+    /// load vmlinux as firmware payload
+    pub fn load_payload(
+        &mut self,
+        payload_offset: u64,
+        payload_size: u64,
+        vm_memory: &GuestMemoryImpl,
+    ) -> std::result::Result<PayloadInfo, StartMicroVmError> {
+        // load kernel
+        let kernel_loader_result =
+            self.load_kernel(vm_memory.deref(), Some(GuestAddress(payload_offset)))?;
+        // Kernel should be loaded into the payload section, Otherwise data won't be accepted by
+        // TD. Make sure that the kernel does not overflow this range.
+        if kernel_loader_result.kernel_end > (payload_offset + payload_size) {
+            Err(StartMicroVmError::TdDataLoader(
+                LoadTdDataError::LoadPayload,
+            ))
+        } else {
+            let payload_info = PayloadInfo {
+                image_type: PayloadImageType::RawVmLinux,
+                entry_point: kernel_loader_result.kernel_load.0,
+            };
+            Ok(payload_info)
+        }
+    }
+    /// load cmdline as firmware param
+    pub fn load_cmdline(
+        &self,
+        cmdline_offset: u64,
+        vm_memory: &GuestMemoryImpl,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        let cmdline = &self
+            .kernel_config
+            .as_ref()
+            .ok_or(StartMicroVmError::MissingKernelConfig)?
+            .cmdline;
+        linux_loader::loader::load_cmdline(vm_memory, GuestAddress(cmdline_offset), cmdline)
+            .map_err(StartMicroVmError::LoadCommandline)?;
+        Ok(())
+    }
+    /// generate hob list fot firmware
+    pub fn generate_hob_list(
+        &self,
+        hob_offset: u64,
+        vm_memory: &GuestMemoryImpl,
+        address_space: AddressSpace,
+        payload_info: PayloadInfo,
+        acpi_tables: &[dbs_acpi::sdt::Sdt],
+    ) -> std::result::Result<(), vm_memory::GuestMemoryError> {
+        let mut hob = dbs_tdx::td_shim::hob::TdHob::start(hob_offset);
+        // add memory resource
+        let mut memory_regions: Vec<(bool, u64, u64)> = Vec::new();
+        address_space
+            .walk_regions(|region| {
+                match region.region_type() {
+                    AddressSpaceRegionType::DefaultMemory => {
+                        memory_regions.push((true, region.start_addr().0, region.len()));
+                    }
+                    AddressSpaceRegionType::Firmware => {
+                        memory_regions.push((false, region.start_addr().0, region.len()));
+                    }
+                    _ => {}
+                }
+                Ok(())
+            })
+            .unwrap();
+        for (is_ram, start, size) in memory_regions {
+            hob.add_memory_resource(vm_memory, start, size, is_ram)?;
+        }
+        // add mmio resource
+        hob.add_mmio_resource(
+            vm_memory,
+            layout::MMIO_LOW_START,
+            TD_SHIM_START - layout::MMIO_LOW_START,
+        )?;
+        // add payload info
+        hob.add_payload(vm_memory, payload_info)?;
+        // add acpi tables
+        for acpi_table in acpi_tables {
+            hob.add_acpi_table(vm_memory, acpi_table.as_slice())?;
+        }
+        hob.finish(vm_memory)
     }
 }
