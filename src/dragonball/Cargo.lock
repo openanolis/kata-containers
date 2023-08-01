@@ -265,11 +265,16 @@ dependencies = [
 name = "dbs-interrupt"
 version = "0.2.2"
 dependencies = [
+ "byteorder",
  "dbs-arch",
  "dbs-device",
+ "downcast-rs",
  "kvm-bindings",
  "kvm-ioctls",
  "libc",
+ "log",
+ "thiserror",
+ "vm-memory",
  "vmm-sys-util 0.11.1",
 ]
 
@@ -283,6 +288,17 @@ dependencies = [
  "log",
  "serde",
  "vm-superio",
+ "vmm-sys-util 0.11.1",
+]
+
+[[package]]
+name = "dbs-tdx"
+version = "0.1.0"
+dependencies = [
+ "kvm-bindings",
+ "log",
+ "thiserror",
+ "vm-memory",
  "vmm-sys-util 0.11.1",
 ]
 
@@ -377,6 +393,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "downcast-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc55e97c7c363aa76468b2151f7b26fc28c3e6f43d0713dbfed05d6f7eea46a2"
+
+[[package]]
 name = "dragonball"
 version = "0.1.0"
 dependencies = [
@@ -390,6 +412,7 @@ dependencies = [
  "dbs-device",
  "dbs-interrupt",
  "dbs-legacy-devices",
+ "dbs-tdx",
  "dbs-upcall",
  "dbs-utils",
  "dbs-virtio-devices",

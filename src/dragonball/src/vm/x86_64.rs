@@ -8,9 +8,13 @@
 
 use std::convert::TryInto;
 use std::ops::Deref;
+#[cfg(feature = "tdx")]
+use std::os::unix::io::AsRawFd;
 
 use dbs_address_space::AddressSpace;
 use dbs_boot::{add_e820_entry, bootparam, layout, mptable, BootParamsWrapper, InitrdConfig};
+#[cfg(feature = "tdx")]
+use dbs_tdx::tdx_ioctls::{tdx_finalize, tdx_init, tdx_init_memory_region};
 use dbs_utils::epoll_manager::EpollManager;
 use dbs_utils::time::TimestampUs;
 use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_DUMMY};
@@ -154,6 +158,23 @@ impl Vm {
 
 impl Vm {
     /// Initialize the virtual machine instance.
+    pub fn init_microvm(
+        &mut self,
+        epoll_mgr: EpollManager,
+        vm_as: GuestAddressSpaceImpl,
+        request_ts: TimestampUs,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        info!(self.logger, "VM: checking if is confidential microvm ...");
+        if self.is_tdx_enabled() {
+            #[cfg(feature = "tdx")]
+            return self.init_tdx_microvm(epoll_mgr, vm_as, request_ts);
+            #[cfg(not(feature = "tdx"))]
+            return Err(StartMicroVmError::TdxError);
+        }
+
+        self.init_legacy_microvm(epoll_mgr, vm_as, request_ts)
+    }
+    /// Initialize the virtual machine instance.
     ///
     /// It initialize the virtual machine instance by:
     /// 1) initialize virtual machine global state and configuration.
@@ -162,13 +183,13 @@ impl Vm {
     /// 4) create and initialize vCPUs.
     /// 5) configure CPU power management features.
     /// 6) load guest kernel image.
-    pub fn init_microvm(
+    pub fn init_legacy_microvm(
         &mut self,
         epoll_mgr: EpollManager,
         vm_as: GuestAddressSpaceImpl,
         request_ts: TimestampUs,
     ) -> std::result::Result<(), StartMicroVmError> {
-        info!(self.logger, "VM: start initializing microvm ...");
+        info!(self.logger, "VM: start initializing legacy microvm ...");
 
         self.init_tss()?;
         // For x86_64 we need to create the interrupt controller before calling `KVM_CREATE_VCPUS`
@@ -277,6 +298,76 @@ impl Vm {
             .map_err(|_| StartMicroVmError::RegisterEvent)?;
         self.reset_eventfd = Some(reset_evt);
 
+        Ok(())
+    }
+}
+
+#[cfg(feature = "tdx")]
+impl Vm {
+    /// Init TD
+    fn init_tdx(&self) -> std::result::Result<(), StartMicroVmError> {
+        let cpuid = self.vcpu_manager().unwrap().supported_cpuid.clone();
+        let max_vcpu_count = self.vm_config().max_vcpu_count as u32;
+        tdx_init(&self.vm_fd().as_raw_fd(), &cpuid, max_vcpu_count)
+            .map_err(StartMicroVmError::TdxIoctlError)?;
+        Ok(())
+    }
+    /// Finalize TD
+    fn finalize_tdx(&self) -> std::result::Result<(), StartMicroVmError> {
+        tdx_finalize(&self.vm_fd().as_raw_fd()).map_err(StartMicroVmError::TdxIoctlError)?;
+        Ok(())
+    }
+    // TODO: remove dead code here
+    #[allow(dead_code)]
+    /// Init TDX memory
+    fn init_tdx_memory(
+        &mut self,
+        host_address: u64,
+        guest_address: u64,
+        size: u64,
+        measure: bool,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        tdx_init_memory_region(
+            &self.vm_fd().as_raw_fd(),
+            host_address,
+            guest_address,
+            size,
+            measure,
+        )
+        .map_err(StartMicroVmError::TdxIoctlError)?;
+        Ok(())
+    }
+    /// Initialize the Intel trusted domian instance.
+    ///
+    /// It initialize the TD by:
+    /// 1) initialize TD
+    /// 2) initialize virtual machine global state and configuration(TODO).
+    /// 2) create system devices, such as interrupt controller, PIT etc(TODO).
+    /// 3) create and start IO devices, such as serial, console, block, net, vsock etc(TODO).
+    /// 4) create and initialize vCPUs.
+    /// 5) configure CPU power management features.(TODO)
+    /// 6) load guest kernel image.(TODO)
+    /// 7) add memory region fot TD
+    /// 8) finalize TD
+    pub fn init_tdx_microvm(
+        &mut self,
+        _epoll_mgr: EpollManager,
+        _vm_as: GuestAddressSpaceImpl,
+        _request_ts: TimestampUs,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        info!(self.logger, "VM: start initializing tdx microvm ...");
+        // Init TD before create vcpu
+        self.init_tdx()?;
+        // Create and Init vcpus
+        // TODO: right entrypoints should not be 0x0
+        // TODO fix cpuid befor create vcpu
+        self.vcpu_manager()
+            .map_err(StartMicroVmError::Vcpu)?
+            .create_tdx_vcpus(0x0)
+            .map_err(StartMicroVmError::Vcpu)?;
+        // TODO: init memory region
+        self.finalize_tdx()?;
+        info!(self.logger, "VM: initializing tdx microvm done");
         Ok(())
     }
 }

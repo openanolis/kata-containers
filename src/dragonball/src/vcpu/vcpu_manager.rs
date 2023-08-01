@@ -16,6 +16,8 @@ use std::sync::{Arc, Barrier, Mutex, RwLock};
 use std::time::Duration;
 
 use dbs_arch::VpmuFeatureLevel;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_tdx::tdx_ioctls::{tdx_init_vcpu, TdxIoctlError};
 #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
 use dbs_upcall::{DevMgrService, UpcallClient};
 use dbs_utils::epoll_manager::{EpollManager, EventOps, EventSet, Events, MutEventSubscriber};
@@ -117,6 +119,11 @@ pub enum VcpuManagerError {
     /// Kvm Ioctl Error
     #[error("failure in issuing KVM ioctl command: {0}")]
     Kvm(#[source] kvm_ioctls::Error),
+
+    /// Tdx init vcpu error
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[error("TDX init vcpu error:{0}")]
+    TdxVcpuInit(#[source] TdxIoctlError),
 }
 
 #[cfg(feature = "hotplug")]
@@ -249,6 +256,12 @@ impl VcpuManager {
         io_manager: IoManagerCached,
         epoll_manager: EpollManager,
     ) -> Result<Arc<Mutex<Self>>> {
+        #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+        let is_tdx_enable = shared_info
+            .read()
+            .expect("Failed to determine if instance is confidential vm because shared_info couldn't be read due to poisoned lock")
+            .is_tdx_enabled();
+
         let support_immediate_exit = kvm_context.kvm().check_extension(Cap::ImmediateExit);
         let max_vcpu_count = vm_config_info.max_vcpu_count;
         let kvm_max_vcpu_count = kvm_context.get_max_vcpus();
@@ -280,7 +293,11 @@ impl VcpuManager {
 
         #[cfg(target_arch = "x86_64")]
         let supported_cpuid = kvm_context
-            .supported_cpuid(kvm_bindings::KVM_MAX_CPUID_ENTRIES)
+            .supported_cpuid(
+                kvm_bindings::KVM_MAX_CPUID_ENTRIES,
+                #[cfg(feature = "tdx")]
+                is_tdx_enable,
+            )
             .map_err(VcpuManagerError::Kvm)?;
         #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let vpmu_feature_level = match vm_config_info.vpmu_feature {
@@ -761,6 +778,28 @@ impl VcpuManager {
 
     fn get_vcpus_action(&self) -> VcpuAction {
         self.vcpus_in_action.0
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+impl VcpuManager {
+    /// create default num of vcpus for bootup and init tdx vcpus
+    pub fn create_tdx_vcpus(&mut self, entry_addr: u64) -> Result<()> {
+        info!("create boot vcpus");
+        let boot_vcpu_count = self.vcpu_config.boot_vcpu_count;
+        // TODO init cpuid
+        self.create_vcpus(boot_vcpu_count, None, None)?;
+        self.init_tdx_vcpus(entry_addr)
+    }
+    /// Init tdx vcpus
+    fn init_tdx_vcpus(&self, hob_address: u64) -> Result<()> {
+        for vcpu_info in &self.vcpu_infos {
+            if let Some(vcpu_fd) = &vcpu_info.vcpu_fd {
+                tdx_init_vcpu(&vcpu_fd.as_raw_fd(), hob_address)
+                    .map_err(VcpuManagerError::TdxVcpuInit)?;
+            }
+        }
+        Ok(())
     }
 }
 

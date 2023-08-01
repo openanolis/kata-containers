@@ -834,7 +834,11 @@ pub mod tests {
         let vcpu_fd = Arc::new(vm.create_vcpu(0).unwrap());
         let io_manager = IoManagerCached::new(Arc::new(ArcSwap::new(Arc::new(IoManager::new()))));
         let supported_cpuid = kvm_context
-            .supported_cpuid(kvm_bindings::KVM_MAX_CPUID_ENTRIES)
+            .supported_cpuid(
+                kvm_bindings::KVM_MAX_CPUID_ENTRIES,
+                #[cfg(feature = "tdx")]
+                false,
+            )
             .unwrap();
         let reset_event_fd = EventFd::new(libc::EFD_NONBLOCK).unwrap();
         let vcpu_state_event = EventFd::new(libc::EFD_NONBLOCK).unwrap();

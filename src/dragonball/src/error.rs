@@ -11,6 +11,8 @@
 
 #[cfg(target_arch = "aarch64")]
 use dbs_arch::pmu::PmuError;
+#[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+use dbs_tdx::tdx_ioctls::TdxIoctlError;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtIoError;
 
@@ -193,6 +195,15 @@ pub enum StartMicroVmError {
     /// Virtio-balloon errors.
     #[error("virtio-balloon errors: {0}")]
     BalloonDeviceError(#[source] device_manager::balloon_dev_mgr::BalloonDeviceError),
+
+    /// TDX ioctl related error.
+    #[cfg(all(target_arch = "x86_64", feature = "tdx"))]
+    #[error("TDX ioctl related error.")]
+    TdxIoctlError(#[source] TdxIoctlError),
+
+    /// TDX not supported
+    #[error("Dragonball without TDX support.")]
+    TdxError,
 }
 
 /// Errors associated with starting the instance.

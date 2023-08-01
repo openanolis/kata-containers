@@ -19,6 +19,7 @@ dbs-boot = { path = "./src/dbs_boot" }
 dbs-device = { path = "./src/dbs_device" }
 dbs-interrupt = { path = "./src/dbs_interrupt", features = ["kvm-irq"] }
 dbs-legacy-devices = { path = "./src/dbs_legacy_devices" }
+dbs-tdx = { path = "./src/dbs_tdx" }
 dbs-upcall = { path = "./src/dbs_upcall" , optional = true }
 dbs-utils = { path = "./src/dbs_utils" }
 dbs-virtio-devices = { path = "./src/dbs_virtio_devices", optional = true, features = ["virtio-mmio"] }
@@ -48,6 +49,7 @@ test-utils = { path = "../libs/test-utils" }
 
 [features]
 acpi = []
+tdx = []
 atomic-guest-memory = ["vm-memory/backend-atomic"]
 hotplug = ["virtio-vsock"]
 virtio-vsock = ["dbs-virtio-devices/virtio-vsock", "virtio-queue"]

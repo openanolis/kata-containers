@@ -694,6 +694,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbs-tdx"
+version = "0.1.0"
+dependencies = [
+ "kvm-bindings",
+ "log",
+ "thiserror",
+ "vm-memory",
+ "vmm-sys-util 0.11.1",
+]
+
+[[package]]
 name = "dbs-upcall"
 version = "0.3.0"
 dependencies = [
@@ -829,6 +840,7 @@ dependencies = [
  "dbs-device",
  "dbs-interrupt",
  "dbs-legacy-devices",
+ "dbs-tdx",
  "dbs-upcall",
  "dbs-utils",
  "dbs-virtio-devices",
