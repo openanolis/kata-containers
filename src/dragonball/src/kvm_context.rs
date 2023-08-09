@@ -15,14 +15,14 @@ use std::os::unix::io::{FromRawFd, RawFd};
 use dbs_arch::cpuid::cpu_leaf::leaf_0x4000_0001::eax::*;
 #[cfg(feature = "tdx")]
 use dbs_tdx::tdx_ioctls::tdx_get_caps;
-#[cfg(feature = "tdx")]
+#[cfg(any(feature = "tdx", feature = "sev"))]
 use kvm_bindings::CpuId;
 use kvm_bindings::KVM_API_VERSION;
 use kvm_ioctls::{Cap, Kvm, VmFd};
 #[cfg(feature = "tdx")]
 use vmm_sys_util::errno;
 
-use crate::error::{Error as VmError, Result};
+use crate::{error::{Error as VmError, Result}, sev::HOST_CPUID_AMD_EMC};
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required
@@ -121,10 +121,16 @@ mod x86_64 {
             &self,
             max_entries_count: usize,
             #[cfg(feature = "tdx")] is_tdx_enabled: bool,
+            #[cfg(feature = "sev")] is_sev_enabled: bool,
+            #[cfg(feature = "sev")] is_sev_es_enabled: bool,
         ) -> std::result::Result<CpuId, kvm_ioctls::Error> {
             #[cfg(feature = "tdx")]
             if is_tdx_enabled {
                 return self.tdx_supported_cpuid(max_entries_count);
+            }
+            #[cfg(feature = "sev")]
+            if is_sev_enabled {
+                return self.sev_supported_cpuid(max_entries_count, is_sev_es_enabled);
             }
             self.kvm.get_supported_cpuid(max_entries_count)
         }
@@ -303,6 +309,46 @@ impl KvmContext {
     }
 }
 
+#[cfg(feature = "sev")]
+impl KvmContext {
+    /// Get CpuId supported by SEV
+    pub fn sev_supported_cpuid(
+        &self,
+        max_entries_count: usize,
+        is_sev_es_enabled: bool,
+    ) -> std::result::Result<CpuId, kvm_ioctls::Error> {
+        let mut cpuid = self.kvm.get_supported_cpuid(max_entries_count)?;
+        self.sev_fix_cpuid(&mut cpuid, is_sev_es_enabled)?;
+        Ok(cpuid)
+    }
+
+    /// TODO:
+    pub fn sev_fix_cpuid(
+        &self,
+        cpuid: &mut CpuId,
+        is_sev_es_enabled: bool,
+    ) -> std::result::Result<(), kvm_ioctls::Error> {
+        for entry in cpuid.as_mut_slice().iter_mut() {
+            // See the note of `CpuIdAmdEmc`.
+            if entry.function == 0x8000_001f {
+                entry.index = 0;
+                entry.flags = 0;
+
+                entry.eax = 2;
+                entry.eax |= if is_sev_es_enabled { 8 } else { 0 };
+
+                let cbitpos = HOST_CPUID_AMD_EMC.cbitpos();
+                let phys_addr_reduction = HOST_CPUID_AMD_EMC.phys_addr_reduction();
+                entry.ebx = cbitpos | (phys_addr_reduction << 6);
+
+                entry.ecx = 0;
+                entry.edx = 0;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -343,13 +389,21 @@ mod tests {
                 kvm_bindings::KVM_MAX_CPUID_ENTRIES,
                 #[cfg(feature = "tdx")]
                 false,
+                #[cfg(feature = "sev")]
+                false,
+                #[cfg(feature = "sev")]
+                false,
             )
             .expect("failed to get supported CPUID");
         assert!(c
             .supported_cpuid(
                 0,
                 #[cfg(feature = "tdx")]
-                false
+                false,
+                #[cfg(feature = "sev")]
+                false,
+                #[cfg(feature = "sev")]
+                false,
             )
             .is_err());
     }

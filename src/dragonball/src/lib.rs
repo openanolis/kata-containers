@@ -39,6 +39,8 @@ mod test_utils;
 
 mod vmm;
 
+mod sev;
+
 pub use self::error::StartMicroVmError;
 pub use self::io_manager::IoManagerCached;
 pub use self::vmm::Vmm;

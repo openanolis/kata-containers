@@ -20,6 +20,7 @@ use dbs_virtio_devices::block::{aio::Aio, io_uring::IoUring, Block, LocalFile, U
 use serde_derive::{Deserialize, Serialize};
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
+use crate::api::v1::TeeType;
 use crate::config_manager::{ConfigItem, DeviceConfigInfo, RateLimiterConfigInfo};
 use crate::device_manager::blk_dev_mgr::BlockDeviceError::InvalidDeviceId;
 use crate::device_manager::{DeviceManager, DeviceMgrError, DeviceOpContext};
@@ -566,7 +567,7 @@ impl BlockDeviceMgr {
             Arc::new(cfg.queue_sizes()),
             epoll_mgr,
             limiters,
-            ctx.is_tdx_enabled(),
+            ctx.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]),
         )?))
     }
 

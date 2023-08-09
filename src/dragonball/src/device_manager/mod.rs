@@ -45,7 +45,7 @@ use dbs_upcall::{
 use dbs_virtio_devices::vsock::backend::VsockInnerConnector;
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
-use crate::api::v1::InstanceInfo;
+use crate::api::v1::{InstanceInfo, TeeType};
 use crate::error::StartMicroVmError;
 use crate::resource_manager::ResourceManager;
 use crate::vm::{KernelConfigInfo, Vm, VmConfigInfo};
@@ -324,6 +324,14 @@ impl DeviceOpContext {
             .is_tdx_enabled()
     }
 
+    #[inline(always)]
+    pub(crate) fn is_one_of_tee_enabled(&self, tee_list: &[TeeType]) -> bool {
+        self.shared_info
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_one_of_tee_enabled(tee_list)
+    }
+
     #[allow(unused_variables)]
     fn generate_kernel_boot_args(&mut self, kernel_config: &mut KernelConfigInfo) -> Result<()> {
         if self.is_hotplug {
@@ -551,7 +559,6 @@ impl DeviceManager {
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
     /// Check if tdx enabled
     fn is_tdx_enabled(&self) -> bool {
         self.shared_info
@@ -559,6 +566,15 @@ impl DeviceManager {
             .read()
             .expect("failed to get instance state, because shared info is poisoned lock")
             .is_tdx_enabled()
+    }
+
+    /// Check if one TEE VM type from the list is enabled.
+    #[inline(always)]
+    pub fn is_one_of_tee_enabled(&self, tee_list: &[TeeType]) -> bool {
+        self.shared_info
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_one_of_tee_enabled(tee_list)
     }
 
     /// set userspace_ioapic_enabled after machine config
@@ -620,15 +636,16 @@ impl DeviceManager {
 
             #[cfg(target_arch = "x86_64")]
             {
-                let cmos_params: Option<(u64, u64)> = if self.is_tdx_enabled() {
-                    let memory_size_byte = (vm_config.mem_size_mib as u64) << 20;
-                    let memory_below_4g =
-                        std::cmp::min(dbs_boot::layout::MMIO_LOW_START, memory_size_byte);
-                    let memory_above_4g: u64 = memory_size_byte - memory_below_4g;
-                    Some((memory_below_4g, memory_above_4g))
-                } else {
-                    None
-                };
+                let cmos_params: Option<(u64, u64)> =
+                    if self.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]) {
+                        let memory_size_byte = (vm_config.mem_size_mib as u64) << 20;
+                        let memory_below_4g =
+                            std::cmp::min(dbs_boot::layout::MMIO_LOW_START, memory_size_byte);
+                        let memory_above_4g: u64 = memory_size_byte - memory_below_4g;
+                        Some((memory_below_4g, memory_above_4g))
+                    } else {
+                        None
+                    };
 
                 legacy_manager = LegacyDeviceManager::create_manager(
                     &mut tx.io_manager,

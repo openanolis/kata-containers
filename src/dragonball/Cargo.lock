@@ -95,6 +95,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bitflags"
+version = "2.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "630be753d4e58660abd17930c71b647fe46c27ea6b63cc59e1e3851406972e42"
+
+[[package]]
 name = "blake3"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -231,6 +237,7 @@ dependencies = [
 [[package]]
 name = "dbs-acpi"
 version = "0.1.0"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "vm-memory",
 ]
@@ -238,7 +245,7 @@ dependencies = [
 [[package]]
 name = "dbs-address-space"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "arc-swap",
  "lazy_static",
@@ -252,7 +259,7 @@ dependencies = [
 [[package]]
 name = "dbs-allocator"
 version = "0.1.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "thiserror",
 ]
@@ -273,7 +280,7 @@ dependencies = [
 [[package]]
 name = "dbs-arch"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "kvm-bindings",
  "kvm-ioctls",
@@ -301,7 +308,7 @@ dependencies = [
 [[package]]
 name = "dbs-boot"
 version = "0.3.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "dbs-arch 0.2.2 (git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch)",
  "kvm-bindings",
@@ -316,7 +323,7 @@ dependencies = [
 [[package]]
 name = "dbs-device"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "thiserror",
 ]
@@ -324,7 +331,7 @@ dependencies = [
 [[package]]
 name = "dbs-interrupt"
 version = "0.2.2"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "byteorder",
  "dbs-arch 0.2.2 (git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch)",
@@ -342,7 +349,7 @@ dependencies = [
 [[package]]
 name = "dbs-legacy-devices"
 version = "0.1.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "dbs-device",
  "dbs-utils",
@@ -368,7 +375,7 @@ dependencies = [
 [[package]]
 name = "dbs-upcall"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "anyhow",
  "dbs-utils",
@@ -381,7 +388,7 @@ dependencies = [
 [[package]]
 name = "dbs-utils"
 version = "0.2.1"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "anyhow",
  "event-manager",
@@ -396,7 +403,7 @@ dependencies = [
 [[package]]
 name = "dbs-virtio-devices"
 version = "0.2.0"
-source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#a8d37cd2bffee23f10585a2cbccae4ffffa3b110"
+source = "git+https://github.com/studychao/dragonball-sandbox.git?branch=chao/tdx_test_branch#4628bc802ad76a21ad2bcd45b124b5feaf02ba6a"
 dependencies = [
  "byteorder",
  "caps",
@@ -490,6 +497,7 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "bytes",
+ "cfg-if",
  "dbs-acpi",
  "dbs-address-space",
  "dbs-allocator",
@@ -509,6 +517,8 @@ dependencies = [
  "linux-loader",
  "log",
  "nix 0.24.3",
+ "once_cell",
+ "raw-cpuid",
  "seccompiler",
  "serde",
  "serde_derive",
@@ -531,7 +541,7 @@ version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20df693c700404f7e19d4d6fae6b15215d2913c27955d2b9d6f2c0f537511cd0"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "libc",
 ]
 
@@ -596,7 +606,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91aa2575daf333bef77ad5026d28d5ebdb04ec8e5d7a4ac9b1bb03976c2d673a"
 dependencies = [
  "arc-swap",
- "bitflags",
+ "bitflags 1.3.2",
  "caps",
  "core-foundation-sys",
  "lazy_static",
@@ -772,7 +782,7 @@ version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd1e1a01cfb924fd8c5c43b6827965db394f5a3a16c599ce03452266e1cf984c"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "libc",
 ]
 
@@ -949,7 +959,7 @@ version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f3790c00a0150112de0f4cd161e3d7fc4b2d8a5542ffc35f099a2562aecb35c"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "cc",
  "cfg-if",
  "libc",
@@ -962,7 +972,7 @@ version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa52e972a9a719cecb6864fb88568781eb706bac2cd1d4f04a648542dbf78069"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "cfg-if",
  "libc",
  "memoffset",
@@ -1041,7 +1051,7 @@ checksum = "e0ace6945daa16842e72e9fe7647e2b8715856f50f07350cce82bd68db1ed02c"
 dependencies = [
  "anyhow",
  "arc-swap",
- "bitflags",
+ "bitflags 1.3.2",
  "blake3",
  "fuse-backend-rs",
  "futures",
@@ -1067,7 +1077,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e08bc5ea9054fca2ec8b19dcce25ea600679b7fbf035aad86cfe4a659002c88b"
 dependencies = [
  "arc-swap",
- "bitflags",
+ "bitflags 1.3.2",
  "fuse-backend-rs",
  "hex",
  "lazy_static",
@@ -1119,9 +1129,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "option-ext"
@@ -1189,12 +1199,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw-cpuid"
+version = "11.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d86a7c4638d42c44551f4791a20e687dbb4c3de1f33c43dd71e355cd429def1"
+dependencies = [
+ "bitflags 2.3.3",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -1229,7 +1248,7 @@ version = "0.36.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f43abb88211988493c1abb44a70efa56ff0ce98f233b7b276146f1f3f7ba9644"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "errno",
  "io-lifetimes",
  "libc",
@@ -1322,12 +1341,10 @@ dependencies = [
 [[package]]
 name = "sev"
 version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c77eff933413b557ad3af20f6ddb198471d639d611b4738bcb78d32d7941892"
 dependencies = [
  "bincode",
  "bitfield",
- "bitflags",
+ "bitflags 1.3.2",
  "codicon",
  "dirs",
  "hex",
@@ -1721,7 +1738,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08604d7be03eb26e33b3cee3ed4aef2bf550b305d1cca60e84da5d28d3790b62"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "libc",
 ]
 
@@ -1731,7 +1748,7 @@ version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd64fe09d8e880e600c324e7d664760a17f56e9672b7495a86381b49e4f72f46"
 dependencies = [
- "bitflags",
+ "bitflags 1.3.2",
  "libc",
 ]
 

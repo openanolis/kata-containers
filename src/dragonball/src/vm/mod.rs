@@ -31,7 +31,7 @@ use crate::address_space_manager::{
 };
 #[cfg(feature = "sev")]
 use crate::api::v1::VmStartingStage;
-use crate::api::v1::{ConfidentialVmType, InstanceInfo, InstanceState};
+use crate::api::v1::{InstanceInfo, InstanceState, TeeType};
 use crate::device_manager::console_manager::DmesgWriter;
 use crate::device_manager::{DeviceManager, DeviceMgrError, DeviceOpContext};
 use crate::error::{LoadInitrdError, Result, StartMicroVmError, StopMicrovmError};
@@ -164,6 +164,19 @@ impl Default for VmConfigInfo {
         }
     }
 }
+
+#[cfg(feature = "sev")]
+impl VmConfigInfo {
+    pub(crate) fn is_sev_es_enabled(&self) -> bool {
+        self.sev_start.as_ref().is_some_and(|start| {
+            start
+                .policy
+                .flags
+                .contains(sev_launch::PolicyFlags::ENCRYPTED_STATE)
+        })
+    }
+}
+
 ///
 /// An `Vm` instance holds a resources assigned to a virtual machine instance, such as CPU, memory,
 /// devices etc. When an `Vm` instance gets deconstructed, all resources assigned should be
@@ -223,26 +236,23 @@ impl Vm {
         shared_info: Arc<RwLock<InstanceInfo>>,
         epoll_manager: EpollManager,
     ) -> Result<Self> {
-        let shared_info_guard = shared_info
-            .read()
-            .expect("failed to get instance state, because shared info is poisoned lock");
-        let id = shared_info_guard.id.clone();
+        let (id, confidential_vm_type) = {
+            let shared_info = shared_info
+                .read()
+                .expect("failed to get instance state, because shared info is poisoned lock");
+            (shared_info.id.clone(), shared_info.confidential_vm_type)
+        };
         let logger = slog_scope::logger().new(slog::o!("id" => id));
         let kvm = KvmContext::new(kvm_fd)?;
-        let vm_fd = Self::check_confidential_vm_type_and_create_vm(
-            &logger,
-            shared_info_guard.confidential_vm_type,
-            &kvm,
-        )?;
-        drop(shared_info_guard);
+        let vm_fd = Self::check_tee_type_and_create_vm(&logger, confidential_vm_type, &kvm)?;
 
         let resource_manager = Arc::new(ResourceManager::new(Some(kvm.max_memslots())));
         let device_manager = DeviceManager::new(
             vm_fd.clone(),
-            resource_manager.clone(),
+            Arc::clone(&resource_manager),
             epoll_manager.clone(),
             &logger,
-            shared_info.clone(),
+            Arc::clone(&shared_info),
         );
 
         Ok(Vm {
@@ -277,9 +287,9 @@ impl Vm {
     }
 
     #[allow(unused_variables)]
-    fn check_confidential_vm_type_and_create_vm(
+    fn check_tee_type_and_create_vm(
         logger: &Logger,
-        confidential_vm_type: Option<ConfidentialVmType>,
+        confidential_vm_type: Option<TeeType>,
         kvm: &KvmContext,
     ) -> Result<Arc<VmFd>> {
         // Check compatibility of architecture and confidential computing features
@@ -306,26 +316,26 @@ impl Vm {
         }
         #[cfg(target_arch = "x86_64")]
         Ok(match confidential_vm_type {
-            Some(ConfidentialVmType::TDX) => {
+            Some(TeeType::TDX) => {
                 #[cfg(not(feature = "tdx"))]
                 {
                     error!(
                         logger,
                         "Unsupported confidential VM type {:?}: Dragonball built without feature \"tdx\".",
-                        ConfidentialVmType::TDX
+                        TeeType::TDX
                     );
                     return Err(crate::error::Error::ConfidentialVmType);
                 }
                 #[cfg(feature = "tdx")]
-                Arc::new(kvm.create_vm_with_type(ConfidentialVmType::TDX as u64)?)
+                Arc::new(kvm.create_vm_with_type(TeeType::TDX as u64)?)
             }
-            Some(ConfidentialVmType::SEV) => {
+            Some(TeeType::SEV) => {
                 #[cfg(not(feature = "sev"))]
                 {
                     error!(
                         logger,
                         "Unsupported confidential VM type {:?}: Dragonball built without feature \"sev\".",
-                        ConfidentialVmType::SEV
+                        TeeType::SEV
                     );
                     return Err(crate::error::Error::ConfidentialVmType);
                 }
@@ -450,6 +460,25 @@ impl Vm {
             .read()
             .expect("failed to get instance state, because shared info is poisoned lock");
         shared_info.is_sev_enabled()
+    }
+
+    #[cfg(feature = "sev")]
+    pub(crate) fn is_sev_es_enabled(&self) -> bool {
+        self.vm_config.sev_start.as_ref().is_some_and(|start| {
+            start
+                .policy
+                .flags
+                .contains(sev_launch::PolicyFlags::ENCRYPTED_STATE)
+        })
+    }
+
+    /// Check if one TEE VM type from the list is enabled.
+    #[inline(always)]
+    pub fn is_one_of_tee_enabled(&self, tee_list: &[TeeType]) -> bool {
+        self.shared_info()
+            .read()
+            .expect("failed to get instance state, because shared info is poisoned lock")
+            .is_one_of_tee_enabled(tee_list)
     }
 
     /// Save VM instance exit state
@@ -883,8 +912,7 @@ impl Vm {
                     AddressManagerError::GuestMemoryNotInitialized,
                 ))?;
 
-            let is_tee = self.is_tdx_enabled() || self.is_sev_enabled();
-            if !is_tee {
+            if self.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]) {
                 self.init_configure_system(&vm_as)?;
                 #[cfg(feature = "dbs-upcall")]
                 self.init_upcall()?;
@@ -1319,7 +1347,7 @@ pub mod tests {
     #[cfg(feature = "tdx")]
     fn test_load_firmware() {
         // prepare resource
-        use crate::api::v1::ConfidentialVmType;
+        use crate::api::v1::TeeType;
         let kernel_path = "/test_resources/linux-loader/test_elf.bin";
         let kernel_path_buf = PathBuf::from(kernel_path);
         if !kernel_path_buf.exists() {
@@ -1355,7 +1383,7 @@ pub mod tests {
         vm.shared_info
             .write()
             .expect("Failed to start microVM because shared info couldn't be written due to poisoned lock")
-            .confidential_vm_type = Some(ConfidentialVmType::TDX);
+            .confidential_vm_type = Some(TeeType::TDX);
         vm.set_vm_config(vm_config);
         assert!(vm.init_guest_memory().is_ok());
         let vm_memory = vm
@@ -1429,7 +1457,7 @@ pub mod tests {
             address_space,
             payload_info,
             &acpi_tables,
-            ConfidentialVmType::TDX,
+            TeeType::TDX,
         );
         assert!(res.is_ok());
     }

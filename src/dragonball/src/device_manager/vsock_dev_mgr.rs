@@ -18,6 +18,7 @@ use dbs_virtio_devices::Error as VirtioError;
 use serde_derive::{Deserialize, Serialize};
 
 use super::StartMicroVmError;
+use crate::api::v1::TeeType;
 use crate::config_manager::{ConfigItem, DeviceConfigInfo, DeviceConfigInfos};
 use crate::device_manager::{DeviceManager, DeviceOpContext};
 
@@ -221,7 +222,7 @@ impl VsockDeviceMgr {
                     info.config.guest_cid as u64,
                     Arc::new(info.config.queue_sizes()),
                     epoll_mgr.clone(),
-                    ctx.is_tdx_enabled(),
+                    ctx.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]),
                 )
                 .map_err(VirtioError::VirtioVsockError)
                 .map_err(StartMicroVmError::CreateVsockDevice)?,

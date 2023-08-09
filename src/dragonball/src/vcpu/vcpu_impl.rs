@@ -853,6 +853,8 @@ pub mod tests {
                 kvm_bindings::KVM_MAX_CPUID_ENTRIES,
                 #[cfg(feature = "tdx")]
                 false,
+                #[cfg(feature = "sev")]
+                false,
             )
             .unwrap();
         let reset_event_fd = EventFd::new(libc::EFD_NONBLOCK).unwrap();
@@ -870,6 +872,7 @@ pub mod tests {
             tx,
             time_stamp,
             false,
+            #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             None,
         )
         .unwrap();

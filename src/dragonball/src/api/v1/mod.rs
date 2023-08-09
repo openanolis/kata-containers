@@ -12,9 +12,11 @@ pub use self::boot_source::{BootSourceConfig, BootSourceConfigError, DEFAULT_KER
 
 /// Wrapper over the microVM general information.
 mod instance_info;
-pub use self::instance_info::{ConfidentialVmType, InstanceInfo, InstanceState};
 #[cfg(feature = "sev")]
 pub use self::instance_info::VmStartingStage;
+pub use self::instance_info::{InstanceInfo, InstanceState, TeeType};
+/// TODO: doc
+pub type ConfidentialVmType = TeeType;
 
 /// Wrapper for configuring the memory and CPU of the microVM.
 mod machine_config;

@@ -11,6 +11,7 @@ use serde_derive::{Deserialize, Serialize};
 use slog::{error, info};
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
+use crate::api::v1::TeeType;
 use crate::config_manager::{
     ConfigItem, DeviceConfigInfo, DeviceConfigInfos, RateLimiterConfigInfo,
 };
@@ -420,7 +421,7 @@ impl FsDeviceMgr {
                 Box::new(handler),
                 epoll_mgr,
                 limiter,
-                ctx.is_tdx_enabled(),
+                ctx.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]),
             )
             .map_err(FsDeviceError::CreateFsDevice)?,
         );

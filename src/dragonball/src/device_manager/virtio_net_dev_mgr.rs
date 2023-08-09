@@ -17,6 +17,7 @@ use dbs_virtio_devices::Error as VirtioError;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::address_space_manager::GuestAddressSpaceImpl;
+use crate::api::v1::TeeType;
 use crate::config_manager::{
     ConfigItem, DeviceConfigInfo, DeviceConfigInfos, RateLimiterConfigInfo,
 };
@@ -370,7 +371,7 @@ impl VirtioNetDeviceMgr {
             epoll_mgr,
             rx_rate_limiter,
             tx_rate_limiter,
-            ctx.is_tdx_enabled(),
+            ctx.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]),
         )?;
 
         Ok(Box::new(net_device))

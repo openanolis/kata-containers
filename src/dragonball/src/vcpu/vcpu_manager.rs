@@ -245,6 +245,11 @@ impl VcpuManager {
             .read()
             .expect("Failed to determine if instance is confidential vm because shared_info couldn't be read due to poisoned lock")
             .is_tdx_enabled();
+        #[cfg(feature = "sev")]
+        let is_sev_enable = shared_info
+            .read()
+            .expect("Failed to determine if instance is confidential vm because shared_info couldn't be read due to poisoned lock")
+            .is_sev_enabled();
 
         let support_immediate_exit = kvm_context.kvm().check_extension(Cap::ImmediateExit);
         let max_vcpu_count = vm_config_info.max_vcpu_count;
@@ -281,6 +286,10 @@ impl VcpuManager {
                 kvm_bindings::KVM_MAX_CPUID_ENTRIES,
                 #[cfg(feature = "tdx")]
                 is_tdx_enable,
+                #[cfg(feature = "sev")]
+                is_sev_enable,
+                #[cfg(feature = "sev")]
+                vm_config_info.is_sev_es_enabled(),
             )
             .map_err(VcpuManagerError::Kvm)?;
         #[cfg(target_arch = "x86_64")]

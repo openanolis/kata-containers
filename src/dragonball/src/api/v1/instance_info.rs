@@ -9,7 +9,7 @@ use serde_derive::{Deserialize, Serialize};
 /// from confidential container related requests.
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub enum ConfidentialVmType {
+pub enum TeeType {
     /// Intel Trusted Domain
     TDX = 2,
     /// AMD Secure Encrypted Virtualization (SEV, SEV-ES)
@@ -94,7 +94,7 @@ pub struct InstanceInfo {
     /// Last instance downtime
     pub last_instance_downtime: u64,
     /// Confidential vm type
-    pub confidential_vm_type: Option<ConfidentialVmType>,
+    pub confidential_vm_type: Option<TeeType>,
 }
 
 impl InstanceInfo {
@@ -114,12 +114,26 @@ impl InstanceInfo {
 
     /// return true if VM confidential type is TDX
     pub fn is_tdx_enabled(&self) -> bool {
-        matches!(self.confidential_vm_type, Some(ConfidentialVmType::TDX))
+        matches!(self.confidential_vm_type, Some(TeeType::TDX))
     }
 
     /// return true if VM confidential type is SEV
     pub fn is_sev_enabled(&self) -> bool {
-        matches!(self.confidential_vm_type, Some(ConfidentialVmType::SEV))
+        matches!(self.confidential_vm_type, Some(TeeType::SEV))
+    }
+
+    /// Check if one TEE VM type from the list is enabled.
+    #[inline(always)]
+    pub fn is_one_of_tee_enabled(&self, tee_list: &[TeeType]) -> bool {
+        if tee_list.len() == 0 {
+            return false;
+        }
+
+        if let Some(tee_type) = self.confidential_vm_type {
+            tee_list.iter().any(|&t| t == tee_type)
+        } else {
+            false
+        }
     }
 }
 

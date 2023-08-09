@@ -13,6 +13,7 @@ use log::{debug, error, info, warn};
 
 use crate::error::{Result, StartMicroVmError, StopMicrovmError};
 use crate::event_manager::EventManager;
+use crate::sev::HOST_CPUID_AMD_EMC;
 use crate::vm::{CpuTopology, KernelConfigInfo, VmConfigInfo};
 use crate::vmm::Vmm;
 
@@ -306,7 +307,7 @@ impl VmmService {
             .map_err(|e| BootSource(InvalidKernelPath(e)))?;
 
         // Open firmware image file if there is one.
-        let is_firmware_required = vm.is_tdx_enabled() || vm.is_sev_enabled();
+        let is_firmware_required = vm.is_one_of_tee_enabled(&[TeeType::TDX, TeeType::SEV]);
         let firmware_file = match (is_firmware_required, &boot_source_config.firmware_path) {
             (false, None) => None,
             (false, Some(_)) => {
@@ -478,8 +479,19 @@ impl VmmService {
         }
         #[cfg(feature = "sev")]
         {
-            if machine_config.sev_start.is_some() {
-                config.sev_start = machine_config.sev_start;
+            if let Some(sev_start) = machine_config.sev_start {
+                if !HOST_CPUID_AMD_EMC.SEV() {
+                    return Err(MachineConfig(HostSevNotSupported));
+                }
+                if sev_start
+                    .policy
+                    .flags
+                    .contains(sev::launch::sev::PolicyFlags::ENCRYPTED_STATE)
+                    && !HOST_CPUID_AMD_EMC.SEV_ES()
+                {
+                    return Err(MachineConfig(HostSevEsNotSupported));
+                }
+                config.sev_start = Some(sev_start);
             }
         }
 

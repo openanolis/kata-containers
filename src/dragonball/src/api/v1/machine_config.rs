@@ -83,4 +83,12 @@ pub enum VmConfigError {
     /// NUMA region vCPU count is invalid
     #[error("Max id of vCPUs in NUMA regions: {0}, should matches max vcpu count in config")]
     InvalidNumaRegionCpuMaxId(u16),
+
+    /// The host CPU does not support AMD SEV.
+    #[error("The host CPU does not support AMD SEV")]
+    HostSevNotSupported,
+
+    /// The host CPU support SEV, but does not support SEV-ES.
+    #[error("The host CPU support SEV, but does not support SEV-ES")]
+    HostSevEsNotSupported,
 }
