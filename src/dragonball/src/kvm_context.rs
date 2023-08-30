@@ -22,7 +22,9 @@ use kvm_ioctls::{Cap, Kvm, VmFd};
 #[cfg(feature = "tdx")]
 use vmm_sys_util::errno;
 
-use crate::{error::{Error as VmError, Result}, sev::HOST_CPUID_AMD_EMC};
+use crate::error::{Error as VmError, Result};
+#[cfg(feature = "sev")]
+use crate::sev::HOST_CPUID_AMD_EMC;
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required
@@ -322,14 +324,13 @@ impl KvmContext {
         Ok(cpuid)
     }
 
-    /// TODO:
+    /// Fixes the SEV related cpuid. See the note of `CpuIdAmdEmc`.
     pub fn sev_fix_cpuid(
         &self,
         cpuid: &mut CpuId,
         is_sev_es_enabled: bool,
     ) -> std::result::Result<(), kvm_ioctls::Error> {
         for entry in cpuid.as_mut_slice().iter_mut() {
-            // See the note of `CpuIdAmdEmc`.
             if entry.function == 0x8000_001f {
                 entry.index = 0;
                 entry.flags = 0;

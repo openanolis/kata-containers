@@ -39,7 +39,9 @@ mod test_utils;
 
 mod vmm;
 
-mod sev;
+/// AMD SEV related facilities for virtual machines.
+#[cfg(feature = "sev")]
+pub mod sev;
 
 pub use self::error::StartMicroVmError;
 pub use self::io_manager::IoManagerCached;

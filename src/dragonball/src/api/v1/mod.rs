@@ -15,7 +15,8 @@ mod instance_info;
 #[cfg(feature = "sev")]
 pub use self::instance_info::VmStartingStage;
 pub use self::instance_info::{InstanceInfo, InstanceState, TeeType};
-/// TODO: doc
+/// This struct represents the strongly typed equivalent of the json body from confidential container related requests.
+#[deprecated(note = "Use TeeType instead.")]
 pub type ConfidentialVmType = TeeType;
 
 /// Wrapper for configuring the memory and CPU of the microVM.

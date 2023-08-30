@@ -855,6 +855,8 @@ pub mod tests {
                 false,
                 #[cfg(feature = "sev")]
                 false,
+                #[cfg(feature = "sev")]
+                false,
             )
             .unwrap();
         let reset_event_fd = EventFd::new(libc::EFD_NONBLOCK).unwrap();

@@ -13,8 +13,6 @@
 use dbs_tdx::tdx_ioctls::TdxIoctlError;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtIoError;
-#[cfg(feature = "sev")]
-use sev::launch::sev as sev_launch;
 
 #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
 use crate::device_manager::ioapic_dev_mgr::IoapicDeviceMgrError;
@@ -95,6 +93,10 @@ pub enum LoadTdDataError {
     /// Failed to parse tdshim data
     #[error("failed to parse tdshim data: {0}")]
     ParseTdshim(#[source] dbs_tdx::td_shim::metadata::TdvfError),
+    /// Failed to parse the ovmf table of tdshim
+    #[cfg(feature = "sev")]
+    #[error("failed to parse the ovmf table of tdshim: {0}")]
+    ParseOvmfTable(#[source] crate::sev::sev::tdshim::ParseOvmfTableError),
     /// Failed to read tdshim data
     #[error("failed to read tdshim data: {0}")]
     ReadTdshim(#[source] std::io::Error),
@@ -237,27 +239,29 @@ pub enum StartMicroVmError {
     #[error("SEV error: {0}")]
     SevIoctlError(#[source] std::io::Error),
 
-    /// Cannot start SEV VM beacuse `vm_config.sev_start` is not set
-    #[cfg(feature = "sev")]
-    #[error("cannot start SEV VM beacuse `vm_config.sev_start` is not set")]
-    SevMissingStart,
-
-    /// Cannot start SEV VM beacuse `vm_config.sev_secret` is not set
-    #[cfg(feature = "sev")]
-    #[error("cannot start SEV VM beacuse `vm_config.sev_secret` is not set")]
-    SevMissingSecret,
-
     /// SEV not supported
     #[error("Dragonball without SEV support.")]
     SevNotSupported,
 
-    /// Starting an SEV VM requires two calls to `start_microvm`. This time
-    /// (the first time) it successfully completed and the measurement is returned.
-    /// However, the VM has not yet started. Call `start_microvm` again with the
-    /// `secret` set to start the VM.
+    /// SEV microVM paused, waiting for injecting secrets and then resume execution.
     #[cfg(feature = "sev")]
-    #[error("SEV VM measured and measurement returned.")]
-    SevMeasured(sev_launch::Measurement),
+    #[error("SEV microVM paused, waiting for injecting secrets and then resume execution.")]
+    SevPaused,
+
+    /// SEV VM is currently not in SevPaused state where secrets can be injected.
+    #[cfg(feature = "sev")]
+    #[error("SEV VM is currently not in SevPaused state where secrets can be injected.")]
+    SevVmNotInjectable,
+
+    /// Invalid guest physical address, not within any valid memory region.
+    #[cfg(feature = "sev")]
+    #[error("Invalid guest physical address, not within any valid memory region.")]
+    SevInvalidGpa,
+
+    /// The SEV secret attempting to inject is too long.
+    #[cfg(feature = "sev")]
+    #[error("The SEV secret attempting to inject is too long.")]
+    SevOverlyLongSecret,
 
     /// Cannot load td data
     #[cfg(any(feature = "tdx", feature = "sev"))]

@@ -13,7 +13,10 @@ use log::{debug, error, info, warn};
 
 use crate::error::{Result, StartMicroVmError, StopMicrovmError};
 use crate::event_manager::EventManager;
-use crate::sev::HOST_CPUID_AMD_EMC;
+#[cfg(feature = "sev")]
+use crate::sev::{sev::SevSecretsInjection, HOST_CPUID_AMD_EMC};
+#[cfg(feature = "sev")]
+use crate::vm::SevMeasurement;
 use crate::vm::{CpuTopology, KernelConfigInfo, VmConfigInfo};
 use crate::vmm::Vmm;
 
@@ -97,18 +100,16 @@ pub enum VmmAction {
     ConfigureBootSource(BootSourceConfig),
 
     /// Launch the microVM. This action can only be called before the microVM has booted.
-    ///
-    /// For SEV VM, it needs to first call `StartMicroVm`, followed by
-    /// `StartMicroVmWithSecret`. Normally, the first call will return
-    /// `StartMicroVmError::SevMeasured(Measurement)`. The user should verify the
-    /// measurement, generate a secret, and use it for the second call. When the
-    /// second call returns Ok, the VM is truly successfully started.
     StartMicroVm,
 
-    /// Launch the microVM with the SEV secret. Before calling this,
-    /// `StartMicroVm` must be called first.
+    /// Launch the AMD SEV microVM. This action can only be called before the microVM has booted.
     #[cfg(feature = "sev")]
-    StartMicroVmWithSevSecret(sev::launch::sev::Secret),
+    StartSevMicroVm,
+
+    /// Inject SEV secrets. This can only be invoked when VM is at VmStartingStage::SevPaused.
+    /// `resume` in the parameters can be specified as true to let VM to complete its startup.
+    #[cfg(feature = "sev")]
+    InjectSevSecrets(SevSecretsInjection),
 
     /// Shutdown the vmicroVM. This action can only be called after the microVM has booted.
     /// When vmm is used as the crate by the other process, which is need to
@@ -178,6 +179,10 @@ pub enum VmmData {
     Empty,
     /// The microVM configuration represented by `VmConfigInfo`.
     MachineConfiguration(Box<VmConfigInfo>),
+
+    /// The measurement of the starting of SEV microVM.
+    #[cfg(feature = "sev")]
+    SevMeasurement(SevMeasurement),
 }
 
 /// Request data type used to communicate between the API and the VMM.
@@ -229,8 +234,10 @@ impl VmmService {
             }
             VmmAction::StartMicroVm => self.start_microvm(vmm, event_mgr),
             #[cfg(feature = "sev")]
-            VmmAction::StartMicroVmWithSevSecret(secret) => {
-                self.start_microvm_with_sev_secret(vmm, event_mgr, Box::new(secret))
+            VmmAction::StartSevMicroVm => self.start_sev_microvm(vmm, event_mgr),
+            #[cfg(feature = "sev")]
+            VmmAction::InjectSevSecrets(injection) => {
+                self.inject_sev_secrets(vmm, event_mgr, injection)
             }
             VmmAction::ShutdownMicroVm => self.shutdown_microvm(vmm),
             VmmAction::GetVmConfiguration => Ok(VmmData::MachineConfiguration(Box::new(
@@ -364,23 +371,56 @@ impl VmmService {
     }
 
     #[cfg(feature = "sev")]
-    fn start_microvm_with_sev_secret(
+    fn start_sev_microvm(
         &mut self,
         vmm: &mut Vmm,
         event_mgr: &mut EventManager,
-        secret: Box<sev::launch::sev::Secret>,
     ) -> VmmRequestResult {
-        use self::StartMicroVmError::IncorrectSevStartCallSequence;
+        use self::StartMicroVmError::{MicroVmAlreadyRunning, SevNotSupported};
         use self::VmmActionError::StartMicroVm;
 
         let vmm_seccomp_filter = vmm.vmm_seccomp_filter();
         let vcpu_seccomp_filter = vmm.vcpu_seccomp_filter();
 
         let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
-        if vm.instance_state() != InstanceState::Starting(VmStartingStage::SevMeasured) {
-            return Err(StartMicroVm(IncorrectSevStartCallSequence));
+        if !vm.is_sev_enabled() {
+            return Err(StartMicroVm(SevNotSupported));
         }
-        vm.set_sev_secret(secret);
+        if vm.is_vm_initialized() {
+            return Err(StartMicroVm(MicroVmAlreadyRunning));
+        }
+
+        let res = vm.start_microvm(event_mgr, vmm_seccomp_filter, vcpu_seccomp_filter);
+        match res {
+            Ok(()) | Err(StartMicroVmError::SevPaused) => {
+                // Safe to unwarp because the build and measurement must be set
+                // during starting microvm when sev is enabled.
+                Ok(VmmData::SevMeasurement(vm.sev_measurement().clone()))
+            }
+            Err(e) => Err(StartMicroVm(e)),
+        }
+    }
+
+    #[cfg(feature = "sev")]
+    fn inject_sev_secrets(
+        &mut self,
+        vmm: &mut Vmm,
+        event_mgr: &mut EventManager,
+        injection: SevSecretsInjection,
+    ) -> VmmRequestResult {
+        use self::VmmActionError::StartMicroVm;
+
+        let vmm_seccomp_filter = vmm.vmm_seccomp_filter();
+        let vcpu_seccomp_filter = vmm.vcpu_seccomp_filter();
+        let vm = vmm.get_vm_mut().ok_or(VmmActionError::InvalidVMID)?;
+
+        vm.sev_inject_secrets(injection.secrets)
+            .map(|_| VmmData::Empty)
+            .map_err(StartMicroVm)?;
+
+        if !injection.resume_vm {
+            return Ok(VmmData::Empty);
+        }
 
         vm.start_microvm(event_mgr, vmm_seccomp_filter, vcpu_seccomp_filter)
             .map(|_| VmmData::Empty)
@@ -479,20 +519,18 @@ impl VmmService {
         }
         #[cfg(feature = "sev")]
         {
-            if let Some(sev_start) = machine_config.sev_start {
-                if !HOST_CPUID_AMD_EMC.SEV() {
-                    return Err(MachineConfig(HostSevNotSupported));
+            let is_sev_enabled = vm.is_sev_enabled();
+
+            if let Some(sev_start_inner) = machine_config.sev_start.get() {
+                if !is_sev_enabled {
+                    return Err(MachineConfig(SevNotSupported));
                 }
-                if sev_start
-                    .policy
-                    .flags
-                    .contains(sev::launch::sev::PolicyFlags::ENCRYPTED_STATE)
-                    && !HOST_CPUID_AMD_EMC.SEV_ES()
-                {
-                    return Err(MachineConfig(HostSevEsNotSupported));
+                if sev_start_inner.is_sev_es_enabled() && !HOST_CPUID_AMD_EMC.SEV_ES() {
+                    return Err(MachineConfig(SevEsNotSupported));
                 }
-                config.sev_start = Some(sev_start);
             }
+
+            config.sev_start = machine_config.sev_start;
         }
 
         vm.set_vm_config(config.clone());

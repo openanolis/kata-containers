@@ -233,7 +233,7 @@ impl VcpuManager {
     pub fn new(
         vm_fd: Arc<VmFd>,
         kvm_context: &KvmContext,
-        vm_config_info: &VmConfigInfo,
+        vm_config_info: &mut VmConfigInfo,
         vm_as: GuestAddressSpaceImpl,
         vcpu_seccomp_filter: BpfProgram,
         shared_info: Arc<RwLock<InstanceInfo>>,
@@ -250,6 +250,9 @@ impl VcpuManager {
             .read()
             .expect("Failed to determine if instance is confidential vm because shared_info couldn't be read due to poisoned lock")
             .is_sev_enabled();
+        #[cfg(feature = "sev")]
+        let is_sev_es_enable =
+            is_sev_enable && vm_config_info.sev_start.get_or_init().is_sev_es_enabled();
 
         let support_immediate_exit = kvm_context.kvm().check_extension(Cap::ImmediateExit);
         let max_vcpu_count = vm_config_info.max_vcpu_count;
@@ -289,7 +292,7 @@ impl VcpuManager {
                 #[cfg(feature = "sev")]
                 is_sev_enable,
                 #[cfg(feature = "sev")]
-                vm_config_info.is_sev_es_enabled(),
+                is_sev_es_enable,
             )
             .map_err(VcpuManagerError::Kvm)?;
         #[cfg(target_arch = "x86_64")]
@@ -1145,7 +1148,7 @@ mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1197,7 +1200,7 @@ mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };

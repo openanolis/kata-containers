@@ -6,13 +6,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 
+use std::convert::TryInto;
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use std::io::{Seek, SeekFrom};
 use std::mem;
 use std::ops::Deref;
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use std::os::unix::io::AsRawFd;
-use std::{convert::TryInto, io::Write};
 
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use dbs_acpi::acpi::create_acpi_tables_tdx;
@@ -36,6 +36,7 @@ use kvm_bindings::{kvm_irqchip, kvm_pit_config, kvm_pit_state2, KVM_PIT_SPEAKER_
 use linux_loader::cmdline::Cmdline;
 #[cfg(feature = "sev")]
 use sev::{firmware::host::Firmware as SevFirmware, launch::sev as sev_launch};
+#[allow(unused_imports)]
 use slog::{debug, info};
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use vm_memory::ByteValued;
@@ -43,17 +44,23 @@ use vm_memory::{Address, Bytes, GuestAddress, GuestAddressSpace, GuestMemory};
 
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::address_space_manager::AddressManagerError;
+use crate::address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl};
+#[cfg(any(feature = "tdx", feature = "sev"))]
+use crate::api::v1::TeeType;
 #[cfg(feature = "sev")]
 use crate::api::v1::{InstanceState, VmStartingStage};
 #[cfg(any(feature = "tdx", feature = "sev"))]
 use crate::error::LoadTdDataError;
 use crate::error::{Error, Result, StartMicroVmError};
 use crate::event_manager::EventManager;
-use crate::vm::{Vm, VmError};
-use crate::{
-    address_space_manager::{GuestAddressSpaceImpl, GuestMemoryImpl},
-    api::v1::TeeType,
+#[cfg(feature = "sev")]
+use crate::sev::sev::{
+    tdshim::{SevHashesTableGpa, SevSecretBlockGpa},
+    SecretWithGpa,
 };
+#[cfg(feature = "sev")]
+use crate::vm::SevMeasurement;
+use crate::vm::{Vm, VmError};
 
 /// Configures the system and should be called once per vm before starting vcpu
 /// threads.
@@ -588,7 +595,6 @@ impl Vm {
             ));
         };
 
-        // Safe to unwrap here
         Ok((hob_offset, payload_offset, payload_size, cmdline_offset))
     }
 
@@ -643,10 +649,7 @@ impl Vm {
 
         // Create the payload info that will be inserted into
         // the HOB.
-        let payload_info = PayloadInfo {
-            image_type: PayloadImageType::BzImage,
-            entry_point: payload_offset,
-        };
+        let payload_info = PayloadInfo::new(PayloadImageType::BzImage, payload_offset);
         Ok(payload_info)
     }
 
@@ -708,7 +711,7 @@ impl Vm {
         payload_info: PayloadInfo,
         acpi_tables: &[dbs_acpi::sdt::Sdt],
         tee_type: TeeType,
-    ) -> std::result::Result<(), vm_memory::GuestMemoryError> {
+    ) -> std::result::Result<u64, vm_memory::GuestMemoryError> {
         let mut hob = dbs_tdx::td_shim::hob::TdHob::start(hob_offset);
         // add memory resource
         let mut memory_regions: Vec<(bool, u64, u64)> = Vec::new();
@@ -746,7 +749,9 @@ impl Vm {
         for acpi_table in acpi_tables {
             hob.add_acpi_table(vm_memory, acpi_table.as_slice())?;
         }
-        hob.finish(vm_memory)
+        hob.finish(vm_memory)?;
+
+        Ok(hob.current_len())
     }
 }
 
@@ -783,33 +788,31 @@ impl Vm {
                     AddressManagerError::GuestMemoryNotInitialized,
                 ))?;
 
-        self.generate_hob_list(
-            hob_offset,
-            vm_memory.deref(),
-            address_space,
-            payload_info,
-            &acpi_tables,
-            TeeType::SEV,
-        )
-        .map_err(LoadTdDataError::LoadData)
-        .map_err(StartMicroVmError::TdDataLoader)?;
+        let hob_len = self
+            .generate_hob_list(
+                hob_offset,
+                vm_memory.deref(),
+                address_space,
+                payload_info,
+                &acpi_tables,
+                TeeType::SEV,
+            )
+            .map_err(LoadTdDataError::LoadData)
+            .map_err(StartMicroVmError::TdDataLoader)?;
 
         // Do some SEV ioctl(2).
 
-        let sev_fd = SevFirmware::open().map_err(StartMicroVmError::SevIoctlError)?;
-        // let platform_status = sev_fd
-        //     .platform_status()
-        //     .map_err(|e| Into::<std::io::Error>::into(e))
-        //     .map_err(sev::error::Error::IoError)
-        //     .map_err(StartMicroVmError::SevError)?;
-        // let build = platform_status.build;
+        let mut sev_fd = SevFirmware::open().map_err(StartMicroVmError::SevIoctlError)?;
+        let platform_status = sev_fd
+            .platform_status()
+            .map_err(Into::<std::io::Error>::into)
+            .map_err(StartMicroVmError::SevIoctlError)?;
+        let build = platform_status.build;
 
-        // TODO: check is sev-es supported:
-        // status.flags & SEV_STATUS_FLAGS_CONFIG_ES
-        // SEV_STATUS_FLAGS_CONFIG_ES = 0x0100
-        // TODO: check is in-kernel irqchip allowed
+        // Note: Currently, dragonball always use in-kernel irqchip, which is required by SEV-ES.
+        let is_sev_es_enabled = self.vm_config.sev_start.get_or_init().is_sev_es_enabled();
 
-        let launcher = if self.is_sev_es_enabled() {
+        let launcher = if is_sev_es_enabled {
             sev_launch::Launcher::new_es(self.vm_fd().as_raw_fd(), sev_fd)
                 .map_err(StartMicroVmError::SevIoctlError)?
         } else {
@@ -817,14 +820,20 @@ impl Vm {
                 .map_err(StartMicroVmError::SevIoctlError)?
         };
 
-        let start = self
-            .vm_config
-            .sev_start
-            .take()
-            .ok_or(StartMicroVmError::SevMissingStart)?;
-        let mut launcher = launcher
-            .start(*start)
-            .map_err(StartMicroVmError::SevIoctlError)?;
+        let start = {
+            self.vm_config.sev_start.init();
+            self.vm_config.sev_start.get().unwrap()
+        };
+
+        let mut launcher = if let Some(sc) = start.secure_channel.as_deref() {
+            launcher
+                .start_raw(&start.policy, &sc.cert, &sc.session)
+                .map_err(StartMicroVmError::SevIoctlError)?
+        } else {
+            launcher
+                .start_with_policy_only(start.policy)
+                .map_err(StartMicroVmError::SevIoctlError)?
+        };
 
         self.vcpu_manager()
             .map_err(StartMicroVmError::Vcpu)?
@@ -847,37 +856,89 @@ impl Vm {
         }
 
         info!(self.logger, "Encrypting guest data...");
-        let timer = std::time::Instant::now();
 
-        for section in sections {
-            let host_address = vm_memory
+        // [BFV, CFV, kernel, cmdline, TD-hob]
+        let regions_to_encrypt = {
+            let mut regions_to_encrypt: [Option<(u64, u64)>; 5] = Default::default();
+
+            for section in sections.iter() {
+                let i = match section.r#type {
+                    TdvfSectionType::Bfv => 0,
+                    TdvfSectionType::Cfv => 1,
+                    TdvfSectionType::Payload => 2,
+                    TdvfSectionType::PayloadParam => 3,
+                    TdvfSectionType::TdHob => 4,
+                    _ => {
+                        continue;
+                    }
+                };
+                regions_to_encrypt[i] = Some((section.address, section.size));
+            }
+
+            // Safe to unwarp because they have been tested in `self.load_firmware()`.
+            let mut regions_to_encrypt: [(u64, u64); 5] =
+                regions_to_encrypt.map(|reg| reg.unwrap());
+
+            // Shrink to the exact size of the kernel file, align up to 16.
+            let kernel_file = self
+                .kernel_config
+                .as_mut()
+                .ok_or(StartMicroVmError::MissingKernelConfig)?
+                .kernel_file_mut();
+            let kernel_file_len = kernel_file.metadata().unwrap().len();
+            regions_to_encrypt[2].1 = (kernel_file_len + 15) & !15;
+
+            regions_to_encrypt
+        };
+
+        let cmdline_bytes = {
+            let cmdline = &self.kernel_config.as_ref().unwrap().cmdline;
+            cmdline.as_cstring().unwrap().as_bytes_with_nul().to_vec()
+        };
+
+        let tdhob_bytes = {
+            let (gpa, _) = regions_to_encrypt[4];
+            let hva = vm_memory
                 .deref()
-                .get_host_address(GuestAddress(section.address))
+                .get_host_address(GuestAddress(gpa))
                 .unwrap();
-            let hva = (host_address, section.size as usize);
-            let gpa = (section.address as *mut u8, section.size as usize);
-            debug!(
-                self.logger,
-                "update_data: HVA = {:014p}..{:014p}, GPA = {:014p}..{:014p}",
-                hva.0,
-                unsafe { hva.0.add(hva.1) },
-                gpa.0,
-                unsafe { gpa.0.add(gpa.1) },
-            );
-            launcher
-                .update_data_without_registration(unsafe {
-                    std::slice::from_raw_parts(host_address, section.size as usize)
-                })
-                .map_err(StartMicroVmError::SevIoctlError)?;
-        }
+            let slice = unsafe { std::slice::from_raw_parts(hva, hob_len as usize) };
+            slice.to_vec()
+        };
 
-        if self.is_sev_es_enabled() {
-            launcher
-                .update_vmsa()
-                .map_err(StartMicroVmError::SevIoctlError)?;
-        }
+        let elapsed = {
+            let timer = std::time::Instant::now();
 
-        let elapsed = timer.elapsed();
+            for (gpa, len) in regions_to_encrypt {
+                let hva = vm_memory
+                    .deref()
+                    .get_host_address(GuestAddress(gpa))
+                    .unwrap();
+                debug!(
+                    self.logger,
+                    "update_data: HVA = {:014p}..{:014p}, GPA = {:014p}..{:014p}",
+                    hva,
+                    unsafe { hva.add(len as usize) },
+                    gpa as *mut u8,
+                    unsafe { (gpa as *mut u8).add(len as usize) },
+                );
+                launcher
+                    .update_data_without_registration(unsafe {
+                        std::slice::from_raw_parts(hva, len as usize)
+                    })
+                    .map_err(StartMicroVmError::SevIoctlError)?;
+            }
+
+            if is_sev_es_enabled {
+                debug!(self.logger, "update_vmsa");
+                launcher
+                    .update_vmsa()
+                    .map_err(StartMicroVmError::SevIoctlError)?;
+            }
+
+            timer.elapsed()
+        };
+
         info!(
             self.logger,
             "Encrypting guest data... done in {:?}", elapsed
@@ -887,51 +948,141 @@ impl Vm {
             .measure()
             .map_err(StartMicroVmError::SevIoctlError)?;
 
-        let measurement = launcher.measurement();
-        self.sev_launcher = Some(launcher);
-        self.shared_info
-            .write()
-            .expect(
-                "Failed to start microVM because shared info couldn't \
-                    be written due to poisoned lock",
-            )
-            .state = InstanceState::Starting(VmStartingStage::SevMeasured);
+        let sev_measurement = SevMeasurement {
+            measurement: launcher.measurement(),
+            build,
+            cmdline: cmdline_bytes,
+            tdhob: tdhob_bytes,
+        };
 
         info!(
             self.logger,
-            "VM: SEV microVM measured. Method `start_microvm` returned, waiting \
-                to be called again with the secret to start the VM."
+            "VM: SEV microVM measured, measurement = {:?}, build = {:?}",
+            sev_measurement.measurement,
+            sev_measurement.build,
         );
-        // debug!(self.logger, "VM: SEV measurement = {:?}", measurement);
 
-        Err(StartMicroVmError::SevMeasured(measurement))
+        self.sev_measurement = Some(sev_measurement);
+        self.sev_launcher = Some(launcher);
+
+        if start.paused {
+            self.shared_info
+                .write()
+                .expect(
+                    "Failed to start microVM because shared info couldn't \
+                    be written due to poisoned lock",
+                )
+                .state = InstanceState::Starting(VmStartingStage::SevPaused);
+            info!(
+                self.logger,
+                "VM: SEV microVM paused, waiting for injecting secrets and then resume execution."
+            );
+            Err(StartMicroVmError::SevPaused)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Injects the SEV secrets into the VM.
+    pub fn sev_inject_secrets(
+        &mut self,
+        secrets: Vec<SecretWithGpa>,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        info!(
+            self.logger,
+            "VM: received sev_inject_secrets command, injection_list = {:?}", secrets
+        );
+
+        if !self.is_sev_enabled() {
+            return Err(StartMicroVmError::SevNotSupported);
+        }
+
+        if self.instance_state() != InstanceState::Starting(VmStartingStage::SevPaused) {
+            return Err(StartMicroVmError::SevVmNotInjectable);
+        }
+
+        if secrets.is_empty() {
+            return Ok(());
+        }
+
+        let vm_memory = self
+            .vm_as()
+            .ok_or(StartMicroVmError::AddressManagerError(
+                AddressManagerError::GuestMemoryNotInitialized,
+            ))?
+            .memory();
+
+        for s in secrets {
+            let SecretWithGpa { secret, gpa } = s;
+
+            let gpa = if let Some(gpa) = gpa {
+                gpa
+            } else {
+                let (secret_block, _) = self
+                    .sev_ovmf_table
+                    .get_or_try_init(|| self.parse_ovmf_table())?;
+                if secret.ciphertext.len() > secret_block.size as usize {
+                    return Err(StartMicroVmError::SevOverlyLongSecret);
+                }
+                secret_block.addr as usize
+            };
+
+            if !vm_memory.check_range(GuestAddress(gpa as u64), secret.ciphertext.len()) {
+                return Err(StartMicroVmError::SevInvalidGpa);
+            }
+            let hva = vm_memory
+                .get_host_address(GuestAddress(gpa as u64))
+                .or(Err(StartMicroVmError::SevInvalidGpa))? as usize;
+
+            info!(
+                self.logger,
+                "SEV: inject {} bytes of secret into GPA({:014p}..{:014p}), HVA({:014p}..{:014p})",
+                secret.ciphertext.len(),
+                gpa as *const u8,
+                (gpa + secret.ciphertext.len()) as *const u8,
+                hva as *const u8,
+                (hva + secret.ciphertext.len()) as *const u8,
+            );
+
+            // Safe to unwarp because VM is currently in SevPaused state, where sev_launcher should be set.
+            self.sev_launcher
+                .as_mut()
+                .unwrap()
+                .inject(&secret, hva)
+                .map_err(StartMicroVmError::SevIoctlError)?;
+        }
+
+        Ok(())
+    }
+
+    fn parse_ovmf_table(
+        &self,
+    ) -> std::result::Result<(SevSecretBlockGpa, SevHashesTableGpa), StartMicroVmError> {
+        let kernel_config = self
+            .kernel_config
+            .as_ref()
+            .ok_or(StartMicroVmError::MissingKernelConfig)?;
+
+        // safe to unwarap here as we alredy checked when configuring boot source
+        let firmware_file = kernel_config.firmware_file().unwrap();
+        crate::sev::sev::tdshim::parse_ovmf_table(firmware_file)
+            .map_err(LoadTdDataError::ParseOvmfTable)
+            .map_err(StartMicroVmError::TdDataLoader)
     }
 
     fn init_sev_microvm_rest(&mut self) -> std::result::Result<(), StartMicroVmError> {
-        // Safe to unwarp because the current instance state is
-        // InstanceState::Starting(VmStartingStage::SevMeasured),
-        // at which sev_launcher is Some(..).
-        let mut launcher = self.sev_launcher.take().expect("Missing SEV launcher.");
-        let secret: sev::launch::sev::Secret = *self
-            .sev_secret
-            .take()
-            .ok_or(StartMicroVmError::SevMissingSecret)?;
+        // Safe to unwarp because VM is currently in SevPaused state, where sev_launcher should be Some().
+        let launcher = self.sev_launcher.take().expect("Missing SEV launcher.");
 
-        // FIXME: guest_address is ?
-        let mmap = self.vm_as().unwrap().memory();
-        let region = mmap.iter().next().unwrap();
-        let guest = region.as_ptr() as usize;
-
-        // let guest = guest + region.size() / 2; // 暂时放在中间
-        let guest = guest + region.size() - 16; // 暂时放在末尾
-
-        // launcher
-        //     .inject(&secret, guest)
-        //     .map_err(StartMicroVmError::SevIoctlError)?;
         let _handle = launcher
             .finish()
             .map_err(StartMicroVmError::SevIoctlError)?;
 
         Ok(())
+    }
+
+    /// Get the SEV build info.
+    pub fn sev_measurement(&self) -> &SevMeasurement {
+        self.sev_measurement.as_ref().unwrap()
     }
 }

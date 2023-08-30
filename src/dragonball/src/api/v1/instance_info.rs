@@ -45,14 +45,6 @@ pub enum InstanceState {
 
 /// Denotes the VM's starting stage. Currently used only when booting an SEV VM.
 ///
-/// When booting an SEV VM,
-/// 1. after receiving the `start` data structure, the VMM will measure and
-///    encrypt the VM's memory, returning the memory's measurement. At this point,
-///    VM is at VmStartingStage::SevMeasured.
-/// 2. Then tenant will verify it, generate a secret, and call `start_microvm` again,
-/// 3. with which the VMM will continue the subsequent steps of booting the VM
-///    (starting vcpus, etc).
-///
 /// For more information about the SEV booting process, refer to "Launching a
 /// Guest" in Appendix A of
 /// https://www.amd.com/system/files/TechDocs/55766_SEV-KM_API_Specification.pdf
@@ -61,8 +53,8 @@ pub enum InstanceState {
 pub enum VmStartingStage {
     /// Initial stage
     Initial,
-    /// SEV VM memory has already been measured
-    SevMeasured,
+    /// SEV microVM paused, waiting for injecting secrets and then resume execution 
+    SevPaused,
 }
 
 /// The state of async actions
@@ -125,7 +117,7 @@ impl InstanceInfo {
     /// Check if one TEE VM type from the list is enabled.
     #[inline(always)]
     pub fn is_one_of_tee_enabled(&self, tee_list: &[TeeType]) -> bool {
-        if tee_list.len() == 0 {
+        if tee_list.is_empty() {
             return false;
         }
 

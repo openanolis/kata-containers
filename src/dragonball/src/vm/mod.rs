@@ -38,6 +38,11 @@ use crate::error::{LoadInitrdError, Result, StartMicroVmError, StopMicrovmError}
 use crate::event_manager::EventManager;
 use crate::kvm_context::KvmContext;
 use crate::resource_manager::ResourceManager;
+#[cfg(feature = "sev")]
+use crate::sev::{
+    sev::tdshim::{SevHashesTableGpa, SevSecretBlockGpa},
+    HOST_CPUID_AMD_EMC,
+};
 use crate::vcpu::{VcpuManager, VcpuManagerError};
 #[cfg(target_arch = "aarch64")]
 use dbs_arch::gic::Error as GICError;
@@ -107,6 +112,126 @@ impl Default for CpuTopology {
     }
 }
 
+/// Necessary fields indicating the behavior of SEV microVM startup.
+#[cfg(feature = "sev")]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct SevStart {
+    inner: Option<SevStartInner>,
+}
+
+#[cfg(feature = "sev")]
+impl SevStart {
+    /// Constructs a new instance of SevStart with the given fields.
+    pub fn new(
+        paused: bool,
+        policy: sev_launch::Policy,
+        secure_channel: Option<Box<SevSecureChannel>>,
+    ) -> Self {
+        Self {
+            inner: Some(SevStartInner {
+                paused,
+                policy,
+                secure_channel,
+            }),
+        }
+    }
+
+    /// Returns true if the inner Option is a Some value.
+    pub fn is_some(&self) -> bool {
+        self.inner.is_some()
+    }
+
+    /// Get inner fields or init it. You should always check if SEV is enabled
+    /// before calling this.
+    pub fn get_or_init(&mut self) -> &SevStartInner {
+        if self.inner.is_none() {
+            self.inner = Some(SevStartInner::new_auto());
+        }
+        unsafe { self.inner.as_ref().unwrap_unchecked() }
+    }
+
+    /// Get the inner field.
+    pub fn get(&self) -> Option<&SevStartInner> {
+        self.inner.as_ref()
+    }
+
+    /// Inits the inner field if is None. You should always check if SEV is
+    /// enabled before calling this.
+    pub fn init(&mut self) {
+        if self.inner.is_none() {
+            self.inner = Some(SevStartInner::new_auto());
+        }
+    }
+}
+
+/// Necessary fields indicating the behavior of SEV microVM startup.
+#[cfg(feature = "sev")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SevStartInner {
+    /// Whether the SEV VM will pause and wait for the injection of secrets
+    /// after starting.
+    pub paused: bool,
+    /// The tenant's policy for this SEV guest.
+    pub policy: sev_launch::Policy,
+    /// A struct containing the necessary certificate and session to
+    /// establish a secure channel between AMD-SP and the tenant.
+    pub secure_channel: Option<Box<SevSecureChannel>>,
+}
+
+#[cfg(feature = "sev")]
+impl SevStartInner {
+    pub(crate) fn new_auto() -> Self {
+        let mut policy = sev_launch::Policy::default();
+        policy.flags.set(sev_launch::PolicyFlags::NO_DEBUG, true);
+        policy
+            .flags
+            .set(sev_launch::PolicyFlags::NO_KEY_SHARING, true);
+        if HOST_CPUID_AMD_EMC.SEV_ES() {
+            // TODO: enable SEV-ES by default
+            // policy.flags.set(sev_launch::PolicyFlags::ENCRYPTED_STATE, true);
+        }
+        policy.flags.set(sev_launch::PolicyFlags::NO_SEND, true);
+
+        Self {
+            paused: false,
+            policy,
+            secure_channel: None,
+        }
+    }
+
+    /// Whether SEV-ES is enabled in vm_config.
+    pub fn is_sev_es_enabled(&self) -> bool {
+        self.policy
+            .flags
+            .contains(sev_launch::PolicyFlags::ENCRYPTED_STATE)
+    }
+}
+
+/// A struct containing the necessary certificate and session to
+/// establish a secure channel between AMD-SP and the tenant.
+#[cfg(feature = "sev")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SevSecureChannel {
+    /// The tenant's Diffie-Hellman certificate.
+    pub cert: sev::certs::sev::sev::Certificate,
+    /// A secure channel with the AMD SP.
+    pub session: sev::launch::sev::Session,
+}
+
+/// A struct containing some arguments and the measurement of VM's launch.
+#[cfg(feature = "sev")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SevMeasurement {
+    /// A measurement of the SEV guest.
+    pub measurement: sev::launch::sev::Measurement,
+    /// A description of the SEV platform's build information.
+    pub build: sev::Build,
+    /// The cmdline guest kernel is used.
+    pub cmdline: Vec<u8>,
+    /// The tdhob guest firmware is used.
+    pub tdhob: Vec<u8>,
+}
+
 /// Configuration information for virtual machine instance.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VmConfigInfo {
@@ -133,7 +258,7 @@ pub struct VmConfigInfo {
 
     /// AMD SEV `start`, used to establish a secure session with the AMD SP
     #[cfg(feature = "sev")]
-    pub sev_start: Option<Box<sev::launch::sev::Start>>,
+    pub sev_start: SevStart,
 
     /// userspace iopaic enabled or not
     #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
@@ -158,22 +283,10 @@ impl Default for VmConfigInfo {
             mem_size_mib: 128,
             serial_path: None,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         }
-    }
-}
-
-#[cfg(feature = "sev")]
-impl VmConfigInfo {
-    pub(crate) fn is_sev_es_enabled(&self) -> bool {
-        self.sev_start.as_ref().is_some_and(|start| {
-            start
-                .policy
-                .flags
-                .contains(sev_launch::PolicyFlags::ENCRYPTED_STATE)
-        })
     }
 }
 
@@ -226,7 +339,9 @@ pub struct Vm {
     sev_launcher:
         Option<sev_launch::Launcher<sev_launch::Measured, i32, sev::firmware::host::Firmware>>,
     #[cfg(feature = "sev")]
-    sev_secret: Option<Box<sev::launch::sev::Secret>>,
+    sev_measurement: Option<SevMeasurement>,
+    #[cfg(feature = "sev")]
+    sev_ovmf_table: once_cell::sync::OnceCell<(SevSecretBlockGpa, SevHashesTableGpa)>,
 }
 
 impl Vm {
@@ -236,7 +351,7 @@ impl Vm {
         shared_info: Arc<RwLock<InstanceInfo>>,
         epoll_manager: EpollManager,
     ) -> Result<Self> {
-        let (id, confidential_vm_type) = {
+        let (id, tee_type) = {
             let shared_info = shared_info
                 .read()
                 .expect("failed to get instance state, because shared info is poisoned lock");
@@ -244,7 +359,7 @@ impl Vm {
         };
         let logger = slog_scope::logger().new(slog::o!("id" => id));
         let kvm = KvmContext::new(kvm_fd)?;
-        let vm_fd = Self::check_tee_type_and_create_vm(&logger, confidential_vm_type, &kvm)?;
+        let vm_fd = Self::check_tee_type_and_create_vm(&logger, tee_type, &kvm)?;
 
         let resource_manager = Arc::new(ResourceManager::new(Some(kvm.max_memslots())));
         let device_manager = DeviceManager::new(
@@ -279,21 +394,23 @@ impl Vm {
             irqchip_handle: None,
             #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
             upcall_client: None,
+
             #[cfg(feature = "sev")]
             sev_launcher: None,
             #[cfg(feature = "sev")]
-            sev_secret: None,
+            sev_measurement: None,
+            #[cfg(feature = "sev")]
+            sev_ovmf_table: once_cell::sync::OnceCell::new(),
         })
     }
 
     #[allow(unused_variables)]
     fn check_tee_type_and_create_vm(
         logger: &Logger,
-        confidential_vm_type: Option<TeeType>,
+        tee_type: Option<TeeType>,
         kvm: &KvmContext,
     ) -> Result<Arc<VmFd>> {
-        // Check compatibility of architecture and confidential computing features
-        // at compile time.
+        // Compile-time check.
         #[cfg(all(not(target_arch = "x86_64"), feature = "tdx"))]
         compile_error!(
             "Feature \"tdx\" of Dragonball can only be enabled under the x86_64 \
@@ -306,8 +423,9 @@ impl Vm {
                 architecture."
         );
 
+        // Run-time check.
         #[cfg(not(target_arch = "x86_64"))]
-        if let Some(ty) = confidential_vm_type {
+        if let Some(ty) = tee_type {
             error!(
                 logger,
                 "The confidential VM type {ty:?} can only be used under x86_64."
@@ -315,7 +433,7 @@ impl Vm {
             return Err(crate::error::Error::ConfidentialVmType);
         }
         #[cfg(target_arch = "x86_64")]
-        Ok(match confidential_vm_type {
+        Ok(match tee_type {
             Some(TeeType::TDX) => {
                 #[cfg(not(feature = "tdx"))]
                 {
@@ -340,7 +458,17 @@ impl Vm {
                     return Err(crate::error::Error::ConfidentialVmType);
                 }
                 #[cfg(feature = "sev")]
-                Arc::new(kvm.create_vm()?)
+                {
+                    if !HOST_CPUID_AMD_EMC.SEV() {
+                        error!(
+                            logger,
+                            "Unsupported confidential VM type {:?}: Host CPU does not support SEV.",
+                            TeeType::SEV
+                        );
+                        return Err(crate::error::Error::ConfidentialVmType);
+                    }
+                    Arc::new(kvm.create_vm()?)
+                }
             }
             _ => Arc::new(kvm.create_vm()?),
         })
@@ -399,12 +527,6 @@ impl Vm {
         self.vm_config = config;
     }
 
-    /// Set the SEV secret.
-    #[cfg(feature = "sev")]
-    pub fn set_sev_secret(&mut self, secret: Box<sev_launch::Secret>) {
-        self.sev_secret = Some(secret);
-    }
-
     /// Gets a reference to the kvm file descriptor owned by this VM.
     pub fn vm_fd(&self) -> &VmFd {
         &self.vm_fd
@@ -460,16 +582,6 @@ impl Vm {
             .read()
             .expect("failed to get instance state, because shared info is poisoned lock");
         shared_info.is_sev_enabled()
-    }
-
-    #[cfg(feature = "sev")]
-    pub(crate) fn is_sev_es_enabled(&self) -> bool {
-        self.vm_config.sev_start.as_ref().is_some_and(|start| {
-            start
-                .policy
-                .flags
-                .contains(sev_launch::PolicyFlags::ENCRYPTED_STATE)
-        })
     }
 
     /// Check if one TEE VM type from the list is enabled.
@@ -534,7 +646,7 @@ impl Vm {
         let vcpu_manager = VcpuManager::new(
             self.vm_fd.clone(),
             &self.kvm,
-            &self.vm_config,
+            &mut self.vm_config,
             vm_as,
             vcpu_seccomp_filter,
             self.shared_info.clone(),
@@ -841,7 +953,11 @@ impl Vm {
         info!(self.logger, "VM: received instance start command");
 
         // See note of `api::v1::instance_info::VmStartingStage`.
-        let is_multi_stage_start = cfg!(feature = "sev") && self.is_sev_enabled();
+        #[cfg(not(feature = "sev"))]
+        let is_multi_stage_start = false;
+        #[cfg(feature = "sev")]
+        let is_multi_stage_start =
+            self.is_sev_enabled() && self.vm_config.sev_start.get_or_init().paused;
 
         // Whether to run the specific stage, if is None, run all stages.
         let run_specific_stage = match (is_multi_stage_start, self.instance_state()) {
@@ -849,7 +965,7 @@ impl Vm {
             #[cfg(feature = "sev")]
             (true, InstanceState::Uninitialized) => Some(0),
             #[cfg(feature = "sev")]
-            (true, InstanceState::Starting(VmStartingStage::SevMeasured)) => Some(1),
+            (true, InstanceState::Starting(VmStartingStage::SevPaused)) => Some(1),
             _ => return Err(StartMicroVmError::MicroVmAlreadyRunning),
         };
 
@@ -1088,7 +1204,7 @@ pub mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1118,7 +1234,7 @@ pub mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1161,7 +1277,7 @@ pub mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
@@ -1237,7 +1353,7 @@ pub mod tests {
             },
             vpmu_feature: 0,
             #[cfg(feature = "sev")]
-            sev_start: None,
+            sev_start: Default::default(),
             #[cfg(all(target_arch = "x86_64", feature = "userspace-ioapic"))]
             userspace_ioapic_enabled: false,
         };
