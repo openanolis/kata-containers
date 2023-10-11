@@ -98,12 +98,6 @@ impl DragonballInner {
     pub(crate) async fn cold_start_vm(&mut self, timeout: i32) -> Result<()> {
         info!(sl!(), "start sandbox cold");
 
-        let confidential_vm_type = self
-            .enable_protection()
-            .context("check enable protection")?;
-        self.vmm_instance
-            .set_confidential_vm_type(confidential_vm_type);
-
         self.set_vm_base_config().context("set vm base config")?;
 
         // get rootfs driver
@@ -170,6 +164,13 @@ impl DragonballInner {
         self.run_dir = [KATA_PATH, self.id.as_str()].join("/");
         create_dir_all(self.run_dir.as_str())
             .with_context(|| format!("failed to create dir {}", self.run_dir.as_str()))?;
+
+        // set confidential vm type
+        let confidential_vm_type = self
+            .enable_protection()
+            .context("check enable protection")?;
+        self.vmm_instance
+            .set_confidential_vm_type(confidential_vm_type);
 
         // run vmm server
         self.vmm_instance
