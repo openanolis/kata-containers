@@ -7,6 +7,7 @@
 mod block_volume;
 mod default_volume;
 pub mod hugepage;
+mod secure_volume;
 mod share_fs_volume;
 mod shm_volume;
 use async_trait::async_trait;
@@ -52,7 +53,12 @@ impl VolumeResource {
         let oci_mounts = &spec.mounts;
         // handle mounts
         for m in oci_mounts {
-            let volume: Arc<dyn Volume> = if shm_volume::is_shim_volume(m) {
+            let volume: Arc<dyn Volume> = if secure_volume::is_secure_volume(m) {
+                Arc::new(
+                    secure_volume::SecureVolume::new(m)
+                        .with_context(|| format!("new secure volume {:?}", m))?,
+                )
+            } else if shm_volume::is_shim_volume(m) {
                 let shm_size = shm_volume::DEFAULT_SHM_SIZE;
                 Arc::new(
                     shm_volume::ShmVolume::new(m, shm_size)
