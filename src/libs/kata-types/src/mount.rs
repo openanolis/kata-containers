@@ -60,10 +60,12 @@ impl Mount {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DirectVolumeMountInfo {
     /// The type of the volume (ie. block)
+    #[serde(alias = "volume-type")]
     pub volume_type: String,
     /// The device backing the volume.
     pub device: String,
     /// The filesystem type to be mounted on the volume.
+    #[serde(alias = "fstype")]
     pub fs_type: String,
     /// Additional metadata to pass to the agent regarding this volume.
     pub metadata: HashMap<String, String>,
@@ -77,17 +79,19 @@ pub fn join_path(prefix: &str, volume_path: &str) -> Result<PathBuf> {
     if volume_path.is_empty() {
         return Err(anyhow!("volume path must not be empty"));
     }
-    let b64_encoded_path = base64::encode(volume_path.as_bytes());
+    let b64_url_encoded_path = base64::encode_config(volume_path.as_bytes(), base64::URL_SAFE);
 
-    Ok(safe_path::scoped_join(prefix, b64_encoded_path)?)
+    Ok(safe_path::scoped_join(prefix, b64_url_encoded_path)?)
 }
 
 /// get DirectVolume mountInfo from mountinfo.json.
 pub fn get_volume_mount_info(volume_path: &str) -> Result<DirectVolumeMountInfo> {
     let mount_info_file_path =
         join_path(KATA_DIRECT_VOLUME_ROOT_PATH, volume_path)?.join(KATA_MOUNT_INFO_FILE_NAME);
-    let mount_info_file = fs::read_to_string(mount_info_file_path)?;
-    let mount_info: DirectVolumeMountInfo = serde_json::from_str(&mount_info_file)?;
+    let mount_info_file = fs::read_to_string(&mount_info_file_path)
+        .with_context(|| format!("read from {:?}", &mount_info_file_path))?;
+    let mount_info: DirectVolumeMountInfo = serde_json::from_str(&mount_info_file)
+        .with_context(|| format!("serde from {}", &mount_info_file))?;
 
     Ok(mount_info)
 }

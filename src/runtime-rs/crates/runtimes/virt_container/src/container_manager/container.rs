@@ -163,7 +163,11 @@ impl Container {
         self.agent
             .create_container(r)
             .await
-            .context("agent create container")?;
+            .context("agent create container")
+            .map_err(|e| {
+                error!(self.logger, "agent failed to create container {:?}", e);
+                e
+            })?;
         self.resource_manager.dump().await;
         Ok(())
     }
