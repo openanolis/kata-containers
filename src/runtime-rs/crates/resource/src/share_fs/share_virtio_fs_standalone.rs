@@ -12,9 +12,14 @@ use crate::share_fs::share_virtio_fs::{
 use crate::share_fs::{KATA_GUEST_SHARE_DIR, VIRTIO_FS};
 use agent::Storage;
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use async_trait::async_trait;
 use hypervisor::Hypervisor;
 use kata_types::config::hypervisor::SharedFsInfo;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, Command},

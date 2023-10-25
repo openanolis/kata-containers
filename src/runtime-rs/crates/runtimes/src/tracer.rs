@@ -8,12 +8,17 @@ use std::cmp::min;
 use std::sync::Arc;
 
 use anyhow::Result;
+use slog::Logger;
 use lazy_static::lazy_static;
 use opentelemetry::global;
 use opentelemetry::runtime::Tokio;
 use tracing::{span, subscriber::NoSubscriber, Span, Subscriber};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::Registry;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 const DEFAULT_JAEGER_URL: &str = "http://localhost:14268/api/traces";
 

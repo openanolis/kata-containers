@@ -8,6 +8,10 @@ mod hybrid_vsock;
 pub use hybrid_vsock::HybridVsock;
 mod vsock;
 pub use vsock::Vsock;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 use std::{
     pin::Pin,
@@ -25,6 +29,7 @@ use tokio::{
     net::UnixStream,
 };
 use url::Url;
+use slog::Logger;
 
 const VSOCK_SCHEME: &str = "vsock";
 const HYBRID_VSOCK_SCHEME: &str = "hvsock";

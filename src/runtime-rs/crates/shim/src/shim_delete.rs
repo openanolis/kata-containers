@@ -8,8 +8,13 @@ use anyhow::{Context, Result};
 use containerd_shim_protos::api;
 use kata_sys_util::spec::{get_bundle_path, get_container_type, load_oci_spec};
 use kata_types::container::ContainerType;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use nix::{sys::signal::kill, sys::signal::SIGKILL, unistd::Pid};
 use protobuf::Message;
+use slog::Logger;
 use std::{fs, path::Path};
 
 use crate::{shim::ShimExecutor, Error};

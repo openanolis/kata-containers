@@ -19,12 +19,17 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use path_clean::PathClean;
+use slog::Logger;
 
 use crate::{
     device::{hypervisor, Device, DeviceType},
     PciPath, PciSlot,
 };
 use kata_sys_util::fs::get_base_name;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 pub const SYS_BUS_PCI_DRIVER_PROBE: &str = "/sys/bus/pci/drivers_probe";
 pub const SYS_BUS_PCI_DEVICES: &str = "/sys/bus/pci/devices";

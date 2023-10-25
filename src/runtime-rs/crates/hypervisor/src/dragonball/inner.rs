@@ -10,6 +10,7 @@ use crate::{
     DEV_HUGEPAGES, HUGETLBFS, HUGE_SHMEM, HYPERVISOR_DRAGONBALL, SHMEM,
 };
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use async_trait::async_trait;
 use dragonball::{
     api::v1::{BootSourceConfig, VcpuResizeInfo},
@@ -23,6 +24,10 @@ use kata_types::{
         hypervisor::{HugePageType, Hypervisor as HypervisorConfig},
         KATA_PATH,
     },
+};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
 };
 use nix::mount::MsFlags;
 use persist::sandbox_persist::Persist;

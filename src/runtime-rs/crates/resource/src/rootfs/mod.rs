@@ -8,10 +8,15 @@ mod nydus_rootfs;
 mod share_fs_rootfs;
 use agent::Storage;
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use async_trait::async_trait;
 use kata_types::mount::Mount;
 mod block_rootfs;
 use hypervisor::{device::device_manager::DeviceManager, Hypervisor};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use std::{sync::Arc, vec::Vec};
 use tokio::sync::RwLock;
 

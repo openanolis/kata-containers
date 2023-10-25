@@ -13,8 +13,13 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use nix::sys::socket::{connect, socket, AddressFamily, SockFlag, SockType, VsockAddr};
 use tokio::net::UnixStream;
+use slog::Logger;
 
 use super::{ConnectConfig, Sock, Stream};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct Vsock {

@@ -6,8 +6,13 @@
 
 use anyhow::Result;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use slog::Logger;
 
 use crate::sock;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 // https://github.com/slog-rs/slog/blob/master/src/lib.rs#L2082
 const LOG_LEVEL_TRACE: &str = "TRCE";

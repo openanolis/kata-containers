@@ -8,7 +8,12 @@ use std::sync::Arc;
 
 use agent::Agent;
 use anyhow::Context;
+use slog::Logger;
 use tokio::sync::{mpsc, Mutex};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 /// monitor check interval 30s
 const HEALTH_CHECK_TIMER_INTERVAL: u64 = 30;

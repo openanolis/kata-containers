@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use slog::Logger;
 use hypervisor::{
     device::{
         driver::{
@@ -18,6 +19,10 @@ use hypervisor::{
     Hypervisor, ShareFsDeviceConfig,
 };
 use kata_sys_util::mount;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use nix::mount::MsFlags;
 
 use super::{utils, PASSTHROUGH_FS_DIR};
