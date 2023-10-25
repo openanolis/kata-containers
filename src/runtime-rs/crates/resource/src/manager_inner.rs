@@ -8,6 +8,7 @@ use std::{sync::Arc, thread};
 
 use agent::{types::Device, Agent, Storage};
 use anyhow::{anyhow, Context, Ok, Result};
+use slog::Logger;
 use async_trait::async_trait;
 use hypervisor::{
     device::{
@@ -19,6 +20,10 @@ use hypervisor::{
 };
 use kata_types::config::TomlConfig;
 use kata_types::mount::Mount;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use oci::{Linux, LinuxCpu, LinuxResources};
 use persist::sandbox_persist::Persist;
 use tokio::{runtime, sync::RwLock};

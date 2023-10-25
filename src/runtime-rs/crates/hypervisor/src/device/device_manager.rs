@@ -9,11 +9,16 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use kata_sys_util::rand::RandomBytes;
 use tokio::sync::{Mutex, RwLock};
+use slog::Logger;
 
 use crate::{
     vhost_user_blk::VhostUserBlkDevice, BlockConfig, BlockDevice, HybridVsockDevice, Hypervisor,
     NetworkDevice, VfioDevice, VhostUserConfig, KATA_BLK_DEV_TYPE, KATA_MMIO_BLK_DEV_TYPE,
     KATA_NVDIMM_DEV_TYPE, VIRTIO_BLOCK_MMIO, VIRTIO_BLOCK_PCI, VIRTIO_PMEM,
+};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
 };
 
 use super::{

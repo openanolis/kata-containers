@@ -21,10 +21,15 @@ use std::sync::Arc;
 
 use agent::IPFamily;
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use async_trait::async_trait;
 use hypervisor::device::device_manager::DeviceManager;
 use hypervisor::Hypervisor;
 use kata_types::config::TomlConfig;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use scopeguard::defer;
 use serde::{Deserialize, Serialize};
 use tokio::fs;

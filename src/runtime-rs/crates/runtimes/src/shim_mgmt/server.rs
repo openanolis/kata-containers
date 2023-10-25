@@ -14,11 +14,16 @@
 use std::{fs, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
+use slog::Logger;
 use common::Sandbox;
 use hyper::{server::conn::Http, service::service_fn};
 use shim_interface::{mgmt_socket_addr, shim_mgmt::ERR_NO_SHIM_SERVER};
 use tokio::net::UnixListener;
 
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use super::handlers::handler_mux;
 
 /// The shim management server instance

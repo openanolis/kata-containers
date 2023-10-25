@@ -18,6 +18,11 @@ use hypervisor::{dragonball::Dragonball, BlockConfig, Hypervisor, HYPERVISOR_DRA
 use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_CID};
 use kata_sys_util::hooks::HookStates;
 use kata_types::config::TomlConfig;
+use slog::Logger;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use persist::{self, sandbox_persist::Persist};
 use resource::manager::ManagerArgs;
 use resource::network::{dan_config_path, DanNetworkConfig, NetworkConfig, NetworkWithNetNsConfig};

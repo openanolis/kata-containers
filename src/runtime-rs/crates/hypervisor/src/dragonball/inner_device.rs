@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use dbs_utils::net::MacAddr;
 use dragonball::{
     api::v1::{
@@ -20,6 +21,10 @@ use super::DragonballInner;
 use crate::{
     device::DeviceType, HybridVsockConfig, NetworkConfig, ShareFsDeviceConfig, ShareFsMountConfig,
     ShareFsMountType, ShareFsOperation, VfioBusMode, VfioDevice, VmmState, JAILER_ROOT,
+};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
 };
 
 const MB_TO_B: u32 = 1024 * 1024;

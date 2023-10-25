@@ -12,6 +12,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
+use slog::Logger;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use dragonball::{
     api::v1::{
@@ -25,6 +26,10 @@ use dragonball::{
 use nix::sched::{setns, CloneFlags};
 use seccompiler::BpfProgram;
 use vmm_sys_util::eventfd::EventFd;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 use crate::ShareFsOperation;
 

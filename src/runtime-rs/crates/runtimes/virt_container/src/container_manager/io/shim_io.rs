@@ -17,10 +17,15 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 use nix::{
     fcntl::{self, OFlag},
     sys::stat::Mode,
 };
+use slog::Logger;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncRead, AsyncWrite},

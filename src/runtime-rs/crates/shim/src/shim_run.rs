@@ -8,6 +8,11 @@ use std::os::unix::io::RawFd;
 
 use anyhow::{Context, Result};
 use kata_sys_util::spec::get_bundle_path;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
+use slog::Logger;
 
 use crate::{
     core_sched, logger,

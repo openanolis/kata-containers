@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-use std::{path::PathBuf, str::from_utf8, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, str::from_utf8, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use common::{
@@ -17,6 +17,11 @@ use kata_sys_util::spec::load_oci_spec;
 use kata_types::{
     annotations::Annotation, config::default::DEFAULT_GUEST_DNS_FILE, config::TomlConfig,
 };
+use logging::{
+    FILTER_RULE,
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 #[cfg(feature = "linux")]
 use linux_container::LinuxContainer;
 use netns_rs::NetNs;
@@ -25,6 +30,7 @@ use resource::{
     cpu_mem::initial_size::InitialSizeManager,
     network::{dan_config_path, generate_netns_name},
 };
+use slog::Logger;
 use shim_interface::shim_mgmt::ERR_NO_SHIM_SERVER;
 use tokio::fs;
 use tokio::sync::{mpsc::Sender, Mutex, RwLock};
@@ -42,6 +48,18 @@ use crate::{
     shim_mgmt::server::MgmtServer,
     tracer::{KataTracer, ROOTSPAN},
 };
+
+fn convert_string_to_slog_level(string_level: String) -> slog::Level {
+    match string_level.as_str() {
+        "trace" => slog::Level::Trace,
+        "debug" => slog::Level::Debug,
+        "info" => slog::Level::Info,
+        "warn" => slog::Level::Warning,
+        "error" => slog::Level::Error,
+        "critical" => slog::Level::Critical,
+        _ => slog::Level::Info,
+    }
+}
 
 struct RuntimeHandlerManagerInner {
     id: String,
@@ -148,6 +166,24 @@ impl RuntimeHandlerManagerInner {
         }
 
         let config = load_config(spec, options).context("load config")?;
+
+        // Retrieve the log-levels set in configuration file, modify the FILTER_RULE accordingly
+        let agent_level = config.agent.get("kata").unwrap().slog_level.clone();
+        let hypervisor_level = config
+            .hypervisor
+            .get("dragonball")
+            .unwrap()
+            .debug_info
+            .slog_level.clone();
+        let runtime_level = config.runtime.slog_level.clone();
+        FILTER_RULE.rcu(|inner| {
+            let mut updated_inner = HashMap::new();
+            updated_inner.clone_from(inner);
+            updated_inner.insert("runtimes".to_string(), convert_string_to_slog_level(runtime_level.clone()));
+            updated_inner.insert("agent".to_string(), convert_string_to_slog_level(agent_level.clone()));
+            updated_inner.insert("vmm-dragonball".to_string(), convert_string_to_slog_level(hypervisor_level.clone()));
+            updated_inner
+        });
 
         let dan_path = dan_config_path(&config, &self.id);
         let mut network_created = false;
@@ -469,7 +505,11 @@ fn load_config(spec: &oci::Spec, option: &Option<Vec<u8>>) -> Result<TomlConfig>
     } else {
         String::from("")
     };
-    info!(sl!(), "get config path {:?}", &config_path);
+
+    // Clone a logger from global logger to ensure the logs in this function get flushed when drop
+    let logger = slog_scope::logger().new(slog::o!("marker" => "temp"));
+
+    info!(logger, "get config path {:?}", &config_path);
     let (mut toml_config, _) =
         TomlConfig::load_from_file(&config_path).context("load toml config")?;
     annotation.update_config_by_annotation(&mut toml_config)?;
@@ -492,7 +532,7 @@ fn load_config(spec: &oci::Spec, option: &Option<Vec<u8>>) -> Result<TomlConfig>
         .setup_config(&mut toml_config)
         .context("failed to setup static resource mgmt config")?;
 
-    info!(sl!(), "get config content {:?}", &toml_config);
+    info!(logger, "get config content {:?}", &toml_config);
     Ok(toml_config)
 }
 

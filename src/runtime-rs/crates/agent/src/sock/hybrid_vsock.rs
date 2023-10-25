@@ -12,8 +12,13 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
 };
+use slog::Logger;
 
 use super::{ConnectConfig, Sock, Stream};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct HybridVsock {

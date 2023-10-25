@@ -17,8 +17,13 @@ use kata_types::config::Agent as AgentConfig;
 use protocols::{agent_ttrpc_async as agent_ttrpc, health_ttrpc_async as health_ttrpc};
 use tokio::sync::RwLock;
 use ttrpc::asynchronous::Client;
+use slog::Logger;
 
 use crate::{log_forwarder::LogForwarder, sock};
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 // https://github.com/firecracker-microvm/firecracker/blob/master/docs/vsock.md
 #[derive(Debug, Default)]

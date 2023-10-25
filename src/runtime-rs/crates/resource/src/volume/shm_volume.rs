@@ -7,9 +7,14 @@
 use std::path::Path;
 
 use anyhow::Result;
+use slog::Logger;
 use async_trait::async_trait;
 use hypervisor::device::device_manager::DeviceManager;
 use tokio::sync::RwLock;
+use logging::{
+    AGENT_LOGGER, RESOURCE_LOGGER, RUNTIMES_LOGGER, SERVICE_LOGGER, SHIM_LOGGER,
+    VIRT_CONTAINER_LOGGER, VMM_DRAGONBALL_LOGGER, VMM_LOGGER,
+};
 
 use super::Volume;
 use crate::share_fs::DEFAULT_KATA_GUEST_SANDBOX_DIR;

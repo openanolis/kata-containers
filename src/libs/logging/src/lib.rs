@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#[macro_use]
+extern crate lazy_static;
+use arc_swap::ArcSwap;
 use slog::{o, record_static, BorrowedKV, Drain, Key, OwnedKV, OwnedKVList, Record, KV};
 use std::collections::HashMap;
 use std::io;
 use std::io::Write;
 use std::process;
 use std::result;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 mod file_rotate;
 mod log_writer;
@@ -17,12 +20,55 @@ mod log_writer;
 pub use file_rotate::FileRotator;
 pub use log_writer::LogWriter;
 
+lazy_static! {
+    pub static ref FILTER_RULE: ArcSwap<HashMap<String, slog::Level>> =
+        ArcSwap::from(Arc::new(HashMap::from([
+            ("agent".to_string(), slog::Level::Info),
+            ("runtimes".to_string(), slog::Level::Info),
+            ("resource".to_string(), slog::Level::Info),
+            ("virt-container".to_string(), slog::Level::Info),
+            ("service".to_string(), slog::Level::Info),
+            ("shim".to_string(), slog::Level::Info),
+            ("hypervisor".to_string(), slog::Level::Info),
+            ("vmm-dragonball".to_string(), slog::Level::Info),
+        ])));
+
+    pub static ref AGENT_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref RESOURCE_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref RUNTIMES_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref VIRT_CONTAINER_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref SERVICE_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref SHIM_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    
+    pub static ref VMM_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+    pub static ref VMM_DRAGONBALL_LOGGER: ArcSwap<slog::Logger> =
+        ArcSwap::from(Arc::new(slog::Logger::root(slog::Discard, o!())));
+}
+
 #[macro_export]
 macro_rules! logger_with_subsystem {
     ($name: ident, $subsystem: expr) => {
         macro_rules! $name {
                             () => {
-                                    slog_scope::logger().new(slog::o!("subsystem" => $subsystem))
+                                match $subsystem {
+                                    "agent" => Logger::clone(&AGENT_LOGGER.load()),
+                                    "resource" => Logger::clone(&RESOURCE_LOGGER.load()),
+                                    "runtimes" => Logger::clone(&RUNTIMES_LOGGER.load()),
+                                    "virt-container" => Logger::clone(&VIRT_CONTAINER_LOGGER.load()),
+                                    "service" => Logger::clone(&SERVICE_LOGGER.load()),
+                                    "shim" => Logger::clone(&SHIM_LOGGER.load()),
+                                    "hypervisor" => Logger::clone(&VMM_LOGGER.load()),
+                                    "vmm-dragonball" => Logger::clone(&VMM_DRAGONBALL_LOGGER.load()),
+
+                                    _ => slog_scope::logger().new(slog::o!("subsystem" => $subsystem)),
+                                }
                             };
                         }
     };
@@ -47,7 +93,7 @@ pub fn create_term_logger(level: slog::Level) -> (slog::Logger, slog_async::Asyn
     let unique_drain = UniqueDrain::new(term_drain).fuse();
 
     // Allow runtime filtering of records by log level
-    let filter_drain = RuntimeLevelFilter::new(unique_drain, level).fuse();
+    let filter_drain = RuntimeComponentLevelFilter::new(unique_drain, level).fuse();
 
     // Ensure the logger is thread-safe
     let (async_drain, guard) = slog_async::Async::new(filter_drain)
@@ -79,8 +125,23 @@ where
     // Ensure only a unique set of key/value fields is logged
     let unique_drain = UniqueDrain::new(json_drain).fuse();
 
+    // Adjust the level which will be applied to the log-system
+    // Info is the default level, but if Debug flag is set, the overall log level will be changed to Debug here
+    if level == slog::Level::Debug {
+        FILTER_RULE.store(Arc::new(HashMap::from([
+            ("agent".to_string(), slog::Level::Debug),
+            ("runtimes".to_string(), slog::Level::Debug),
+            ("resource".to_string(), slog::Level::Debug),
+            ("virt-container".to_string(), slog::Level::Debug),
+            ("service".to_string(), slog::Level::Debug),
+            ("shim".to_string(), slog::Level::Debug),
+            ("hypervisor".to_string(), slog::Level::Debug),
+            ("vmm-dragonball".to_string(), slog::Level::Debug),
+        ])));
+    }
+
     // Allow runtime filtering of records by log level
-    let filter_drain = RuntimeLevelFilter::new(unique_drain, level).fuse();
+    let filter_drain = RuntimeComponentLevelFilter::new(unique_drain, level).fuse();
 
     // Ensure the logger is thread-safe
     let (async_drain, guard) = slog_async::Async::new(filter_drain)
@@ -216,23 +277,23 @@ where
     }
 }
 
-// A RuntimeLevelFilter will discard all log records whose log level is less than the level
-// specified in the struct.
-struct RuntimeLevelFilter<D> {
+// A RuntimeComponentLevelFilter will discard all log records whose log level is less than the level
+// specified in the struct according to the component it belongs to.
+struct RuntimeComponentLevelFilter<D> {
     drain: D,
-    level: Mutex<slog::Level>,
+    _level: Mutex<slog::Level>,
 }
 
-impl<D> RuntimeLevelFilter<D> {
+impl<D> RuntimeComponentLevelFilter<D> {
     fn new(drain: D, level: slog::Level) -> Self {
-        RuntimeLevelFilter {
+        RuntimeComponentLevelFilter {
             drain,
-            level: Mutex::new(level),
+            _level: Mutex::new(level),
         }
     }
 }
 
-impl<D> Drain for RuntimeLevelFilter<D>
+impl<D> Drain for RuntimeComponentLevelFilter<D>
 where
     D: Drain,
 {
@@ -244,9 +305,23 @@ where
         record: &slog::Record,
         values: &slog::OwnedKVList,
     ) -> result::Result<Self::Ok, Self::Err> {
-        let log_level = self.level.lock().unwrap();
+        let subsystem_level_config = FILTER_RULE.load();
 
-        if record.level().is_at_least(*log_level) {
+        let mut logger_serializer = HashSerializer::new();
+        values.serialize(record, &mut logger_serializer).unwrap();
+
+        let mut record_serializer = HashSerializer::new();
+        record.kv().serialize(record, &mut record_serializer).unwrap();
+
+        let mut subsystem = None;
+        for (k, v) in record_serializer.fields.iter().chain(logger_serializer.fields.iter()) {
+            if k == "subsystem" {
+                subsystem = Some(v.to_string());
+                break;
+            }
+        }
+        let according_level = subsystem_level_config.get(&subsystem.unwrap()).unwrap_or(&slog::Level::Info);
+        if record.level().is_at_least(*according_level) {
             self.drain.log(record, values)?;
         }
 
