@@ -126,6 +126,10 @@ pub struct Runtime {
     #[serde(default)]
     pub vfio_mode: String,
 
+    /// Whether to enable the sealed secret.
+    #[serde(default)]
+    pub sealed_secret_enabled: bool,
+
     /// Vendor customized runtime configuration.
     #[serde(default, flatten)]
     pub vendor: RuntimeVendor,

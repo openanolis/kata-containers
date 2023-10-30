@@ -7,13 +7,14 @@
 mod block_volume;
 mod default_volume;
 pub mod hugepage;
+mod sealed_secret_volume;
 mod secure_volume;
 mod share_fs_volume;
 mod shm_volume;
 use async_trait::async_trait;
 
 use anyhow::{anyhow, Context, Result};
-use kata_types::mount;
+use kata_types::{config::TomlConfig, mount};
 use std::{sync::Arc, vec::Vec};
 use tokio::sync::RwLock;
 
@@ -46,6 +47,7 @@ impl VolumeResource {
 
     pub async fn handler_volumes(
         &self,
+        toml_config: &Arc<TomlConfig>,
         share_fs: &Option<Arc<dyn ShareFs>>,
         cid: &str,
         spec: &oci::Spec,
@@ -70,6 +72,11 @@ impl VolumeResource {
                     } else {
                         return Err(anyhow!("Unsupported direct volume {:?}", mount_info));
                     }
+                } else if sealed_secret_volume::is_sealed_secret_volume(toml_config, m) {
+                    Arc::new(
+                        sealed_secret_volume::SealedSecretVolume::new(m)
+                        .with_context(||format!("new sealed secret volume {:?}", m))?
+                    )
                 } else if shm_volume::is_shim_volume(m) {
                     let shm_size = shm_volume::DEFAULT_SHM_SIZE;
                     Arc::new(
