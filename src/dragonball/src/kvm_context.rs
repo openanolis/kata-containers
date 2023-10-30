@@ -411,6 +411,15 @@ impl KvmContext {
                     _ => {}
                 }
             }
+            if entry.function == 0x4 {
+                match entry.index {
+                    0 => entry.eax &= 0x03ffffff,
+                    1 => entry.eax &= 0x03ffffff,
+                    2 => entry.eax &= 0x03ffffff,
+                    3 => entry.eax &= 0x03ffffff,
+                    _ => {}
+                }
+            }
         }
         Ok(())
     }
