@@ -23,7 +23,7 @@ use kvm_ioctls::{Cap, Kvm, VmFd};
 use vmm_sys_util::errno;
 
 use crate::error::{Error as VmError, Result};
-use slog::{error, info};
+use log::{debug, info};
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required
@@ -178,19 +178,16 @@ mod x86_64 {
 
             for entry in cpuid.as_mut_slice().iter_mut() {
                 if entry.function == 0x7 && entry.index == 0x0 {
-                    debug!("AMX DEBUG: cpuid 7_0_edx: 0x:{:X}", entry.edx);
-                    debug!("AMX DEBUG: cpuid 7_0_edx_22, AMX tile computational operations");
-                    debug!("AMX DEBUG: cpuid 7_0_edx_24, AMX tile support");
-                    debug!(
-                        "AMX DEBUG: cpuid 7_0_edx_25, AMX tile computational operations on
-        8-bit integers"
-                    );
                     if 0 == (entry.edx & CPUID_7_0_EDX_AMX_TILE) {
-                        info!("AMX DEBUG: check cpuid 7_0_edx failed with AMX_TILE(bit24)");
-                        info!("AMX DEBUG: force set cpuid 7_0_edx set 24 bit = 1 ");
+                        debug!(
+                            "AMX DEBUG: check cpuid 7_0_edx failed with AMX_TILE(bit24)"
+                        );
+                        debug!(
+                            "AMX DEBUG: force set cpuid 7_0_edx set 24 bit = 1 "
+                        );
                         entry.edx |= CPUID_7_0_EDX_AMX_TILE;
                     } else {
-                        info!("AMX DEBUG: cpuid 7_0_edx 24 bit already 1 ");
+                        debug!("AMX DEBUG: cpuid 7_0_edx 24 bit already 1 ");
                     }
                 }
             }
@@ -239,7 +236,9 @@ mod x86_64 {
                     entry.edx = 0 as u32;
                 }
             }
+            Ok(())
         }
+
         /// Get information about supported MSRs of x86 processor.
         pub fn supported_msrs(
             &self,
@@ -357,6 +356,7 @@ impl KvmContext {
         max_entries_count: usize,
     ) -> std::result::Result<CpuId, kvm_ioctls::Error> {
         let mut cpuid = self.kvm.get_supported_cpuid(max_entries_count)?;
+        self.enable_amx_support(&mut cpuid)?;
         self.tdx_caps_fix_cpuid(&mut cpuid)?;
         self.tdx_pv_fix_cpuid(&mut cpuid)?;
         Ok(cpuid)
@@ -386,7 +386,9 @@ impl KvmContext {
         cpuid: &mut CpuId,
     ) -> std::result::Result<(), kvm_ioctls::Error> {
         // Magic number for XCR0 mask
-        const XCR0_MASK: u64 = 0x82ff;
+        //const XCR0_MASK: u64 = 0x82ff;
+        debug!("Magic number for XCR0 mask: 0x682ff;");
+        const XCR0_MASK: u64 = 0x682ff;
         const XSS_MASK: u64 = !XCR0_MASK;
         let tdx_caps =
             tdx_get_caps(&self.kvm.as_raw_fd()).map_err(|_| errno::Error::new(libc::ENOMEM))?;
