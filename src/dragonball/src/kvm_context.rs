@@ -23,6 +23,7 @@ use kvm_ioctls::{Cap, Kvm, VmFd};
 use vmm_sys_util::errno;
 
 use crate::error::{Error as VmError, Result};
+use slog::{error, info};
 
 /// Describes a KVM context that gets attached to the micro VM instance.
 /// It gives access to the functionality of the KVM wrapper as long as every required
@@ -122,13 +123,123 @@ mod x86_64 {
             max_entries_count: usize,
             #[cfg(feature = "tdx")] is_tdx_enabled: bool,
         ) -> std::result::Result<CpuId, kvm_ioctls::Error> {
+            info!("try to enable amx!");
+            {
+                const ARCH_GET_XCOMP_GUEST_PERM: usize = 0x1024;
+                const ARCH_REQ_XCOMP_GUEST_PERM: usize = 0x1025;
+                const XFEATURE_XTILEDATA: usize = 18;
+                const XFEATURE_XTILEDATA_MASK: usize = 1 << XFEATURE_XTILEDATA;
+
+                // SAFETY: the syscall is only modifying kernel internal
+                // data structures that the kernel is itself expected to safeguard.
+                let amx_tile = unsafe {
+                    libc::syscall(
+                        libc::SYS_arch_prctl,
+                        ARCH_REQ_XCOMP_GUEST_PERM,
+                        XFEATURE_XTILEDATA,
+                    )
+                };
+
+                if amx_tile != 0 {
+                    info!("panic1");
+                    panic!();
+                } else {
+                    let mask: usize = 0;
+                    // SAFETY: the mask being modified (not marked mutable as it is
+                    // modified in unsafe only which is permitted) isn't in use elsewhere.
+                    let result = unsafe {
+                        libc::syscall(libc::SYS_arch_prctl, ARCH_GET_XCOMP_GUEST_PERM, &mask)
+                    };
+                    if result != 0 || (mask & XFEATURE_XTILEDATA_MASK) != XFEATURE_XTILEDATA_MASK {
+                        info!("panic2");
+                        panic!();
+                        //return Err(Error::AmxEnable(anyhow!("Guest AMX usage not supported")));
+                    }
+                }
+            }
+            info!("amx enabled");
+
             #[cfg(feature = "tdx")]
             if is_tdx_enabled {
                 return self.tdx_supported_cpuid(max_entries_count);
             }
-            self.kvm.get_supported_cpuid(max_entries_count)
+            //self.kvm.get_supported_cpuid(max_entries_count)}
+            let mut cpuid = self.kvm.get_supported_cpuid(max_entries_count)?;
+            self.enable_amx_support(&mut cpuid)?;
+            Ok(cpuid)
         }
 
+        /// Set AMX CpuId bits
+        pub fn enable_amx_support(
+            &self,
+            cpuid: &mut CpuId,
+        ) -> std::result::Result<(), kvm_ioctls::Error> {
+            const CPUID_7_0_EDX_AMX_TILE: u32 = 0x1 << 24;
+
+            for entry in cpuid.as_mut_slice().iter_mut() {
+                if entry.function == 0x7 && entry.index == 0x0 {
+                    debug!("AMX DEBUG: cpuid 7_0_edx: 0x:{:X}", entry.edx);
+                    debug!("AMX DEBUG: cpuid 7_0_edx_22, AMX tile computational operations");
+                    debug!("AMX DEBUG: cpuid 7_0_edx_24, AMX tile support");
+                    debug!(
+                        "AMX DEBUG: cpuid 7_0_edx_25, AMX tile computational operations on
+        8-bit integers"
+                    );
+                    if 0 == (entry.edx & CPUID_7_0_EDX_AMX_TILE) {
+                        info!("AMX DEBUG: check cpuid 7_0_edx failed with AMX_TILE(bit24)");
+                        info!("AMX DEBUG: force set cpuid 7_0_edx set 24 bit = 1 ");
+                        entry.edx |= CPUID_7_0_EDX_AMX_TILE;
+                    } else {
+                        info!("AMX DEBUG: cpuid 7_0_edx 24 bit already 1 ");
+                    }
+                }
+            }
+
+            // CPUID Leaf 0x1D constants
+            const INTEL_AMX_TILE_MAX_SUBLEAF: u32 = 0x1;
+            const INTEL_AMX_TOTAL_TILE_BYTES: u32 = 0x2000;
+            const INTEL_AMX_BYTES_PER_TILE: u32 = 0x400;
+            const INTEL_AMX_BYTES_PER_ROW: u32 = 0x40;
+            const INTEL_AMX_TILE_MAX_NAMES: u32 = 0x8;
+            const INTEL_AMX_TILE_MAX_ROWS: u32 = 0x10;
+            //CPUID Leaf 0x1E constants
+            const INTEL_AMX_TMUL_MAX_K: u32 = 0x10;
+            const INTEL_AMX_TMUL_MAX_N: u32 = 0x40;
+
+            for entry in cpuid.as_mut_slice().iter_mut() {
+                /* AMX TILE */
+                if entry.function == 0x1d {
+                    match entry.index {
+                        0 => {
+                            entry.eax = INTEL_AMX_TILE_MAX_SUBLEAF as u32;
+                            entry.ebx = 0 as u32;
+                            entry.ecx = 0 as u32;
+                            entry.edx = 0 as u32;
+                        }
+                        1 => {
+                            entry.eax = INTEL_AMX_TOTAL_TILE_BYTES
+                                | (INTEL_AMX_BYTES_PER_TILE << 16) as u32;
+                            entry.ebx =
+                                INTEL_AMX_BYTES_PER_ROW | (INTEL_AMX_TILE_MAX_NAMES << 16) as u32;
+                            entry.ecx = INTEL_AMX_TILE_MAX_ROWS as u32;
+                            entry.edx = 0 as u32;
+                        }
+                        _ => {
+                            entry.eax = 0 as u32;
+                            entry.ebx = 0 as u32;
+                            entry.ecx = 0 as u32;
+                            entry.edx = 0 as u32;
+                        }
+                    };
+                }
+                if entry.function == 0x1e {
+                    entry.eax = 0 as u32;
+                    entry.ebx = 0 as u32;
+                    entry.ecx = 0 as u32;
+                    entry.edx = 0 as u32;
+                }
+            }
+        }
         /// Get information about supported MSRs of x86 processor.
         pub fn supported_msrs(
             &self,
