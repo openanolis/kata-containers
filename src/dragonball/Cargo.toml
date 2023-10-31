@@ -13,20 +13,18 @@ edition = "2018"
 arc-swap = "1.5.0"
 bytes = "1.1.0"
 cfg-if = "1.0"
-dbs-address-space = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-allocator = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-acpi = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-# dbs-acpi = { path = "/home/fuu/23Q2/studychao-dbs/crates/dbs-acpi" }
-dbs-arch = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-boot = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-device = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-# dbs-tdx = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-tdx = { path = "/home/fuu/23Q2/studychao-dbs/crates/dbs-tdx" }
-dbs-interrupt = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch", features = ["kvm-irq"] }
-dbs-legacy-devices = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-upcall = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-utils = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
-dbs-virtio-devices = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch", optional = true, features = ["virtio-mmio"] }
+dbs-address-space = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-allocator = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-acpi = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-arch = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-boot = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-device = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-tdx = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-interrupt = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball", features = ["kvm-irq"] }
+dbs-legacy-devices = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-upcall = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-utils = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
+dbs-virtio-devices = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball", optional = true, features = ["virtio-mmio"] }
 kvm-bindings = "0.6.0"
 kvm-ioctls = "0.12.0"
 lazy_static = "1.2"
@@ -68,4 +66,4 @@ userspace-ioapic = ["dbs-interrupt/kvm-userspace-ioapic"]
 dbs-upcall = []
 
 [patch.crates-io]
-sev = { path = "/home/fuu/23Q2/fuu-sev" }
+sev = { git = "https://github.com/NK-fengsf/sev.git", branch = "sev_support_for_dragonball" }

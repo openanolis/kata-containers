@@ -10,7 +10,7 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "^1.0"
 async-trait = "0.1.48"
-dbs-utils = { git = "https://github.com/studychao/dragonball-sandbox.git", branch = "chao/tdx_test_branch" }
+dbs-utils = { git = "https://github.com/NK-fengsf/dragonball-sandbox.git", branch = "sev_support_for_dragonball" }
 go-flag = "0.1.0"
 libc = ">=0.2.39"
 nix = "0.24.2"
@@ -30,7 +30,7 @@ kata-types = { path = "../../../libs/kata-types" }
 logging = { path = "../../../libs/logging" }
 shim-interface = { path = "../../../libs/shim-interface" }
 
-dragonball = { path = "../../../dragonball", features = ["atomic-guest-memory", "virtio-vsock", "hotplug", "virtio-blk", "virtio-net", "virtio-fs", "dbs-upcall", "tdx", "acpi", "userspace-ioapic"] }
+dragonball = { path = "../../../dragonball", features = ["atomic-guest-memory", "virtio-vsock", "hotplug", "virtio-blk", "virtio-net", "virtio-fs", "dbs-upcall", "sev", "acpi"] }
 
 [features]
 default = ["userspace-ioapic"]
