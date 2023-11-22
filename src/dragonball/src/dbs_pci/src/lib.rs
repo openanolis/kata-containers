@@ -38,12 +38,24 @@ pub use self::configuration::{
 mod device;
 pub use self::device::PciDevice;
 
+mod root_bus;
+pub use self::root_bus::create_pci_root_bus;
+
+mod root_device;
+pub use self::root_device::PciRootDevice;
+
 /// Error codes related to PCI root/bus/device operations.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Failed to activate the PCI root/bus/device.
+    #[error("failed to activate PCI device, {0:?}")]
+    ActivateFailure(#[source] dbs_device::device_manager::Error),
     /// Invalid resource assigned/allocated.
     #[error("invalid resource {0:?}")]
     InvalidResource(dbs_device::resources::Resource),
+    /// Invalid bus id
+    #[error("bus id {0} invalid")]
+    InvalidBusId(u8),
     /// Errors from IoManager
     /// No resources available.
     #[error("No resources available")]
