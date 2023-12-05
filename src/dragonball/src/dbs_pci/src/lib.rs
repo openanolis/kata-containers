@@ -29,6 +29,8 @@ use dbs_interrupt::KvmIrqManager;
 mod bus;
 mod configuration;
 mod device;
+mod msi;
+mod msix;
 
 pub use self::bus::PciBus;
 pub use self::configuration::{
