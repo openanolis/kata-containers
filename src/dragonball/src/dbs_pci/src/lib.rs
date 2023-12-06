@@ -31,6 +31,7 @@ mod configuration;
 mod device;
 mod msi;
 mod msix;
+mod vfio;
 
 pub use self::bus::PciBus;
 pub use self::configuration::{
