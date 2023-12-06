@@ -27,12 +27,9 @@ use dbs_device::device_manager::IoManagerContext;
 use dbs_interrupt::KvmIrqManager;
 
 mod bus;
-mod configuration;
-mod device;
-mod msi;
-mod msix;
-
 pub use self::bus::PciBus;
+
+mod configuration;
 pub use self::configuration::{
     BarProgrammingParams, PciBarConfiguration, PciBarPrefetchable, PciBarRegionType,
     PciBridgeSubclass, PciCapability, PciCapabilityID, PciClassCode, PciConfiguration,
@@ -40,7 +37,23 @@ pub use self::configuration::{
     PciNetworkControllerSubclass, PciProgrammingInterface, PciSerialBusSubClass, PciSubclass,
     NUM_BAR_REGS, NUM_CONFIGURATION_REGISTERS,
 };
+
+mod device;
 pub use self::device::PciDevice;
+#[cfg(target_arch = "aarch64")]
+pub use self::device::{PciBusResources, ECAM_SPACE_LENGTH};
+
+mod msi;
+pub use self::msi::{MsiCap, MsiState};
+
+mod msix;
+pub use self::msix::{
+    MsixCap, MsixState, MsixTableEntry, FUNCTION_MASK_MASK, MSIX_ENABLE_MASK,
+    MSIX_TABLE_ENTRIES_MODULO, MSIX_TABLE_ENTRY_SIZE,
+};
+
+mod vfio;
+pub use self::vfio::{PciRegionMmap, VfioPciDevice, VfioPciError, VENDOR_NVIDIA};
 
 mod root_bus;
 pub use self::root_bus::create_pci_root_bus;
