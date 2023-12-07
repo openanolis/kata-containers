@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-use std::any::Any;
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::ptr::null_mut;

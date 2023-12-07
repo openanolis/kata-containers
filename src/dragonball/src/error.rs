@@ -14,6 +14,8 @@ use dbs_arch::pmu::PmuError;
 #[cfg(feature = "dbs-virtio-devices")]
 use dbs_virtio_devices::Error as VirtioError;
 
+#[cfg(feature = "host-device")]
+use crate::device_manager::vfio_dev_mgr::VfioDeviceError;
 use crate::{address_space_manager, device_manager, resource_manager, vcpu, vm};
 
 /// Shorthand result type for internal VMM commands.
@@ -198,6 +200,15 @@ pub enum StartMicroVmError {
     #[cfg(feature = "vhost-net")]
     #[error("vhost-net errors: {0:?}")]
     VhostNetDeviceError(#[source] device_manager::vhost_net_dev_mgr::VhostNetDeviceError),
+
+    #[cfg(feature = "host-device")]
+    /// Failed to create VFIO device
+    #[error("cannot create VFIO device")]
+    CreateVfioDevice(#[source] VfioDeviceError),
+    #[cfg(feature = "host-device")]
+    /// Failed to register DMA memory address range.
+    #[error("failure while registering DMA address range: {0}")]
+    RegisterDMAAddress(#[source] VfioDeviceError),
 }
 
 /// Errors associated with starting the instance.
