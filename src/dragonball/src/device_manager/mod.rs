@@ -107,6 +107,11 @@ use self::balloon_dev_mgr::BalloonDeviceMgr;
 pub mod vhost_net_dev_mgr;
 #[cfg(feature = "vhost-net")]
 use self::vhost_net_dev_mgr::VhostNetDeviceMgr;
+#[cfg(feature = "host-device")]
+/// Device manager for PCI/MMIO VFIO devices.
+pub mod vfio_dev_mgr;
+#[cfg(feature = "host-device")]
+use self::vfio_dev_mgr::VfioDeviceMgr;
 
 macro_rules! info(
     ($l:expr, $($args:tt)+) => {
@@ -267,6 +272,8 @@ pub struct DeviceOpContext {
     upcall_client: Option<Arc<UpcallClient<DevMgrService>>>,
     #[cfg(feature = "dbs-virtio-devices")]
     virtio_devices: Vec<Arc<DbsMmioV2Device>>,
+    #[cfg(feature = "host-device")]
+    vfio_manager: Option<Arc<Mutex<VfioDeviceMgr>>>,
     vm_config: Option<VmConfigInfo>,
     shared_info: Arc<RwLock<InstanceInfo>>,
 }
@@ -307,6 +314,8 @@ impl DeviceOpContext {
             virtio_devices: Vec::new(),
             vm_config,
             shared_info,
+            #[cfg(feature = "host-device")]
+            vfio_manager: None,
         }
     }
 
@@ -429,6 +438,13 @@ impl DeviceOpContext {
     }
 }
 
+#[cfg(feature = "host-device")]
+impl DeviceOpContext {
+    pub(crate) fn set_vfio_manager(&mut self, vfio_device_mgr: Arc<Mutex<VfioDeviceMgr>>) {
+        self.vfio_manager = Some(vfio_device_mgr);
+    }
+}
+
 #[cfg(all(feature = "hotplug", feature = "dbs-upcall"))]
 impl DeviceOpContext {
     pub(crate) fn create_hotplug_ctx(vm: &Vm, epoll_mgr: Option<EpollManager>) -> Self {
@@ -546,6 +562,9 @@ pub struct DeviceManager {
 
     #[cfg(feature = "vhost-net")]
     vhost_net_manager: VhostNetDeviceMgr,
+
+    #[cfg(feature = "host-device")]
+    pub(crate) vfio_manager: Arc<Mutex<VfioDeviceMgr>>,
 }
 
 impl DeviceManager {
@@ -562,7 +581,7 @@ impl DeviceManager {
             io_lock: Arc::new(Mutex::new(())),
             irq_manager: Arc::new(KvmIrqManager::new(vm_fd.clone())),
             res_manager,
-            vm_fd,
+            vm_fd: vm_fd.clone(),
             logger: logger.new(slog::o!()),
             shared_info,
 
@@ -584,6 +603,8 @@ impl DeviceManager {
             balloon_manager: BalloonDeviceMgr::default(),
             #[cfg(feature = "vhost-net")]
             vhost_net_manager: VhostNetDeviceMgr::default(),
+            #[cfg(feature = "host-device")]
+            vfio_manager: Arc::new(Mutex::new(VfioDeviceMgr::new(vm_fd, logger))),
         }
     }
 
@@ -759,6 +780,13 @@ impl DeviceManager {
             .attach_devices(&mut ctx)
             .map_err(StartMicroVmError::VhostNetDeviceError)?;
 
+        #[cfg(feature = "host-device")]
+        {
+            let mut vfio_manager = self.vfio_manager.lock().unwrap();
+            vfio_manager.attach_devices(&mut ctx)?;
+            ctx.set_vfio_manager(self.vfio_manager.clone())
+        }
+
         // Ensure that all devices are attached before kernel boot args are
         // generated.
         ctx.generate_kernel_boot_args(kernel_config)
@@ -776,8 +804,16 @@ impl DeviceManager {
     }
 
     /// Start all registered devices when booting the associated virtual machine.
-    pub fn start_devices(&mut self) -> std::result::Result<(), StartMicroVmError> {
-        // TODO: add vfio support here. issue #4589.
+    pub fn start_devices(
+        &mut self,
+        vm_as: &GuestAddressSpaceImpl,
+    ) -> std::result::Result<(), StartMicroVmError> {
+        #[cfg(feature = "host-device")]
+        self.vfio_manager
+            .lock()
+            .unwrap()
+            .start_devices(vm_as)
+            .map_err(StartMicroVmError::RegisterDMAAddress)?;
         Ok(())
     }
 
@@ -1168,6 +1204,8 @@ mod tests {
                 mmio_device_info: HashMap::new(),
                 #[cfg(feature = "vhost-net")]
                 vhost_net_manager: VhostNetDeviceMgr::default(),
+                #[cfg(feature = "host-device")]
+                vfio_manager: Arc::new(Mutex::new(VfioDeviceMgr::new(vm_fd, &logger))),
 
                 logger,
                 shared_info,
