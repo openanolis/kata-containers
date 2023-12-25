@@ -801,7 +801,7 @@ impl Region {
         device: Arc<dyn DeviceIo>,
     ) -> Result<()> {
         if !self.mapped || self.is_sparse_mmap || self.msix_table.is_some() {
-            let resources = self.to_resources();
+            let resources = self.to_trapped_resources();
             ctx.register_device_io(tx, device, &resources)
                 .map_err(VfioPciError::DeviceManager)?;
             self.mapped = true;
@@ -812,7 +812,7 @@ impl Region {
 
     fn untrap<D: IoManagerContext>(&mut self, ctx: &D, tx: &mut D::Context) -> Result<()> {
         if self.mapped {
-            let resources = self.to_resources();
+            let resources = self.to_trapped_resources();
             ctx.unregister_device_io(tx, &resources)
                 .map_err(VfioPciError::DeviceManager)?;
             self.mapped = false;
@@ -846,7 +846,17 @@ impl Region {
         Ok(())
     }
 
-    fn to_resources(&self) -> DeviceResources {
+    fn to_trapped_resources(&self) -> DeviceResources {
+        // we only need trapped resources
+        self.to_resources(true)
+    }
+
+    fn to_register_resources(&self) -> DeviceResources {
+        // we need all resources so do not filter
+        self.to_resources(false)
+    }
+
+    fn to_resources(&self, filter_trapped: bool) -> DeviceResources {
         let mut resources = DeviceResources::new();
 
         if self.is_mmio_bar {
@@ -874,7 +884,7 @@ impl Region {
     }
 }
 
-struct VfioPciDeviceState<C: PciSystemContext> {
+pub struct VfioPciDeviceState<C: PciSystemContext> {
     vfio_path: String,
     interrupt: Interrupt,
     vfio_dev: Arc<VfioDevice>,
@@ -937,6 +947,10 @@ impl<C: PciSystemContext> VfioPciDeviceState<C> {
             bus,
             vfio_container,
         })
+    }
+
+    pub fn vfio_dev(&self) -> &Arc<VfioDevice> {
+        &self.vfio_dev
     }
 
     fn read_config_byte(&self, offset: u32) -> u8 {
@@ -1295,7 +1309,7 @@ impl<C: PciSystemContext> VfioPciDeviceState<C> {
                     }
                     return Err(e);
                 }
-                for res in region.to_resources().iter() {
+                for res in region.to_trapped_resources().iter() {
                     self.trapped_resources.append(res.clone())
                 }
             }
@@ -1304,6 +1318,21 @@ impl<C: PciSystemContext> VfioPciDeviceState<C> {
         ctx.commit_tx(tx);
 
         Ok(())
+    }
+
+    fn free_register_resources(&self) {
+        let mut register_resources = DeviceResources::new();
+        for region in self.regions.iter() {
+            let resources = region.to_register_resources();
+            for res in resources.get_all_resources() {
+                register_resources.append(res.clone());
+            }
+        }
+
+        self.bus
+            .upgrade()
+            .unwrap()
+            .free_resources(register_resources);
     }
 
     fn unregister_regions(&mut self, vm: &Arc<VmFd>) -> Result<()> {
@@ -1653,7 +1682,7 @@ impl<C: PciSystemContext> VfioPciDevice<C> {
         Ok(())
     }
 
-    fn state(&self) -> MutexGuard<VfioPciDeviceState<C>> {
+    pub fn state(&self) -> MutexGuard<VfioPciDeviceState<C>> {
         // Don't expect poisoned lock
         self.state
             .lock()
@@ -1678,6 +1707,14 @@ impl<C: PciSystemContext> VfioPciDevice<C> {
             .lock()
             .expect("poisoned lock for VFIO PCI device")
             .read_config_word(PCI_CONFIG_VENDOR_OFFSET)
+    }
+
+    pub fn clear_device(&self) -> Result<()> {
+        let mut state = self.state();
+        state.free_register_resources();
+        let _ = state.unregister_regions(&self.vm_fd);
+
+        Ok(())
     }
 }
 
@@ -1775,9 +1812,6 @@ impl<C: 'static + PciSystemContext> DeviceIo for VfioPciDevice<C> {
 
     fn get_trapped_io_resources(&self) -> DeviceResources {
         self.state().trapped_resources.clone()
-    }
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
 

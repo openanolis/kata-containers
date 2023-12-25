@@ -73,11 +73,7 @@ impl PciDevice for PciHostBridge {
     }
 }
 
-impl DeviceIo for PciHostBridge {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
+impl DeviceIo for PciHostBridge {}
 
 /// Create the PCI root bus with the given bus ID.
 pub fn create_pci_root_bus(bus_id: u8) -> Result<Arc<PciBus>> {

@@ -12,3 +12,4 @@ readme = "README.md"
 
 [dependencies]
 thiserror = "1"
+downcast-rs = "1"

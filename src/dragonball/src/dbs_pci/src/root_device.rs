@@ -334,10 +334,6 @@ impl DeviceIo for PciRootDevice {
     fn get_assigned_resources(&self) -> DeviceResources {
         self.resources.clone()
     }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

@@ -17,6 +17,8 @@ use std::cmp::{Ord, PartialOrd};
 use std::convert::TryFrom;
 use std::sync::Mutex;
 
+use downcast_rs::{impl_downcast, Downcast};
+
 use self::resources::DeviceResources;
 
 pub mod device_manager;
@@ -180,7 +182,7 @@ impl From<PioAddress> for IoAddress {
 /// multiple threads handling. For device backend drivers not focusing on high performance,
 /// the Mutex<T: DeviceIoMut> adapter may be used to simplify the implementation.
 #[allow(unused_variables)]
-pub trait DeviceIo: Send + Sync {
+pub trait DeviceIo: Send + Sync + Downcast {
     /// Read from the MMIO address `base + offset` into `data`.
     fn read(&self, base: IoAddress, offset: IoAddress, data: &mut [u8]) {}
 
@@ -205,10 +207,9 @@ pub trait DeviceIo: Send + Sync {
     fn get_trapped_io_resources(&self) -> DeviceResources {
         self.get_assigned_resources()
     }
-
-    /// Used to downcast to the specific type.
-    fn as_any(&self) -> &dyn Any;
 }
+
+impl_downcast!(DeviceIo);
 
 /// Trait for device to handle trapped MMIO/PIO access requests.
 ///
@@ -274,10 +275,6 @@ impl<T: DeviceIoMut + Send + 'static> DeviceIo for Mutex<T> {
     fn get_trapped_io_resources(&self) -> DeviceResources {
         // Safe to unwrap() because we don't expect poisoned lock here.
         self.lock().unwrap().get_trapped_io_resources()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
